@@ -1,0 +1,27 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch API - Debug",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "outputCapture": "std",
+      "autoAttachChildProcesses": true,
+      "runtimeArgs": [
+        "run-script",
+        "dev:debug"
+      ],
+      "skipFiles": [
+        "<node_internals>/**",
+        "${workspaceFolder}/node_modules/**/*.js"
+      ],
+      "sourceMaps": true,
+      "restart": true, 
+      "timeout": 10000,
+      "env": {
+        "NODE_ENV": "development"
+      }
+    }
+  ]
+}
