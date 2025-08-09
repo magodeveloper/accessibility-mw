@@ -1,34 +1,57 @@
 import { chromium, Browser, Page } from 'playwright';
 
+type WithPageOptions = {
+  overallTimeoutMs?: number;   // tiempo total duro (cierra browser si vence)
+  navTimeoutMs?: number;       // timeout de navegación (Playwright)
+  idleWaitMs?: number;         // espera adicional de networkidle
+};
+
 export async function withPage<T>(
   inputType: 'html' | 'url',
   value: string,
-  fn: (page: Page) => Promise<T>
+  fn: (page: Page) => Promise<T>,
+  opts?: WithPageOptions
 ): Promise<T> {
   const headless = (process.env.PLAYWRIGHT_HEADLESS ?? 'true') !== 'false';
-  const browser: Browser = await chromium.launch({ headless });
+  const overallTimeoutMs = opts?.overallTimeoutMs ?? Number(process.env.ANALYZE_TIMEOUT_MS ?? 60000);
+  const navTimeoutMs = opts?.navTimeoutMs ?? Number(process.env.NAVIGATION_TIMEOUT_MS ?? 30000);
+  const idleWaitMs = opts?.idleWaitMs ?? Number(process.env.IDLE_WAIT_MS ?? 3000);
 
+  const browser: Browser = await chromium.launch({
+    headless,
+    args: (process.env.IN_CONTAINER === 'true') ? ['--no-sandbox', '--disable-dev-shm-usage'] : []
+  });
   const context = await browser.newContext({
     javaScriptEnabled: true,
     ignoreHTTPSErrors: true
   });
-
   const page = await context.newPage();
-  page.setDefaultNavigationTimeout(parseInt(process.env.REQUEST_TIMEOUT_MS ?? '20000', 10));
+  page.setDefaultNavigationTimeout(navTimeoutMs);
+
+  // Timer duro: si vence, cerramos y rechazamos
+  let timeoutHit = false;
+  const timer = setTimeout(async () => {
+    timeoutHit = true;
+    try { await context.close(); } catch {}
+    try { await browser.close(); } catch {}
+  }, overallTimeoutMs);
 
   try {
     if (inputType === 'url') {
-      // Navega a la URL
       await page.goto(value, { waitUntil: 'load' });
-      // Mejor para SPAs:
-      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+      // pequeña espera adicional para SPAs (no bloqueante si falla)
+      await page.waitForLoadState('networkidle', { timeout: idleWaitMs }).catch(() => {});
     } else {
-      // Carga HTML raw
       await page.setContent(value, { waitUntil: 'load' });
     }
-    return await fn(page);
+    const result = await fn(page);
+    if (timeoutHit) throw new Error(`Analyze aborted after ${overallTimeoutMs}ms`);
+    return result;
   } finally {
-    await context.close();
-    await browser.close();
+    clearTimeout(timer);
+    if (!timeoutHit) {
+      try { await context.close(); } catch {}
+      try { await browser.close(); } catch {}
+    }
   }
 }

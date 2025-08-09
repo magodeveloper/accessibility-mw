@@ -1,16 +1,12 @@
 import { Router } from 'express';
-import { AnalyzeRequestSchema } from '../schemas/analyze.schema';
+import { abortAfter } from '../utils/timing';
 import { withPage } from '../services/render.service';
 import { runAxeOnPage } from '../services/axe.service';
+import { validatePublicHttpUrl } from '../utils/security';
 import { runEqualAccess } from '../services/equalAccess.service';
+import { AnalyzeRequestSchema } from '../schemas/analyze.schema';
 import { mapAxeToUnified, mapEqualAccessToUnified, buildUnifiedResponse } from '../mappers/unifyResults';
 
-/**
- * @openapi
- * tags:
- *   - name: Analyze
- *     description: Analizar accesibilidad (HTML o URL) con axe-core y Equal Access
- */
 export const analyzeRouter = Router();
 
 /**
@@ -24,8 +20,7 @@ export const analyzeRouter = Router();
  *       content:
  *         application/json:
  *           schema:
- *             oneOf:
- *               - $ref: '#/components/schemas/AnalyzeRequest'
+ *             $ref: '#/components/schemas/AnalyzeRequest'
  *           examples:
  *             html-axe:
  *               value:
@@ -44,41 +39,112 @@ export const analyzeRouter = Router();
  *     responses:
  *       200:
  *         description: Resultado unificado
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/UnifiedResponse'
+ *       400:
+ *         description: Error de validación
+ *       500:
+ *         description: Error interno
  */
 analyzeRouter.post('/', async (req, res) => {
+
+  const requestId = (req as any).id;
+
+  const ANALYZE_TIMEOUT_MS = Number(process.env.ANALYZE_TIMEOUT_MS ?? 60000);
+  const NAVIGATION_TIMEOUT_MS = Number(process.env.NAVIGATION_TIMEOUT_MS ?? 30000);
+  // margen extra para el wrapper externo (evita doble disparo simultáneo)
+  const WRAP_MARGIN_MS = 500;
+
+  // 1) Validación rápida de payload
   const parse = AnalyzeRequestSchema.safeParse(req.body);
   if (!parse.success) {
-    return res.status(400).json({ ok: false, error: parse.error.format() });
+    const flat = parse.error.flatten();
+    const fieldMsgs = Object.values(flat.fieldErrors).flat().filter(Boolean);
+    const message = [...flat.formErrors, ...fieldMsgs].join(', ') || 'Datos inválidos';
+
+    req.log?.warn({ requestId, message, details: flat }, 'Analyze blocked by schema');
+    return res.status(400).json({
+      ok: false,
+      error: message,
+      // En prod podrías ocultar details para no filtrar estructura interna
+      details: process.env.NODE_ENV === 'production' ? undefined : flat,
+      requestId
+    });
   }
+
   const { inputType, value, tool, wcagVersion, wcagLevel } = parse.data;
 
   try {
-    const parts = [];
+    // 2) Validación fuerte de URL (SSRF/puertos/redirects)
+    let navValue = value;
+    if (inputType === 'url') {
+      const check = await validatePublicHttpUrl(value, {
+        fetchBody: false,
+        requireHtmlContentType: false
+      });
+      if (!check.ok) {
+        req.log?.warn({ requestId, value, reason: check.reason }, 'Analyze blocked by URL validator');
+        return res.status(400).json({
+          ok: false,
+          error: check.reason ?? 'URL inválida o no permitida',
+          requestId
+        });
+      }
+      navValue = check.finalUrl ?? value;
+    }
+
+    // 3) Ejecutar herramientas seleccionadas
+    type ToolResult = ReturnType<typeof mapAxeToUnified> | ReturnType<typeof mapEqualAccessToUnified>;
+    const parts: ToolResult[] = [];
 
     if (tool === 'axe-core' || tool === 'both') {
-      const axeResult = await withPage(inputType, value, async (page) => {
-        return runAxeOnPage(page);
-      });
-      parts.push(mapAxeToUnified(axeResult, wcagVersion, wcagLevel));
+      const axeRaw = await abortAfter(
+        ANALYZE_TIMEOUT_MS + WRAP_MARGIN_MS,
+        withPage(
+          inputType,
+          navValue,
+          async (page) => {
+            return runAxeOnPage(page);
+          },
+          { overallTimeoutMs: ANALYZE_TIMEOUT_MS, navTimeoutMs: NAVIGATION_TIMEOUT_MS }
+        )
+      );
+      parts.push(mapAxeToUnified(axeRaw, wcagVersion, wcagLevel));
     }
 
     if (tool === 'equal-access' || tool === 'both') {
-      const eaResult = await withPage(inputType, value, async (page) => {
-        // Pasamos la Playwright Page directamente para mejor fidelidad
-        const report = await runEqualAccess(page, `scan-${Date.now()}`);
-        return report;
-      });
-      parts.push(mapEqualAccessToUnified(eaResult, wcagVersion, wcagLevel));
+      const eaReport = await abortAfter(
+        ANALYZE_TIMEOUT_MS + WRAP_MARGIN_MS,
+        withPage(
+          inputType,
+          navValue,
+          async (page) => runEqualAccess(page, `scan-${Date.now()}`),
+          { overallTimeoutMs: ANALYZE_TIMEOUT_MS, navTimeoutMs: NAVIGATION_TIMEOUT_MS }
+        )
+      );
+      parts.push(mapEqualAccessToUnified(eaReport, wcagVersion, wcagLevel));
     }
 
-    const unified = buildUnifiedResponse(parts);
+    // Defensa: si por alguna razón no agregó nada
+    if (parts.length === 0) {
+      req.log?.warn({ requestId, tool }, 'No tool selected after validation');
+      return res.status(400).json({
+        ok: false,
+        error: 'No se seleccionó ninguna herramienta válida',
+        requestId
+      });
+    }
+
+    // 4) Unificar y responder
+    const unified = buildUnifiedResponse(parts as any);
     return res.json(unified);
   } catch (err: any) {
-    req.log?.error({ err }, 'Analyze error');
-    return res.status(500).json({ ok: false, error: err?.message ?? 'Internal error' });
+    const msg = String(err?.message ?? '');
+    const isTimeout = /timeout/i.test(msg);
+    const status = isTimeout ? 504 : 500;
+    req.log?.error({ requestId, err }, 'Analyze error');
+    return res.status(status).json({
+      ok: false,
+      error: isTimeout ? 'Analysis timed out' : (err?.message ?? 'Internal error'),
+      requestId
+    });
   }
 });
