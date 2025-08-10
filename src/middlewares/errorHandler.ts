@@ -12,6 +12,7 @@ export function notFoundHandler(req: Request, res: Response) {
   return res.status(404).json({
     ok: false,
     error: 'Not Found',
+    details: {},
     requestId
   });
 }
@@ -26,9 +27,7 @@ export function errorHandler(err: Error & KnownError, req: Request, res: Respons
     return res.status(504).json({
       ok: false,
       error: 'La operación excedió el tiempo límite',
-      details: {
-        ...(err as any).details ?? {}
-      },
+      details: (err as any).details ?? {},
       requestId
     });
   }
@@ -70,6 +69,7 @@ export function errorHandler(err: Error & KnownError, req: Request, res: Respons
   const payload: Record<string, any> = {
     ok: false,
     error: clientMessage,
+    details: (err as any).details ?? {},
     requestId
   };
 

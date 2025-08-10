@@ -67,26 +67,79 @@ export async function validatePublicHttpUrl(
     return { ok: false, reason: message, details };
   }
 
-  function normalizeNetError(e: any, ip?: string, port?: number) {
+  function normalizeNetError(e: any, ip?: string, port?: number, hostname?: string) {
     const rawMessage = String(e?.message ?? e);
-    const code = e?.code || rawMessage.split(' ')[0] || 'ENETERROR';
-    const base = {
-      code,
-      ip,
-      port,
-      rawMessage // mensaje original
-    };
+    const lower = rawMessage.toLowerCase();
+    // Normaliza e.code a string si existe
+    let inferred: string | undefined = typeof e?.code === 'string' ? e.code : undefined;
+    // Si no hay e.code, intenta inferirlo desde el mensaje
+    if (!inferred) {
+      if (/\bECONNREFUSED\b/i.test(rawMessage) || lower.includes('refused')) {
+        inferred = 'ECONNREFUSED';
+      } else if (/\bENOTFOUND\b/i.test(rawMessage) || lower.includes('dns') || lower.includes('getaddrinfo')) {
+        inferred = 'ENOTFOUND';
+      } else if (/\bESOCKETTIMEDOUT\b/i.test(rawMessage) || /\bETIMEDOUT\b/i.test(rawMessage) || lower.includes('timeout')) {
+        inferred = 'ETIMEDOUT';
+      } else if (/\bECONNRESET\b/i.test(rawMessage)) {
+        inferred = 'ECONNRESET';
+      } else if (/\bEHOSTUNREACH\b/i.test(rawMessage) || lower.includes('host unreachable')) {
+        inferred = 'EHOSTUNREACH';
+      } else if (/\bENETUNREACH\b/i.test(rawMessage) || lower.includes('network is unreachable')) {
+        inferred = 'ENETUNREACH';
+      } else if (/\bEPROTO\b/i.test(rawMessage)) {
+        inferred = 'EPROTO';
+      } else if (/\bABORT_ERR\b/i.test(rawMessage) || e?.name === 'AbortError') {
+        inferred = 'ETIMEDOUT';
+      } else if (
+        /\bERR_TLS_CERT_ALTNAME_INVALID\b/i.test(rawMessage) ||
+        /\bCERT_HAS_EXPIRED\b/i.test(rawMessage) ||
+        /\bUNABLE_TO_VERIFY_LEAF_SIGNATURE\b/i.test(rawMessage) ||
+        /\bDEPTH_ZERO_SELF_SIGNED_CERT\b/i.test(rawMessage) ||
+        lower.includes('self signed certificate') ||
+        lower.includes('certificate') ||
+        lower.includes('tls') ||
+        lower.includes('ssl')
+      ) {
+        inferred = 'TLS_ERROR';
+      }
+    }
+
+    const code = inferred || 'ENETERROR';
+    const base = { code, ip, port, hostname: hostname ?? e?.hostname, rawMessage };
 
     switch (code) {
       case 'ECONNREFUSED':
         return { status: 502, message: 'No se pudo conectar con la URL proporcionada', details: base };
       case 'ETIMEDOUT':
+        return { status: 504, message: 'La conexión excedió el tiempo límite', details: base };
       case 'ESOCKETTIMEDOUT':
         return { status: 504, message: 'La conexión excedió el tiempo límite', details: base };
       case 'ENOTFOUND':
+        return { status: 502, message: 'No se pudo resolver el host de la URL', details: base };
       case 'EAI_AGAIN':
         return { status: 502, message: 'No se pudo resolver el host de la URL', details: base };
+      case 'EHOSTUNREACH':
+        return { status: 502, message: 'No se puede alcanzar el host de destino', details: base };
+      case 'ENETUNREACH':
+        return { status: 502, message: 'La red de destino es inalcanzable', details: base };
+      case 'ECONNRESET':
+        return { status: 502, message: 'La conexión fue reiniciada por el servidor', details: base };
+      case 'EPROTO':
+        return { status: 502, message: 'Error de protocolo en la conexión', details: base };
+      case 'TLS_ERROR':
+        return { status: 502, message: 'Error de certificado/TLS al conectar con la URL', details: base };
+      case 'ERR_TLS_CERT_ALTNAME_INVALID':
+        return { status: 502, message: 'Error de certificado/TLS al conectar con la URL', details: base };
+      case 'CERT_HAS_EXPIRED':
+        return { status: 502, message: 'Error de certificado/TLS al conectar con la URL', details: base };
+      case 'UNABLE_TO_VERIFY_LEAF_SIGNATURE':
+        return { status: 502, message: 'Error de certificado/TLS al conectar con la URL', details: base };
+      case 'DEPTH_ZERO_SELF_SIGNED_CERT':
+        return { status: 502, message: 'Error de certificado/TLS al conectar con la URL', details: base };
       default:
+        if ((process.env.DEBUG_URL_VALIDATOR ?? '').toLowerCase() === 'true') {
+          console.warn('[normalizeNetError:default]', { code, rawMessage, ip, port, hostname: base.hostname });
+        }
         return { status: 502, message: 'Error de red al intentar acceder a la URL', details: base };
     }
   }
@@ -158,11 +211,24 @@ export async function validatePublicHttpUrl(
       try {
         const { address } = await dns.lookup(hostname);
         ips.push(address);
-      } catch { /* ignore */ }
+      } catch (e: any) { 
+        // Log the error for debugging purposes
+        console.error(`DNS lookup failed for ${hostname}:`, e);
+      }
     }
-    if (ips.length === 0) throw new Error(`DNS failed for ${hostname}`);
+    if (ips.length === 0) {
+      const err: any = new Error(`DNS failed for ${hostname}`);
+      err.code = 'ENOTFOUND';
+      err.hostname = hostname;
+      throw err;
+    }
     for (const ip of ips) if (!isNonPublicIp(ip)) return ip;
-    throw new Error(`All resolved IPs for ${hostname} are non-public`);
+    {
+      const err: any = new Error(`All resolved IPs for ${hostname} are non-public`);
+      err.code = 'ENETUNREACH';
+      err.hostname = hostname;
+      throw err;
+    }
   };
 
   // Puertos permitidos (preparse una vez)
@@ -234,7 +300,7 @@ export async function validatePublicHttpUrl(
             clearTimeout(totalTimer);
             const err: any = new Error('Response exceeds byte limit (Content-Length)');
             err.code = 'ERESPONSE_TOO_LARGE';
-            err.ip = ip; err.port = port;
+            err.ip = ip; err.port = port; err.hostname = urlObj.hostname;
             return reject(err instanceof Error ? err : new Error(String(err)));
           }
 
@@ -253,7 +319,7 @@ export async function validatePublicHttpUrl(
               clearTimeout(totalTimer);
               const err: any = new Error(`Unexpected Content-Type: ${ct}`);
               err.code = 'EUNSUPPORTED_CONTENT_TYPE';
-              err.ip = ip; err.port = port;
+              err.ip = ip; err.port = port; err.hostname = urlObj.hostname;
               return reject(err instanceof Error ? err : new Error(String(err)));
             }
           }
@@ -267,7 +333,7 @@ export async function validatePublicHttpUrl(
               clearTimeout(totalTimer);
               const err: any = new Error('Response exceeds byte limit');
               err.code = 'ERESPONSE_TOO_LARGE';
-              err.ip = ip; err.port = port;
+              err.ip = ip; err.port = port; err.hostname = urlObj.hostname;
               req.destroy(err);
               return;
             }
@@ -288,13 +354,21 @@ export async function validatePublicHttpUrl(
         err.code = 'ESOCKETTIMEDOUT';
         err.ip = ip;
         err.port = port;
+        err.hostname = urlObj.hostname;
         req.destroy(err);
       });
       req.on('error', (err) => {
         clearTimeout(totalTimer);
-        (err as any).ip = (err as any).ip ?? ip;
-        (err as any).port = (err as any).port ?? port;
-        reject(err);
+        const anyErr: any = err;
+        anyErr.ip = anyErr.ip ?? ip;
+        anyErr.port = anyErr.port ?? port;
+        anyErr.hostname = anyErr.hostname ?? urlObj.hostname;
+        // Normaliza aborts del AbortController a timeout
+        if (anyErr.name === 'AbortError' || anyErr.code === 'ABORT_ERR') {
+          anyErr.code = 'ETIMEDOUT';
+          anyErr.message = anyErr.message || 'Operation aborted';
+        }
+        reject(anyErr instanceof Error ? anyErr : new Error(String(anyErr)));
       });
 
       req.end();
@@ -318,7 +392,7 @@ export async function validatePublicHttpUrl(
         const ip = await resolveToAllowedIp(url.hostname);
         return { ip, port };
       } catch (e: any) {
-        const { status, message, details } = normalizeNetError(e, e?.ip, e?.port ?? port);
+        const { status, message, details } = normalizeNetError(e, e?.ip, e?.port ?? port, current.hostname);
         return friendlyThrowOrReturn(status, message, details);
       }
     };
@@ -408,7 +482,7 @@ export async function validatePublicHttpUrl(
   try {
     return await handleRedirects(firstUrl, REDIRECT_LIMIT, options?.fetchBody);
   } catch (e: any) {
-    const { status, message, details } = normalizeNetError(e);
+    const { status, message, details } = normalizeNetError(e, undefined, undefined, firstUrl.hostname);
     return friendlyThrowOrReturn(status, message, details);
   }
 }
