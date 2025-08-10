@@ -6,7 +6,10 @@ type BaseItem = {
   help?: string;
   helpUrl?: string;
   nodes?: Array<{ target?: string[]; html?: string; failureSummary?: string }>;
-  wcag?: { version: '2.0' | '2.1' | '2.2'; level: 'A' | 'AA' | 'AAA'; criterion?: string | null };
+  wcag?: {
+    version: '2.0' | '2.1' | '2.2';
+    level: 'A' | 'AA' | 'AAA'; criterion?: string | null
+  };
 };
 
 export type UnifiedToolResult = {

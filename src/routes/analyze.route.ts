@@ -76,21 +76,14 @@ analyzeRouter.post('/', async (req, res) => {
     // 2) Validación fuerte de URL (SSRF/puertos/redirects)
     let navValue = value;
     if (inputType === 'url') {
-      const check = await validatePublicHttpUrl(value, {
+      await validatePublicHttpUrl(value, {
         fetchBody: false,
-        requireHtmlContentType: false
+        requireHtmlContentType: false,
+        throwOnError: true
       });
-      if (!check.ok) {
-        req.log?.warn({ requestId, value, reason: check.reason }, 'Analyze blocked by URL validator');
-        return res.status(400).json({
-          ok: false,
-          error: check.reason ?? 'URL inválida o no permitida',
-          requestId
-        });
-      }
-      navValue = check.finalUrl ?? value;
+      // si no lanzó, puedes normalizar tomando la propia value
+      navValue = value;
     }
-
     // 3) Ejecutar herramientas seleccionadas
     type ToolResult = ReturnType<typeof mapAxeToUnified> | ReturnType<typeof mapEqualAccessToUnified>;
     const parts: ToolResult[] = [];
@@ -101,24 +94,24 @@ analyzeRouter.post('/', async (req, res) => {
         withPage(
           inputType,
           navValue,
-          async (page) => {
-            return runAxeOnPage(page);
-          },
+          async (page) => runAxeOnPage(page),
           { overallTimeoutMs: ANALYZE_TIMEOUT_MS, navTimeoutMs: NAVIGATION_TIMEOUT_MS }
-        )
+        ),
+        { tool: 'axe-core', phase: 'withPage/axe' }
       );
       parts.push(mapAxeToUnified(axeRaw, wcagVersion, wcagLevel));
     }
 
     if (tool === 'equal-access' || tool === 'both') {
-      const eaReport = await abortAfter(
+       const eaReport = await abortAfter(
         ANALYZE_TIMEOUT_MS + WRAP_MARGIN_MS,
         withPage(
           inputType,
           navValue,
           async (page) => runEqualAccess(page, `scan-${Date.now()}`),
           { overallTimeoutMs: ANALYZE_TIMEOUT_MS, navTimeoutMs: NAVIGATION_TIMEOUT_MS }
-        )
+        ),
+        { tool: 'equal-access', phase: 'withPage/equal-access' }
       );
       parts.push(mapEqualAccessToUnified(eaReport, wcagVersion, wcagLevel));
     }

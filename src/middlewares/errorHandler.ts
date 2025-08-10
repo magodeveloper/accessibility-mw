@@ -20,6 +20,40 @@ export function errorHandler(err: Error & KnownError, req: Request, res: Respons
   const requestId = (req as any).id;
   const isProd = (process.env.NODE_ENV === 'production');
 
+  // Detecta timeout
+  if (err.name === 'TimeoutError' || (err as any).code === 'ETIMEDOUT') {
+    req.log?.warn({ requestId, err }, 'Timeout error');
+    return res.status(504).json({
+      ok: false,
+      error: 'La operación excedió el tiempo límite',
+      details: {
+        ...(err as any).details ?? {}
+      },
+      requestId
+    });
+  }
+
+  // Detecta error de parseo JSON del body-parser
+  const isJsonParseError =
+    (err as any)?.type === 'entity.parse.failed' ||
+    (err instanceof SyntaxError && (err as any).body !== undefined);
+
+  // Si es parseo JSON, fuerza 400 y mensaje consistente
+  if (isJsonParseError) {
+    const message = 'JSON inválido';
+    const details = {
+      formErrors: [err.message],
+      fieldErrors: {} as Record<string, string[]>
+    };
+    req.log?.warn({ requestId, message: err.message }, 'JSON parse error');
+    return res.status(400).json({
+      ok: false,
+      error: message,
+      details,
+      requestId
+    });
+  }
+
   // Default 500 si no hay status
   const status = err.status && Number.isInteger(err.status) ? err.status : 500;
 
@@ -39,11 +73,18 @@ export function errorHandler(err: Error & KnownError, req: Request, res: Respons
     requestId
   };
 
-  // Adjunta código de error si lo setearas desde servicios
-  if (err.code && !isProd) payload.code = err.code;
-
-  // Stack traces solo en no-prod
-  if (!isProd && err.stack) payload.stack = err.stack;
+  if (err.code && !isProd) {
+    payload.code = err.code;
+  }
+  // Incluye details si vienen del error (por ej. desde security.ts)
+  if ((err as any).details !== undefined) {
+    payload.details = (err as any).details;
+  }
+  // Si quieres ocultar stack SIEMPRE para mantener el mismo formato:
+  // (recomendado si buscas consistencia total entre errores)
+  if (!isProd && err.stack) {
+    payload.stack = err.stack;
+  }
 
   return res.status(status).json(payload);
 }

@@ -13,18 +13,20 @@ export type UrlValidationResult = {
   ip?: string;
   port?: number;
   body?: string;
+  details?: Record<string, any>;
 };
 
 export type UrlValidationOptions = {
-  urlLengthLimit?: number;      // default 4096
-  redirectLimit?: number;       // default 3
-  responseBytesLimit?: number;  // default 2_000_000
-  requestTimeoutMs?: number;    // default 20_000 (tiempo total)
-  socketTimeoutMs?: number;     // default 30_000 (inactividad de socket)
-  allowedPorts?: string;        // "80,443,3000" o "80-65535"
-  userAgent?: string;           // default Mozilla genérico
-  fetchBody?: boolean;          // si true, hace GET tras validar
+  urlLengthLimit?: number; // default 4096
+  redirectLimit?: number; // default 3
+  responseBytesLimit?: number; // default 2_000_000
+  requestTimeoutMs?: number; // default 20_000 (tiempo total)
+  socketTimeoutMs?: number; // default 30_000 (inactividad de socket)
+  allowedPorts?: string; // "80,443,3000" o "80-65535"
+  userAgent?: string; // default Mozilla genérico
+  fetchBody?: boolean; // si true, hace GET tras validar
   requireHtmlContentType?: boolean; // si true y fetchBody=true, valida Content-Type HTML
+  throwOnError?: boolean; // Si true, lanza Error normalizado (status/expose/code/details) en vez de { ok:false }
 };
 
 export async function validatePublicHttpUrl(
@@ -47,6 +49,47 @@ export async function validatePublicHttpUrl(
   const ALLOWED_PORTS_RAW = (options?.allowedPorts ?? process.env.ALLOWED_PORTS ?? defaultAllowedPorts).trim();
   const USER_AGENT = options?.userAgent ?? 'Mozilla/5.0 (compatible; UrlValidator/1.0)';
   const REQUIRE_HTML_CT = Boolean(options?.requireHtmlContentType);
+
+  function friendlyThrowOrReturn(
+    status: number,
+    message: string,
+    details: Record<string, any> = {}
+  ): UrlValidationResult {
+    if (options?.throwOnError) {
+      const err: any = new Error(message);
+      err.status = status;
+      err.expose = true; // mostrar mensaje en prod
+      err.code = status >= 500 ? 'URL_FETCH_ERROR' : 'URL_VALIDATION_ERROR';
+      err.details = details;
+      throw err;
+    }
+    // mantiene shape unificado
+    return { ok: false, reason: message, details };
+  }
+
+  function normalizeNetError(e: any, ip?: string, port?: number) {
+    const rawMessage = String(e?.message ?? e);
+    const code = e?.code || rawMessage.split(' ')[0] || 'ENETERROR';
+    const base = {
+      code,
+      ip,
+      port,
+      rawMessage // mensaje original
+    };
+
+    switch (code) {
+      case 'ECONNREFUSED':
+        return { status: 502, message: 'No se pudo conectar con la URL proporcionada', details: base };
+      case 'ETIMEDOUT':
+      case 'ESOCKETTIMEDOUT':
+        return { status: 504, message: 'La conexión excedió el tiempo límite', details: base };
+      case 'ENOTFOUND':
+      case 'EAI_AGAIN':
+        return { status: 502, message: 'No se pudo resolver el host de la URL', details: base };
+      default:
+        return { status: 502, message: 'Error de red al intentar acceder a la URL', details: base };
+    }
+  }
 
   // Helpers
   const isHttpLike = (u: URL) => u.protocol === 'http:' || u.protocol === 'https:';
@@ -135,10 +178,7 @@ export async function validatePublicHttpUrl(
     if (u.port) {
       return Number(u.port);
     }
-    if (u.protocol === 'https:') {
-      return 443;
-    }
-    return 80;
+    return u.protocol === 'https:' ? 443 : 80;
   };
 
   // Request por IP (HEAD/GET)
@@ -187,13 +227,15 @@ export async function validatePublicHttpUrl(
           const status = res.statusCode ?? 0;
           const respHeaders = normalizeHeaders(res.headers);
 
-          // Early cut por Content-Length
           const cl = respHeaders['content-length'] ? Number(respHeaders['content-length']) : undefined;
           if (Number.isFinite(cl) && cl! > maxBytes) {
             res.resume();
             res.destroy();
             clearTimeout(totalTimer);
-            return reject(new Error('Response exceeds byte limit (Content-Length)'));
+            const err: any = new Error('Response exceeds byte limit (Content-Length)');
+            err.code = 'ERESPONSE_TOO_LARGE';
+            err.ip = ip; err.port = port;
+            return reject(err instanceof Error ? err : new Error(String(err)));
           }
 
           if (method === 'HEAD') {
@@ -202,7 +244,6 @@ export async function validatePublicHttpUrl(
             return resolve({ status, headers: respHeaders });
           }
 
-          // (Opcional) Rechazar si no es HTML-like
           if (REQUIRE_HTML_CT) {
             const ct = respHeaders['content-type'] || '';
             const isHtml = /\b(text\/html|application\/xhtml\+xml)\b/i.test(ct);
@@ -210,7 +251,10 @@ export async function validatePublicHttpUrl(
               res.resume();
               res.destroy();
               clearTimeout(totalTimer);
-              return reject(new Error(`Unexpected Content-Type: ${ct}`));
+              const err: any = new Error(`Unexpected Content-Type: ${ct}`);
+              err.code = 'EUNSUPPORTED_CONTENT_TYPE';
+              err.ip = ip; err.port = port;
+              return reject(err instanceof Error ? err : new Error(String(err)));
             }
           }
 
@@ -221,7 +265,10 @@ export async function validatePublicHttpUrl(
             received += chunk.length;
             if (received > maxBytes) {
               clearTimeout(totalTimer);
-              req.destroy(new Error('Response exceeds byte limit'));
+              const err: any = new Error('Response exceeds byte limit');
+              err.code = 'ERESPONSE_TOO_LARGE';
+              err.ip = ip; err.port = port;
+              req.destroy(err);
               return;
             }
             chunks.push(chunk);
@@ -234,12 +281,19 @@ export async function validatePublicHttpUrl(
         }
       );
 
+      // Añade metadata al error para que arriba podamos normalizar (normalizeNetError)
       req.on('timeout', () => {
         clearTimeout(totalTimer);
-        req.destroy(new Error('Socket timeout'));
+        const err: any = new Error('Socket timeout');
+        err.code = 'ESOCKETTIMEDOUT';
+        err.ip = ip;
+        err.port = port;
+        req.destroy(err);
       });
       req.on('error', (err) => {
         clearTimeout(totalTimer);
+        (err as any).ip = (err as any).ip ?? ip;
+        (err as any).port = (err as any).port ?? port;
         reject(err);
       });
 
@@ -257,12 +311,15 @@ export async function validatePublicHttpUrl(
 
     const getIpAndCheckPort = async (url: URL): Promise<{ ip: string; port: number } | UrlValidationResult> => {
       const port = getPort(url);
-      if (!isPortAllowed(port)) return { ok: false, reason: `Port ${port} not allowed` };
+      if (!isPortAllowed(port)) {
+        return friendlyThrowOrReturn(400, `Port ${port} not allowed`, { port });
+      }
       try {
         const ip = await resolveToAllowedIp(url.hostname);
         return { ip, port };
       } catch (e: any) {
-        return { ok: false, reason: e.message };
+        const { status, message, details } = normalizeNetError(e, e?.ip, e?.port ?? port);
+        return friendlyThrowOrReturn(status, message, details);
       }
     };
 
@@ -271,7 +328,7 @@ export async function validatePublicHttpUrl(
 
     for (let i = 0; i < redirectLimit; i++) {
       if (!isHttpLike(current)) {
-        return { ok: false, reason: `Unsupported protocol: ${current.protocol}` };
+        return friendlyThrowOrReturn(400, `Unsupported protocol: ${current.protocol}`, { protocol: current.protocol });
       }
 
       const ipPort = await getIpAndCheckPort(current);
@@ -282,17 +339,18 @@ export async function validatePublicHttpUrl(
       try {
         headResp = await requestByIp('HEAD', current, ip, port, RESPONSE_BYTES_LIMIT);
       } catch (e: any) {
-        return { ok: false, reason: e.message };
+        const { status, message, details } = normalizeNetError(e, e?.ip ?? ip, e?.port ?? port);
+        return friendlyThrowOrReturn(status, message, details);
       }
 
       if (isRedirect(headResp)) {
         try {
           current = new URL(headResp.headers.location, current);
           if (!isHttpLike(current)) {
-            return { ok: false, reason: `Redirected to unsupported protocol: ${current.protocol}` };
+            return friendlyThrowOrReturn(400, `Redirected to unsupported protocol: ${current.protocol}`, { protocol: current.protocol });
           }
         } catch {
-          return { ok: false, reason: `Invalid redirect URL: ${headResp.headers.location}` };
+          return friendlyThrowOrReturn(400, `Invalid redirect URL: ${headResp.headers.location}`, { location: headResp.headers.location });
         }
         continue;
       }
@@ -310,7 +368,8 @@ export async function validatePublicHttpUrl(
             body: getResp.body,
           };
         } catch (e: any) {
-          return { ok: false, reason: e.message };
+          const { status, message, details } = normalizeNetError(e, e?.ip ?? ip, e?.port ?? port);
+          return friendlyThrowOrReturn(status, message, details);
         }
       }
 
@@ -324,27 +383,32 @@ export async function validatePublicHttpUrl(
       };
     }
 
-    return { ok: false, reason: 'Too many redirects' };
+    return friendlyThrowOrReturn(400, 'Demasiadas redirecciones');
   };
 
   // Validaciones iniciales de la URL
   if (!rawUrl || rawUrl.length > URL_LENGTH_LIMIT) {
-    return { ok: false, reason: 'Invalid or too long URL' };
+    return friendlyThrowOrReturn(400, 'URL vacía o demasiado larga');
   }
 
   let firstUrl: URL;
   try {
     firstUrl = new URL(rawUrl);
   } catch {
-    return { ok: false, reason: 'Invalid URL format' };
+    return friendlyThrowOrReturn(400, 'Formato de URL inválido');
   }
 
   if (!isHttpLike(firstUrl)) {
-    return { ok: false, reason: 'Only http/https allowed' };
+    return friendlyThrowOrReturn(400, 'Solo se permiten protocolos http/https');
   }
   if (!IS_DEV && (firstUrl.username || firstUrl.password)) {
-    return { ok: false, reason: 'Credentials not allowed' };
+    return friendlyThrowOrReturn(400, 'No se permiten credenciales en la URL');
   }
 
-  return handleRedirects(firstUrl, REDIRECT_LIMIT, options?.fetchBody);
+  try {
+    return await handleRedirects(firstUrl, REDIRECT_LIMIT, options?.fetchBody);
+  } catch (e: any) {
+    const { status, message, details } = normalizeNetError(e);
+    return friendlyThrowOrReturn(status, message, details);
+  }
 }

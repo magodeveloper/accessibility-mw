@@ -1,9 +1,9 @@
 import { chromium, Browser, Page } from 'playwright';
 
 type WithPageOptions = {
-  overallTimeoutMs?: number;   // tiempo total duro (cierra browser si vence)
-  navTimeoutMs?: number;       // timeout de navegación (Playwright)
-  idleWaitMs?: number;         // espera adicional de networkidle
+  overallTimeoutMs?: number; // tiempo total duro (cierra browser si vence)
+  navTimeoutMs?: number; // timeout de navegación (Playwright)
+  idleWaitMs?: number; // espera adicional de networkidle
 };
 
 export async function withPage<T>(
