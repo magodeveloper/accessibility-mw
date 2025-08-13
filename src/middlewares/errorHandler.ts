@@ -12,7 +12,7 @@ export function notFoundHandler(req: Request, res: Response) {
   return res.status(404).json({
     ok: false,
     error: 'Not Found',
-    details: {},
+    details: res.err,
     requestId
   });
 }

@@ -1,0 +1,18 @@
+ruleArchive: latest
+policies:
+  - IBM_Accessibility
+
+reportLevels:
+  - violation
+  - potentialviolation
+  - recommendation
+  - potentialrecommendation
+  - manual
+#  - pass
+
+outputFolder: ./results
+cacheFolder: ./.achecker_cache
+
+outputFormat:
+  - json
+outputFilenameTimestamp: false

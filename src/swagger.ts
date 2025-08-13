@@ -1,4 +1,11 @@
+import path from 'node:path';
 import swaggerJSDoc from 'swagger-jsdoc';
+
+const isProd = process.env.NODE_ENV === 'production';
+
+const apisGlobs = isProd
+  ? [path.join('dist', 'routes', '*.js')]
+  : [path.join('src', 'routes', '*.ts')];
 
 export const swaggerSpec = swaggerJSDoc({
   definition: {
@@ -6,8 +13,13 @@ export const swaggerSpec = swaggerJSDoc({
     info: {
       title: 'Accessibility Analyzer API',
       version: '0.1.0',
-      description: 'API para analizar accesibilidad web usando axe-core y IBM Equal Access (accessibility-checker)'
+      description:
+        'API para analizar accesibilidad web usando axe-core y IBM Equal Access (accessibility-checker)',
     },
+    servers: [
+      // agrega más si tienes staging/prod con otro dominio
+      { url: `http://localhost:${process.env.PORT || 3001}`, description: 'Local' },
+    ],
     components: {
       schemas: {
         AnalyzeRequest: {
@@ -18,8 +30,8 @@ export const swaggerSpec = swaggerJSDoc({
             value: { type: 'string', description: 'HTML o URL' },
             tool: { type: 'string', enum: ['axe-core', 'equal-access', 'both'] },
             wcagVersion: { type: 'string', enum: ['2.0', '2.1', '2.2'] },
-            wcagLevel: { type: 'string', enum: ['A', 'AA', 'AAA'] }
-          }
+            wcagLevel: { type: 'string', enum: ['A', 'AA', 'AAA'] },
+          },
         },
         UnifiedResponse: {
           type: 'object',
@@ -35,9 +47,9 @@ export const swaggerSpec = swaggerJSDoc({
                   recommendations: { type: 'number' },
                   passes: { type: 'number' },
                   incomplete: { type: 'number' },
-                  inapplicable: { type: 'number' }
-                }
-              }
+                  inapplicable: { type: 'number' },
+                },
+              },
             },
             results: {
               type: 'array',
@@ -53,18 +65,18 @@ export const swaggerSpec = swaggerJSDoc({
                       recommendations: { type: 'number' },
                       passes: { type: 'number' },
                       incomplete: { type: 'number' },
-                      inapplicable: { type: 'number' }
-                    }
+                      inapplicable: { type: 'number' },
+                    },
                   },
-                  items: { type: 'array' }
-                }
-              }
+                  items: { type: 'array' },
+                },
+              },
             },
-            total: { type: 'number' }
-          }
-        }
-      }
-    }
+            total: { type: 'number' },
+          },
+        },
+      },
+    },
   },
-  apis: ['src/routes/*.ts']
+  apis: apisGlobs,
 });

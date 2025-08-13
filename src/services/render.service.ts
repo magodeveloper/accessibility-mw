@@ -1,4 +1,4 @@
-import { chromium, Browser, Page } from 'playwright';
+import { chromium, Page } from 'playwright';
 
 type WithPageOptions = {
   overallTimeoutMs?: number; // tiempo total duro (cierra browser si vence)
@@ -12,14 +12,22 @@ export async function withPage<T>(
   fn: (page: Page) => Promise<T>,
   opts?: WithPageOptions
 ): Promise<T> {
-  const headless = (process.env.PLAYWRIGHT_HEADLESS ?? 'true') !== 'false';
+  // Forzar headless en contenedor. Permitir override por env:
+  // PLAYWRIGHT_HEADLESS: "true" | "false" (default: true)
+  const headlessEnv = String(process.env.PLAYWRIGHT_HEADLESS ?? 'true').toLowerCase();
+  const headless = headlessEnv !== 'false';
+
+  if (!headless && !process.env.DISPLAY) {
+    // Si tienes logger, usa req.log. Aquí un warn genérico:
+    console.warn('[withPage] Headed mode sin DISPLAY. Forzando headless=true');
+  }
+
   const overallTimeoutMs = opts?.overallTimeoutMs ?? Number(process.env.ANALYZE_TIMEOUT_MS ?? 60000);
   const navTimeoutMs = opts?.navTimeoutMs ?? Number(process.env.NAVIGATION_TIMEOUT_MS ?? 30000);
   const idleWaitMs = opts?.idleWaitMs ?? Number(process.env.IDLE_WAIT_MS ?? 3000);
 
-  const browser: Browser = await chromium.launch({
-    headless,
-    args: (process.env.IN_CONTAINER === 'true') ? ['--no-sandbox', '--disable-dev-shm-usage'] : []
+  const browser = await chromium.launch({
+    headless: headless || !process.env.DISPLAY, // siempre headless en Docker
   });
   const context = await browser.newContext({
     javaScriptEnabled: true,

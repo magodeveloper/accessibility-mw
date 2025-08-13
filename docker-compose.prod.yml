@@ -1,0 +1,30 @@
+version: '3.9'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      provenance: false
+    image: accessibility-mw:latest
+    env_file:
+      - .env.prod
+    ports:
+      - '3001:3001' # host:container — ajusta si cambias PORT en .env.prod
+    restart: unless-stopped
+    shm_size: '1gb' # recomendado para Chromium
+    ulimits:
+      nofile: 65536
+    # Usa el HEALTHCHECK del Dockerfile (no lo sobreescribimos aquí)
+    # Si quieres logs más controlados:
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '10m'
+        max-file: '3'
+    # Si estás detrás de un proxy inverso, puedes añadir:
+    # networks:
+    #   - web
+# networks:
+#   web:
+#     external: true

@@ -12,8 +12,9 @@
     "skipLibCheck": true,
     "sourceMap": true,
     "inlineSources": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "removeComments": false
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts"], 
   "exclude": ["node_modules"]
 }

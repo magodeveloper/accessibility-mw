@@ -162,16 +162,19 @@ analyzeRouter.post('/', async (req, res) => {
   // 1) Validación rápida de payload
   const parse = AnalyzeRequestSchema.safeParse(req.body);
   if (!parse.success) {
-    const flat = parse.error.flatten();
-    const fieldMsgs = Object.values(flat.fieldErrors).flat().filter(Boolean);
-    const message = [...flat.formErrors, ...fieldMsgs].join(', ') || 'Datos inválidos';
+    const { z } = require('zod');
+    const flat = z.treeifyError(parse.error);
+    const fieldMsgs = Object.values(flat.fieldErrors ?? {}).flat().filter(Boolean);
+    const message = [...(flat.formErrors ?? []), ...fieldMsgs].join(', ') || 'Datos inválidos';
 
     req.log?.warn({ requestId, message, details: flat }, 'Analyze blocked by schema');
     return res.status(400).json({
       ok: false,
       error: message,
-      // En prod podrías ocultar details para no filtrar estructura interna
-      details: process.env.NODE_ENV === 'production' ? undefined : flat,
+      details: {
+        formErrors: flat.formErrors ?? [],
+        fieldErrors: flat.fieldErrors ?? {}
+      },
       requestId
     });
   }
@@ -228,7 +231,7 @@ analyzeRouter.post('/', async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: 'No se seleccionó ninguna herramienta válida',
-        requestId
+        requestId,
       });
     }
 
@@ -240,10 +243,14 @@ analyzeRouter.post('/', async (req, res) => {
     const isTimeout = /timeout/i.test(msg);
     const status = isTimeout ? 504 : 500;
     req.log?.error({ requestId, err }, 'Analyze error');
-    return res.status(status).json({
+    const payload: Record<string, any> = {
       ok: false,
       error: isTimeout ? 'Analysis timed out' : (err?.message ?? 'Internal error'),
       requestId
-    });
+    };
+    if (err?.details !== undefined) payload.details = err.details;
+    if (err?.code) payload.code = err.code;
+    if (process.env.NODE_ENV !== 'production' && err?.stack) payload.stack = err.stack;
+    return res.status(status).json(payload);
   }
 });

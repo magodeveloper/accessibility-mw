@@ -1,0 +1,25 @@
+version: '3.9'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      provenance: false
+    image: accessibility-mw-dev:latest
+    env_file:
+      - .env.dev
+    ports:
+      - '3001:3001'
+    shm_size: '1gb'
+    ulimits:
+      nofile: 65536
+    # En dev podrías querer ver más logs en consola
+    environment:
+      - NODE_ENV=development
+    # Si quieres deshabilitar el HEALTHCHECK en dev:
+    # healthcheck:
+    #   test: ["CMD-SHELL", "exit 0"]
+    #   interval: 1m
+    #   timeout: 3s
+    #   retries: 1

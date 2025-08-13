@@ -39,12 +39,22 @@ export type UnifiedResponse = {
 };
 
 export function mapAxeToUnified(axe: any, wcagVersion: '2.0' | '2.1' | '2.2', wcagLevel: 'A' | 'AA' | 'AAA'): UnifiedToolResult {
+  const order = ['minor','moderate','serious','critical'] as const;
+  const inferImpact = (nodes: any[]): string|undefined => {
+    let idx = -1;
+    for (const n of nodes ?? []) {
+      const i = order.indexOf(String(n?.impact ?? '').toLowerCase() as any);
+      if (i > idx) idx = i;
+    }
+    return idx >= 0 ? order[idx] : undefined;
+  };
+
   const toItems = (arr: any[], type: BaseItem['type']) =>
     arr.map((r) => ({
       id: r.id,
       tool: 'axe-core' as const,
       type,
-      impact: r.impact,
+      impact: r.impact ?? inferImpact(r.nodes),
       help: r.help,
       helpUrl: r.helpUrl,
       nodes: (r.nodes ?? []).map((n: any) => ({
@@ -55,11 +65,12 @@ export function mapAxeToUnified(axe: any, wcagVersion: '2.0' | '2.1' | '2.2', wc
       wcag: { version: wcagVersion, level: wcagLevel, criterion: null }
     }));
 
+ // Importante: omitimos los "pass" del listado, pero NO de las estadísticas
   const items = [
     ...toItems(axe.violations ?? [], 'violation'),
-    ...toItems(axe.passes ?? [], 'pass'),
+    // ...toItems(axe.passes ?? [], 'pass'), // omitido a propósito
     ...toItems(axe.incomplete ?? [], 'incomplete'),
-    ...toItems(axe.inapplicable ?? [], 'inapplicable')
+    // ...toItems(axe.inapplicable ?? [], 'inapplicable'),
   ];
 
   const stats = {
@@ -72,6 +83,26 @@ export function mapAxeToUnified(axe: any, wcagVersion: '2.0' | '2.1' | '2.2', wc
   };
 
   return { tool: 'axe-core', stats, items };
+}
+
+ // Normaliza "impact" para Equal Access a partir de su "level"
+ // Nota: Equal Access no provee impact oficial (minor/moderate/serious/critical) como axe-core.
+ // Este mapeo es heurístico para unificar UI.
+ function mapImpactFromLevel(level: string | undefined): 'minor' | 'moderate' | 'serious' | 'critical' | undefined {
+   const l = String(level ?? '').toLowerCase();
+   switch (l) {
+     case 'violation':
+       return 'serious';
+     case 'recommendation':
+       return 'moderate';
+    case 'potentialviolation':
+    case 'potentialrecommendation':
+    case 'manual':
+      return 'minor';
+    // 'pass' y otros -> sin impacto
+    default:
+      return undefined;
+  }
 }
 
 export function mapEqualAccessToUnified(eaReport: any, wcagVersion: '2.0' | '2.1' | '2.2', wcagLevel: 'A' | 'AA' | 'AAA'): UnifiedToolResult {
@@ -87,7 +118,7 @@ export function mapEqualAccessToUnified(eaReport: any, wcagVersion: '2.0' | '2.1
       id: r.ruleId,
       tool: 'equal-access' as const,
       type,
-      impact: undefined,
+      impact: mapImpactFromLevel(level),
       help: r.message,
       helpUrl: undefined,
       nodes: [{
