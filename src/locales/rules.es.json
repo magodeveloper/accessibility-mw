@@ -1,0 +1,806 @@
+[
+  {
+    "code":"3.1.1",
+    "principle":"comprensible",
+    "guideline":"Idioma de la página",
+    "description":"El idioma principal de la página se puede identificar programáticamente",
+    "level":"A",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:06:26",
+    "updated_at":"2025-08-05 17:06:26"
+  },
+  {
+    "code":"3.1.2",
+    "principle":"comprensible",
+    "guideline":"Idioma de las partes",
+    "description":"El idioma de las secciones diferentes se puede identificar",
+    "level":"AA",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:06:26",
+    "updated_at":"2025-08-05 17:06:26"
+  },
+  {
+    "code":"3.1.3",
+    "principle":"comprensible",
+    "guideline":"Palabras inusuales",
+    "description":"Se proporciona información para palabras o frases inusuales",
+    "level":"AAA",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:06:26",
+    "updated_at":"2025-08-05 17:06:26"
+  },
+  {
+    "code":"3.1.4",
+    "principle":"comprensible",
+    "guideline":"Abreviaciones",
+    "description":"Se proporciona significado de abreviaciones",
+    "level":"AAA",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:06:26",
+    "updated_at":"2025-08-05 17:06:26"
+  },
+  {
+    "code":"3.1.5",
+    "principle":"comprensible",
+    "guideline":"Nivel de lectura",
+    "description":"El texto debe estar redactado en un nivel de lectura inferior a bachillerato",
+    "level":"AAA",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:06:26",
+    "updated_at":"2025-08-05 17:06:26"
+  },
+  {
+    "code":"3.1.6",
+    "principle":"comprensible",
+    "guideline":"Pronunciación",
+    "description":"Se proporciona información sobre la pronunciación",
+    "level":"AAA",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:06:26",
+    "updated_at":"2025-08-05 17:06:26"
+  },
+  {
+    "code":"3.2.1",
+    "principle":"comprensible",
+    "guideline":"Al recibir foco",
+    "description":"Los elementos no cambian automáticamente al recibir el foco",
+    "level":"A",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:06:26",
+    "updated_at":"2025-08-05 17:06:26"
+  },
+  {
+    "code":"3.2.2",
+    "principle":"comprensible",
+    "guideline":"Al recibir entradas",
+    "description":"No se desencadenan cambios inesperados al interactuar",
+    "level":"A",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:06:26",
+    "updated_at":"2025-08-05 17:06:26"
+  },
+  {
+    "code":"3.2.3",
+    "principle":"comprensible",
+    "guideline":"Navegación coherente",
+    "description":"La navegación debe mantenerse consistente en todas las páginas",
+    "level":"AA",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:06:26",
+    "updated_at":"2025-08-05 17:06:26"
+  },
+  {
+    "code":"3.2.4",
+    "principle":"comprensible",
+    "guideline":"Identificación coherente",
+    "description":"Componentes similares se identifican de forma coherente",
+    "level":"AA",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:06:26",
+    "updated_at":"2025-08-05 17:06:26"
+  },
+  {
+    "code":"3.2.5",
+    "principle":"comprensible",
+    "guideline":"Cambios bajo solicitud",
+    "description":"Solo ocurren cambios de contexto cuando el usuario los activa",
+    "level":"AAA",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:06:26",
+    "updated_at":"2025-08-05 17:06:26"
+  },
+  {
+    "code":"3.3.1",
+    "principle":"comprensible",
+    "guideline":"Identificación de errores",
+    "description":"Se identifican los errores de entrada automáticamente",
+    "level":"A",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:06:26",
+    "updated_at":"2025-08-05 17:06:26"
+  },
+  {
+    "code":"3.3.2",
+    "principle":"comprensible",
+    "guideline":"Etiquetas o instrucciones",
+    "description":"Se proporcionan instrucciones claras para campos de entrada",
+    "level":"A",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:06:26",
+    "updated_at":"2025-08-05 17:06:26"
+  },
+  {
+    "code":"3.3.3",
+    "principle":"comprensible",
+    "guideline":"Sugerencias ante errores",
+    "description":"Se ofrecen sugerencias para corregir errores",
+    "level":"AA",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:06:26",
+    "updated_at":"2025-08-05 17:06:26"
+  },
+  {
+    "code":"3.3.4",
+    "principle":"comprensible",
+    "guideline":"Prevención de errores (legales, financieros)",
+    "description":"Se validan, revisan y confirman entradas críticas",
+    "level":"AA",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:06:26",
+    "updated_at":"2025-08-05 17:06:26"
+  },
+  {
+    "code":"3.3.5",
+    "principle":"comprensible",
+    "guideline":"Ayuda contextual",
+    "description":"Se ofrece ayuda contextual fácilmente accesible",
+    "level":"AAA",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:06:26",
+    "updated_at":"2025-08-05 17:06:26"
+  },
+  {
+    "code":"3.3.6",
+    "principle":"comprensible",
+    "guideline":"Confirmación de entrada",
+    "description":"Se requiere confirmación antes de acciones irreversibles",
+    "level":"AAA",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:06:26",
+    "updated_at":"2025-08-05 17:06:26"
+  },
+  {
+    "code":"3.3.7",
+    "principle":"comprensible",
+    "guideline":"Mecanismos de ayuda",
+    "description":"Se proporcionan ayudas integradas accesibles para formularios complejos",
+    "level":"AAA",
+    "version":"2.2",
+    "created_at":"2025-08-05 17:06:26",
+    "updated_at":"2025-08-05 17:06:26"
+  },
+  {
+    "code":"2.1.1",
+    "principle":"operable",
+    "guideline":"Accesible por teclado",
+    "description":"Toda funcionalidad es operable mediante el teclado",
+    "level":"A",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.1.2",
+    "principle":"operable",
+    "guideline":"Sin trampas para el teclado",
+    "description":"No se debe quedar atrapado en componentes de teclado",
+    "level":"A",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.1.3",
+    "principle":"operable",
+    "guideline":"Teclado (sin excepción)",
+    "description":"Todo debe ser accesible sin mouse (sin excepciones)",
+    "level":"AAA",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.1.4",
+    "principle":"operable",
+    "guideline":"Teclas de un solo carácter",
+    "description":"Evitar activación accidental con una sola tecla",
+    "level":"A",
+    "version":"2.1",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.2.1",
+    "principle":"operable",
+    "guideline":"Tiempo ajustable",
+    "description":"Usuario puede extender o desactivar límites de tiempo",
+    "level":"A",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.2.2",
+    "principle":"operable",
+    "guideline":"Pausar, detener, ocultar",
+    "description":"Usuario puede controlar movimiento\/parpadeo\/actualización",
+    "level":"A",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.2.3",
+    "principle":"operable",
+    "guideline":"Sin límites de tiempo",
+    "description":"No hay límite de tiempo, a menos que sea esencial",
+    "level":"AAA",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.2.4",
+    "principle":"operable",
+    "guideline":"Interrupciones",
+    "description":"El contenido no debe interrumpir al usuario",
+    "level":"AAA",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.2.5",
+    "principle":"operable",
+    "guideline":"Re-autenticación",
+    "description":"Datos se conservan tras sesión expirada",
+    "level":"AAA",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.2.6",
+    "principle":"operable",
+    "guideline":"Tiempo de espera",
+    "description":"El usuario es informado del tiempo de espera",
+    "level":"AAA",
+    "version":"2.1",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.3.1",
+    "principle":"operable",
+    "guideline":"Tres destellos o menos",
+    "description":"El contenido no debe parpadear más de tres veces por segundo.",
+    "level":"A",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.3.2",
+    "principle":"operable",
+    "guideline":"Tres destellos (detallado)",
+    "description":"Mismo que 2.3.1, pero con criterios más estrictos",
+    "level":"AAA",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.3.3",
+    "principle":"operable",
+    "guideline":"Animaciones al interactuar",
+    "description":"El usuario puede desactivar animaciones",
+    "level":"AAA",
+    "version":"2.1",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.4.1",
+    "principle":"operable",
+    "guideline":"Evitar bloqueos de enfoque",
+    "description":"Se pueden evitar zonas donde el foco se pierde",
+    "level":"A",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.4.2",
+    "principle":"operable",
+    "guideline":"Titulado de páginas",
+    "description":"Cada página tiene un título claro y descriptivo",
+    "level":"A",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.4.3",
+    "principle":"operable",
+    "guideline":"Orden de enfoque",
+    "description":"El orden de navegación es lógico y predecible",
+    "level":"A",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.4.4",
+    "principle":"operable",
+    "guideline":"Propósito del enlace (en contexto)",
+    "description":"Enlaces tienen propósito claro en su contexto",
+    "level":"A",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.4.5",
+    "principle":"operable",
+    "guideline":"Múltiples formas",
+    "description":"Más de una forma de encontrar una página",
+    "level":"AA",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.4.6",
+    "principle":"operable",
+    "guideline":"Encabezados y etiquetas",
+    "description":"Encabezados describen claramente el contenido",
+    "level":"AA",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.4.7",
+    "principle":"operable",
+    "guideline":"Foco visible",
+    "description":"El foco del teclado es visible en todo momento",
+    "level":"AA",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.4.8",
+    "principle":"operable",
+    "guideline":"Ubicación",
+    "description":"Usuario conoce su ubicación dentro del sitio",
+    "level":"AAA",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.4.9",
+    "principle":"operable",
+    "guideline":"Propósito del enlace (solo enlace)",
+    "description":"El propósito del enlace debe deducirse solo por el texto",
+    "level":"AAA",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.4.10",
+    "principle":"operable",
+    "guideline":"Secuencia de sección",
+    "description":"Elementos tienen un orden de lectura lógico",
+    "level":"AAA",
+    "version":"2.0",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.4.11",
+    "principle":"operable",
+    "guideline":"Foco no oculto",
+    "description":"El foco no está oculto por contenido flotante",
+    "level":"AA",
+    "version":"2.2",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.4.12",
+    "principle":"operable",
+    "guideline":"Evitar pérdida de foco",
+    "description":"El foco no debe moverse automáticamente al interactuar",
+    "level":"AA",
+    "version":"2.2",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.4.13",
+    "principle":"operable",
+    "guideline":"Punto de entrada",
+    "description":"Múltiples puntos para ingresar a contenido frecuente",
+    "level":"AAA",
+    "version":"2.2",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.5.1",
+    "principle":"operable",
+    "guideline":"Gestos con puntero",
+    "description":"Evitar gestos complejos para tareas básicas",
+    "level":"A",
+    "version":"2.1",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.5.2",
+    "principle":"operable",
+    "guideline":"Cancelar entrada con puntero",
+    "description":"El usuario puede cancelar acciones iniciadas accidentalmente",
+    "level":"A",
+    "version":"2.1",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.5.3",
+    "principle":"operable",
+    "guideline":"Inclusión de etiquetas en nombre",
+    "description":"El texto visible debe coincidir con el nombre accesible",
+    "level":"A",
+    "version":"2.1",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.5.4",
+    "principle":"operable",
+    "guideline":"Activación por movimiento",
+    "description":"Acciones físicas deben poder desactivarse",
+    "level":"A",
+    "version":"2.1",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.5.5",
+    "principle":"operable",
+    "guideline":"Tamaño del objetivo",
+    "description":"Objetos interactivos tienen tamaño mínimo de 44×44 px",
+    "level":"AAA",
+    "version":"2.2",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code":"2.5.6",
+    "principle":"operable",
+    "guideline":"Entrada con dispositivos múltiples",
+    "description":"El usuario puede usar entrada redundante",
+    "level":"AAA",
+    "version":"2.2",
+    "created_at":"2025-08-05 17:04:06",
+    "updated_at":"2025-08-05 17:04:06"
+  },
+  {
+    "code": "1.1.1",
+    "principle": "perceptible",
+    "guideline": "Alternativas textuales",
+    "description": "Todo contenido no textual tiene una alternativa textual",
+    "level": "A",
+    "version": "2.0",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.2.1",
+    "principle": "perceptible",
+    "guideline": "Multimedia basada en el tiempo",
+    "description": "Solo audio y video deben tener alternativa textual",
+    "level": "A",
+    "version": "2.0",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.2.2",
+    "principle": "perceptible",
+    "guideline": "Subtítulos (grabado)",
+    "description": "Subtítulos para contenido de audio pregrabado",
+    "level": "A",
+    "version": "2.0",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.2.3",
+    "principle": "perceptible",
+    "guideline": "Audio descripción (grabado)",
+    "description": "Audio descripción para video pregrabado",
+    "level": "A",
+    "version": "2.0",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.2.4",
+    "principle": "perceptible",
+    "guideline": "Subtítulos (en vivo)",
+    "description": "Subtítulos para contenido de audio en vivo",
+    "level": "AA",
+    "version": "2.0",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.2.5",
+    "principle": "perceptible",
+    "guideline": "Audio descripción (grabado)",
+    "description": "Audio descripción como alternativa sincronizada",
+    "level": "AA",
+    "version": "2.0",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.2.6",
+    "principle": "perceptible",
+    "guideline": "Lenguaje de señas (grabado)",
+    "description": "Video de lenguaje de señas para audio pregrabado",
+    "level": "AAA",
+    "version": "2.0",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.2.7",
+    "principle": "perceptible",
+    "guideline": "Descripción extendida (grabado)",
+    "description": "Descripción extendida opcional",
+    "level": "AAA",
+    "version": "2.0",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.2.8",
+    "principle": "perceptible",
+    "guideline": "Alternativa para multimedia",
+    "description": "Alternativa de texto para todo multimedia sincronizado",
+    "level": "AAA",
+    "version": "2.0",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.2.9",
+    "principle": "perceptible",
+    "guideline": "Solo audio (en vivo)",
+    "description": "Alternativa textual para solo audio en vivo",
+    "level": "AAA",
+    "version": "2.0",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.3.1",
+    "principle": "perceptible",
+    "guideline": "Información y relaciones",
+    "description": "La estructura se expresa semánticamente o por texto",
+    "level": "A",
+    "version": "2.0",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.3.2",
+    "principle": "perceptible",
+    "guideline": "Secuencia significativa",
+    "description": "El orden del contenido es significativo",
+    "level": "A",
+    "version": "2.0",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.3.3",
+    "principle": "perceptible",
+    "guideline": "Características sensoriales",
+    "description": "No se depende solo de la forma, color, sonido, etc.",
+    "level": "A",
+    "version": "2.0",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.3.4",
+    "principle": "perceptible",
+    "guideline": "Orientación",
+    "description": "El contenido no restringe orientación del dispositivo",
+    "level": "AA",
+    "version": "2.1",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.3.5",
+    "principle": "perceptible",
+    "guideline": "Identificación del propósito de entrada",
+    "description": "El propósito puede determinarse programáticamente",
+    "level": "AA",
+    "version": "2.1",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.4.1",
+    "principle": "perceptible",
+    "guideline": "Uso del color",
+    "description": "No se usa color como único medio para transmitir info.",
+    "level": "A",
+    "version": "2.0",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.4.2",
+    "principle": "perceptible",
+    "guideline": "Control del audio",
+    "description": "Detener/pausar audio que se reproduce automáticamente",
+    "level": "A",
+    "version": "2.0",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.4.3",
+    "principle": "perceptible",
+    "guideline": "Contraste mínimo",
+    "description": "Contraste mínimo de 4.5:1 entre texto y fondo",
+    "level": "AA",
+    "version": "2.0",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.4.4",
+    "principle": "perceptible",
+    "guideline": "Redimensionar texto",
+    "description": "Texto redimensionable sin pérdida de contenido",
+    "level": "AA",
+    "version": "2.0",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.4.5",
+    "principle": "perceptible",
+    "guideline": "Imágenes de texto",
+    "description": "Evitar imágenes de texto si es posible",
+    "level": "AA",
+    "version": "2.0",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.4.6",
+    "principle": "perceptible",
+    "guideline": "Contraste mejorado",
+    "description": "Contraste mínimo de 7:1",
+    "level": "AAA",
+    "version": "2.0",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.4.7",
+    "principle": "perceptible",
+    "guideline": "Sin imágenes de fondo",
+    "description": "Evitar imágenes de fondo en texto",
+    "level": "AAA",
+    "version": "2.0",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.4.8",
+    "principle": "perceptible",
+    "guideline": "Presentación visual",
+    "description": "Requisitos para el espaciado de texto",
+    "level": "AAA",
+    "version": "2.0",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.4.9",
+    "principle": "perceptible",
+    "guideline": "Imágenes de texto (solo)",
+    "description": "Imágenes de texto solo permitidas con propósito específico",
+    "level": "AAA",
+    "version": "2.0",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.4.10",
+    "principle": "perceptible",
+    "guideline": "Reflujo",
+    "description": "Contenido se adapta sin scroll horizontal",
+    "level": "AA",
+    "version": "2.1",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.4.11",
+    "principle": "perceptible",
+    "guideline": "Contraste de componentes no textuales",
+    "description": "Contraste para íconos, bordes, controles",
+    "level": "AA",
+    "version": "2.1",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.4.12",
+    "principle": "perceptible",
+    "guideline": "Espaciado del texto",
+    "description": "Usuario puede ajustar espaciado sin pérdida",
+    "level": "AA",
+    "version": "2.1",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "1.4.13",
+    "principle": "perceptible",
+    "guideline": "Contenido al enfocar",
+    "description": "Al enfocar, no desaparece automáticamente",
+    "level": "AA",
+    "version": "2.1",
+    "created_at": "2025-08-05 17:02:15",
+    "updated_at": "2025-08-05 17:02:15"
+  },
+  {
+    "code": "4.1.1",
+    "principle": "robusto",
+    "guideline": "Análisis sintáctico",
+    "description": "El contenido está correctamente estructurado (sin errores de marcado)",
+    "level": "A",
+    "version": "2.0"
+  },
+  {
+    "code": "4.1.2",
+    "principle": "robusto",
+    "guideline": "Nombre, función, valor",
+    "description": "Los componentes de interfaz tienen nombre, función y valor definidos",
+    "level": "A",
+    "version": "2.0"
+  },
+  {
+    "code": "4.1.3",
+    "principle": "robusto",
+    "guideline": "Estado del control",
+    "description": "El estado y propiedades de los controles son comunicados a AT",
+    "level": "AA",
+    "version": "2.2"
+  }
+]

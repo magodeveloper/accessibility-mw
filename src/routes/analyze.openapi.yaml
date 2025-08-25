@@ -1,0 +1,381 @@
+openapi: 3.1.0
+info:
+  title: Accessibility Analyze API
+  version: 1.0.0
+  description: API para análisis de accesibilidad web usando axe-core y Equal Access.
+
+paths:
+  /api/analyze:
+    post:
+      summary: Analiza accesibilidad (HTML o URL)
+      description: |
+        **Análisis de Accesibilidad Web Completo**
+
+        Este endpoint ejecuta análisis de accesibilidad usando axe-core y/o IBM Equal Access, 
+        y automáticamente guarda los resultados en el microservicio de análisis.
+
+        ## 🔄 **Integración con Microservicio**
+
+        - **Auto-Save** → Guarda análisis en `http://localhost:8082/api/analysis`
+        - **Auto-Save** → Guarda resultados en `http://localhost:8082/api/result`  
+        - **Auto-Save** → Guarda errores en `http://localhost:8082/api/error`
+        - **Response** → Devuelve `analysisId` para consultas futuras
+
+        ## 🎯 **URLs de Consulta**
+
+        Después del análisis, consulta los datos guardados:
+        - **Por ID**: `http://localhost:8082/api/analysis/{analysisId}`
+        - **Por fecha**: `http://localhost:8082/api/analysis/by-date?userId=1&date=2025-08-22`
+        - **Swagger DB**: `http://localhost:8082/swagger/index.html`
+      tags:
+        - Analysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyzeRequest'
+            examples:
+              axe-html-basic:
+                summary: 'axe-core · HTML básico'
+                value:
+                  inputType: 'html'
+                  value: "<!doctype html>\n<html lang=\"es\">\n  <head><meta charset=\"utf-8\"><title>Hola</title></head>\n  <body>\n    <h1>Hola mundo</h1>\n    <p>Contenido de ejemplo.</p>\n  </body>\n</html>"
+                  tool: 'axe-core'
+                  wcagVersion: '2.2'
+                  wcagLevel: 'AA'
+              axe-html-medium:
+                summary: 'axe-core · HTML con problemas comunes'
+                value:
+                  inputType: 'html'
+                  value: "<!doctype html>\n<html>\n  <head>\n    <meta charset=\"utf-8\">\n    <title>Ejemplo medio</title>\n    <style>.low-contrast{color:#999;background:#9a9a9a;}</style>\n  </head>\n  <body>\n    <img src=\"foto.jpg\">\n    <button></button>\n    <a href=\"#\">Leer más</a>\n    <p class=\"low-contrast\">Texto con bajo contraste.</p>\n    <form>\n      <label for=\"email\">Correo</label>\n      <input id=\"correo\" type=\"email\" placeholder=\"tu@correo.com\">\n      <button type=\"submit\">Enviar</button>\n    </form>\n  </body>\n</html>"
+                  tool: 'axe-core'
+                  wcagVersion: '2.2'
+                  wcagLevel: 'AA'
+              axe-html-advanced:
+                summary: 'axe-core · HTML alta complejidad'
+                value:
+                  inputType: 'html'
+                  value: "<!doctype html>\n<html lang=\"es\">\n  <head>\n    <meta charset=\"utf-8\">\n    <title>Avanzado</title>\n    <style>#menu{display:none;}</style>\n  </head>\n  <body>\n    <header role=\"banner\"><h1>Portal</h1></header>\n    <nav aria-label=\"principal\"><ul><li><a href=\"#m\">Menú</a></li></ul></nav>\n    <main id=\"m\" role=\"main\">\n      <section aria-labelledby=\"s1\"><h2 id=\"s1\">Productos</h2></section>\n      <button aria-haspopup=\"dialog\" aria-controls=\"dlg\">Abrir modal</button>\n      <div id=\"dlg\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"t\" hidden>\n        <h2 id=\"t\">Título modal</h2>\n        <button id=\"cerrar\">X</button>\n      </div>\n      <div role=\"button\">Acción</div>\n    </main>\n    <footer role=\"contentinfo\">© 2025</footer>\n  </body>\n</html>"
+                  tool: 'axe-core'
+                  wcagVersion: '2.2'
+                  wcagLevel: 'AA'
+              both-tools-html:
+                summary: 'axe-core + Equal Access · HTML avanzado'
+                value:
+                  inputType: 'html'
+                  value: "<!doctype html>\n<html lang=\"es\">\n  <head>\n    <meta charset=\"utf-8\">\n    <title>Avanzado</title>\n    <script>\n      document.addEventListener('DOMContentLoaded', () => {\n        const b = document.getElementById('abrir');\n        if (b) b.addEventListener('click', () => {\n          const d = document.getElementById('dlg');\n          if (d) d.removeAttribute('hidden');\n        });\n      });\n    </script>\n  </head>\n  <body>\n    <nav><a href=\"#main\">Ir al contenido</a></nav>\n    <main id=\"main\">\n      <h1>Catálogo</h1>\n      <div role=\"tablist\">\n        <button role=\"tab\" aria-selected=\"true\">Tab 1</button>\n        <button role=\"tab\">Tab 2</button>\n      </div>\n      <button id=\"abrir\">Abrir modal</button>\n      <div id=\"dlg\" role=\"dialog\" aria-modal=\"true\" hidden>\n        <h2>Título</h2>\n        <button>Cerrar</button>\n      </div>\n    </main>\n  </body>\n</html>"
+                  tool: 'both'
+                  wcagVersion: '2.2'
+                  wcagLevel: 'AA'
+              axe-url:
+                summary: 'axe-core · URL pública'
+                value:
+                  inputType: 'url'
+                  value: 'https://www.elcomercio.com/'
+                  tool: 'axe-core'
+                  wcagVersion: '2.2'
+                  wcagLevel: 'AA'
+              equal-access-html:
+                summary: 'Equal Access · HTML con ARIA'
+                value:
+                  inputType: 'html'
+                  value: "<!doctype html>\n<html>\n  <head>\n    <meta charset=\"utf-8\">\n    <title>Ejemplo Equal Access</title>\n  </head>\n  <body>\n    <img src=\"foto.jpg\">\n    <button aria-label=\"\"></button>\n    <label>Nombre<input type=\"text\"></label>\n    <a href=\"#\" role=\"button\">Más</a>\n    <ul><li tabindex=\"0\">Item sin rol</li></ul>\n  </body>\n</html>"
+                  tool: 'equal-access'
+                  wcagVersion: '2.2'
+                  wcagLevel: 'AA'
+      responses:
+        '200':
+          description: |
+            **✅ Análisis Completado y Guardado Exitosamente**
+
+            El análisis se ejecutó correctamente y se guardó en el microservicio de análisis.
+            El resultado incluye el `analysisId` para consultas futuras.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyzeResponse'
+              examples:
+                successful_analysis:
+                  summary: 'Análisis exitoso con guardado automático'
+                  value:
+                    ok: true
+                    data:
+                      ok: true
+                      meta:
+                        inputType: 'html'
+                        value: '<html>...</html>'
+                        tool: 'axe-core'
+                        wcagVersion: '2.2'
+                        wcagLevel: 'AA'
+                        cumulativeWcag: false
+                        duration: 1500
+                      results:
+                        - tool: 'axe-core'
+                          stats:
+                            violations: 2
+                            needsReview: 1
+                            passes: 15
+                          items: []
+                      analysisSaved: true
+                      analysisId: 42
+                      message: 'Análisis y resultados guardados exitosamente en la base de datos'
+                    requestId: 'abc123'
+        '207':
+          description: |
+            **⚠️ Análisis Completado con Problemas de Guardado Parcial**
+
+            El análisis se ejecutó correctamente, pero algunos resultados o errores 
+            no se pudieron guardar en el microservicio.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyzeResponsePartial'
+              examples:
+                partial_save:
+                  summary: 'Guardado parcial con algunos errores'
+                  value:
+                    ok: true
+                    data:
+                      analysisSaved: true
+                      analysisId: 42
+                      message: 'Análisis guardado, pero algunos resultados (2) o errores (1) no se pudieron guardar.'
+                      failedResults:
+                        - wcagCriterion: '1.1.1'
+                          error: 'Network timeout'
+                      failedErrors:
+                        - criterion: '1.3.1'
+                          error: 'Database connection failed'
+                    requestId: 'abc123'
+        '400':
+          description: '❌ Error de validación en los parámetros de entrada'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                validation_error:
+                  summary: 'Error de validación típico'
+                  value:
+                    ok: false
+                    error: "inputType must be 'html' or 'url'"
+                    code: 'VALIDATION_ERROR'
+                    requestId: 'abc123'
+        '429':
+          description: '🚫 Límite de velocidad excedido'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: '💥 Error interno del servidor'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: |
+            **🔌 Microservicio de Análisis No Disponible**
+
+            El análisis se ejecutó correctamente, pero no se pudo conectar 
+            con el microservicio para guardar los resultados.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                service_unavailable:
+                  summary: 'Microservicio no disponible'
+                  value:
+                    ok: false
+                    error: 'Analysis microservice unavailable'
+                    code: 'SERVICE_UNAVAILABLE'
+                    requestId: 'abc123'
+        '504':
+          description: '⏱️ Timeout en el análisis'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    AnalyzeRequest:
+      type: object
+      required:
+        - inputType
+        - value
+        - tool
+      properties:
+        inputType:
+          type: string
+          enum: [html, url]
+          description: Tipo de entrada (HTML directo o URL)
+          example: html
+        value:
+          type: string
+          description: Contenido HTML o URL a analizar
+          example: '<!doctype html><html lang="es"><head><title>Test</title></head><body><h1>Hello</h1></body></html>'
+        tool:
+          type: string
+          enum: [axe-core, equal-access, both]
+          description: Herramienta(s) de análisis a usar
+          example: axe-core
+        wcagVersion:
+          type: string
+          enum: ['2.1', '2.2']
+          default: '2.2'
+          description: Versión WCAG para el análisis
+          example: '2.2'
+        wcagLevel:
+          type: string
+          enum: [A, AA, AAA]
+          default: AA
+          description: Nivel WCAG para el análisis
+          example: AA
+        cumulativeWcag:
+          type: boolean
+          default: false
+          description: Si incluir niveles inferiores (A + AA cuando se solicita AA)
+          example: false
+        userId:
+          type: integer
+          description: ID del usuario que solicita el análisis
+          example: 1
+        reportName:
+          type: string
+          description: Nombre descriptivo para el análisis
+          example: 'Análisis homepage empresa'
+
+    AnalyzeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            ok:
+              type: boolean
+              example: true
+            meta:
+              type: object
+              properties:
+                inputType:
+                  type: string
+                  example: html
+                value:
+                  type: string
+                  example: '<html>...</html>'
+                tool:
+                  type: string
+                  example: axe-core
+                wcagVersion:
+                  type: string
+                  example: '2.2'
+                wcagLevel:
+                  type: string
+                  example: AA
+                cumulativeWcag:
+                  type: boolean
+                  example: false
+                duration:
+                  type: number
+                  example: 1500
+            results:
+              type: array
+              items:
+                type: object
+                properties:
+                  tool:
+                    type: string
+                    example: axe-core
+                  stats:
+                    type: object
+                    properties:
+                      violations:
+                        type: integer
+                        example: 2
+                      needsReview:
+                        type: integer
+                        example: 1
+                      passes:
+                        type: integer
+                        example: 15
+                  items:
+                    type: array
+                    items:
+                      type: object
+            analysisSaved:
+              type: boolean
+              example: true
+            analysisId:
+              type: integer
+              example: 42
+            message:
+              type: string
+              example: 'Análisis y resultados guardados exitosamente en la base de datos'
+        requestId:
+          type: string
+          example: abc123
+
+    AnalyzeResponsePartial:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            analysisSaved:
+              type: boolean
+              example: true
+            analysisId:
+              type: integer
+              example: 42
+            message:
+              type: string
+              example: 'Análisis guardado, pero algunos resultados (2) o errores (1) no se pudieron guardar.'
+            failedResults:
+              type: array
+              items:
+                type: object
+                properties:
+                  wcagCriterion:
+                    type: string
+                    example: '1.1.1'
+                  error:
+                    type: string
+                    example: 'Network timeout'
+            failedErrors:
+              type: array
+              items:
+                type: object
+                properties:
+                  criterion:
+                    type: string
+                    example: '1.3.1'
+                  error:
+                    type: string
+                    example: 'Database connection failed'
+        requestId:
+          type: string
+          example: abc123
+
+    ErrorResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: "inputType must be 'html' or 'url'"
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        requestId:
+          type: string
+          example: abc123

@@ -1,30 +1,49 @@
 version: '3.9'
 
 services:
-  app:
+  accessibility-mw:
     build:
       context: .
       dockerfile: Dockerfile
-      provenance: false
+      target: production
     image: accessibility-mw:latest
-    env_file:
-      - .env.prod
+    container_name: accessibility-mw-prod
+    environment:
+      - NODE_ENV=production
+      - APP_ENV=PROD
+      - PORT=3001
+      - HOST=0.0.0.0
+      - PLAYWRIGHT_HEADLESS=true
+      - NODE_OPTIONS=--enable-source-maps --max-old-space-size=1024
     ports:
-      - '3001:3001' # host:container — ajusta si cambias PORT en .env.prod
+      - '3001:3001'
     restart: unless-stopped
-    shm_size: '1gb' # recomendado para Chromium
+    shm_size: '1gb'
     ulimits:
       nofile: 65536
-    # Usa el HEALTHCHECK del Dockerfile (no lo sobreescribimos aquí)
-    # Si quieres logs más controlados:
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', r => process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     logging:
       driver: 'json-file'
       options:
         max-size: '10m'
         max-file: '3'
-    # Si estás detrás de un proxy inverso, puedes añadir:
-    # networks:
-    #   - web
-# networks:
-#   web:
-#     external: true
+    volumes:
+      - type: tmpfs
+        target: /app/logs
+        tmpfs:
+          size: 200m
+      - type: tmpfs
+        target: /app/.achecker_cache
+        tmpfs:
+          size: 200m
+    networks:
+      - accessibility_network
+
+networks:
+  accessibility_network:
+    driver: bridge

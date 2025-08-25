@@ -1,51 +1,59 @@
-FROM node:20-bookworm AS builder
+# Etapa 1: Compilación completa
+FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Instala deps de prod+dev para compilar TS
-COPY package*.json ./
-RUN npm ci --no-audit --no-fund
+# Instalar dependencias del sistema
+RUN apk add --no-cache git
 
-# Copia fuentes y compila a /app/dist
+# Copiar package files e instalar TODAS las dependencias (prod + dev)
+COPY package*.json ./
+RUN npm ci --no-audit --no-fund --ignore-scripts && \
+  npm cache clean --force
+
+# Copiar código fuente y compilar
 COPY tsconfig*.json ./
+COPY config ./config
 COPY src ./src
 RUN npm run build
 
-# Etapa 2: runtime con Playwright (trae Chromium y deps)
-FROM mcr.microsoft.com/playwright:v1.54.2-jammy
+# Crear instalación limpia SOLO de producción
+RUN rm -rf node_modules && \
+  npm ci --omit=dev --no-audit --no-fund --ignore-scripts && \
+  npm cache clean --force
 
+# Etapa 2: Imagen de producción liviana (SIN reinstalar npm)
+FROM mcr.microsoft.com/playwright:v1.55.0-jammy AS accessibility-mw
 WORKDIR /app
 
-# Valores por defecto; pueden sobrescribirse con -e o --env-file
+# Variables de entorno
 ENV NODE_ENV=production \
-    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
-    PLAYWRIGHT_HEADLESS=true \
-    NODE_OPTIONS=--enable-source-maps \
-    PORT=3001 \
-    HOST=0.0.0.0
+  APP_ENV=PROD \
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+  PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+  PLAYWRIGHT_HEADLESS=true \
+  NODE_OPTIONS="--max-old-space-size=1024" \
+  PORT=3001 \
+  HOST=0.0.0.0
 
-# Instala solo deps de prod
-COPY package*.json ./
-RUN npm ci --omit=dev --no-audit --no-fund
-
-# Copia el build desde la etapa builder (no desde el host)
+# Copiar SOLO los archivos necesarios desde builder
 COPY --from=builder /app/dist ./dist
-
-# Config de Equal Access (asegúrate de NO ignorarla en .dockerignore)
+COPY src/routes/analyze.openapi.yaml ./dist/routes/analyze.openapi.yaml
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package*.json ./
 COPY .achecker.yml ./
 
-# Crear y dar permisos (en /app)
-RUN mkdir -p /app/results /app/.achecker_cache \
-    && chown -R pwuser:pwuser /app
+# ¡NO MÁS npm install! Todo viene del builder
+# Crear directorios, permisos y limpiar en un solo RUN
+RUN mkdir -p /app/results /app/logs && \
+  chown -R pwuser:pwuser /app && \
+  rm -rf /tmp/* /var/cache/* /var/lib/apt/lists/*
 
-# Usuario no root (la imagen de Playwright trae 'pwuser')
 USER pwuser
-
-# Expone el puerto (literal, no soporta variables aquí)
 EXPOSE 3001
 
-# Healthcheck interno al contenedor
+# Healthcheck
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD node -e "require('http').get(`http://localhost:${process.env.PORT || 3001}/health`, r => process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+  CMD node -e "require('http').get(\`http://localhost:\${process.env.PORT || 3001}/health\`, r => process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
 
-# Entrada
+# Punto de entrada
 CMD ["node", "dist/server.js"]

@@ -1,0 +1,34 @@
+{
+  "recommendations": [
+    // TypeScript & JavaScript
+    "ms-vscode.vscode-typescript-next",
+    "ms-vscode.js-debug",
+    
+    // Code Quality
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    
+    // Testing
+    "ms-playwright.playwright",
+    "hbenl.vscode-test-explorer",
+    
+    // Docker & DevOps
+    "ms-azuretools.vscode-docker",
+    "ms-vscode-remote.remote-containers",
+    "github.vscode-github-actions",
+    
+    // Git & Version Control  
+    "github.vscode-pull-request-github",
+    "eamodio.gitlens",
+    
+    // Accessibility
+    "deque-systems.vscode-axe-linter",
+    
+    // Utilities
+    "ms-vscode.vscode-json",
+    "redhat.vscode-yaml",
+    "ms-vscode-remote.remote-wsl",
+    "streetsidesoftware.code-spell-checker"
+  ]
+}

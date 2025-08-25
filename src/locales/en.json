@@ -1,0 +1,16 @@
+{
+  "analysis_saved": "Analysis and results successfully saved to the database.",
+  "analysis_partial": "Analysis saved, but some results or errors could not be saved.",
+  "analysis_error": "Analysis succeeded but could not be saved to the database.",
+  "validation_error": "Validation error.",
+  "internal_error": "Internal error.",
+  "timeout_error": "Analysis timed out.",
+  "no_tool_selected": "No valid tool was selected.",
+  "error_saving_analysis": "Error saving analysis.",
+  "error_saving_result": "Error saving individual result.",
+  "error_saving_error": "Error saving individual error.",
+  "help_missing_alt": "Image is missing alt attribute.",
+  "help_missing_label": "Form field is missing an associated label.",
+  "help_low_contrast": "Color contrast is insufficient.",
+  "help_missing_lang": "The language (lang) attribute is missing in the html tag."
+}

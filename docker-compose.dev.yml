@@ -1,25 +1,48 @@
 version: '3.9'
 
 services:
-  app:
+  accessibility-mw-dev:
     build:
       context: .
       dockerfile: Dockerfile
-      provenance: false
-    image: accessibility-mw-dev:latest
+      target: accessibility-mw
+    image: accessibility-mw:development
+    container_name: accessibility-mw-dev
     env_file:
-      - .env.dev
+      - .env.development
+    environment:
+      # Override específico para Docker - usar host.docker.internal en Windows/Mac
+      - ANALYSIS_API_URL=http://host.docker.internal:8082
+      - HOST=0.0.0.0
+      - NODE_OPTIONS=--enable-source-maps --max-old-space-size=1024
     ports:
       - '3001:3001'
-    shm_size: '1gb'
+    restart: unless-stopped
+    shm_size: '512m'
     ulimits:
-      nofile: 65536
-    # En dev podrías querer ver más logs en consola
-    environment:
-      - NODE_ENV=development
-    # Si quieres deshabilitar el HEALTHCHECK en dev:
-    # healthcheck:
-    #   test: ["CMD-SHELL", "exit 0"]
-    #   interval: 1m
-    #   timeout: 3s
-    #   retries: 1
+      nofile: 32768
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', r => process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 2
+      start_period: 20s
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '5m'
+        max-file: '2'
+    tmpfs:
+      - /app/logs
+      - /app/.achecker_cache
+      - /app/results:size=100m
+    networks:
+      - accessibility_network
+
+networks:
+  accessibility_network:
+    driver: bridge
+  dev_network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: 1500

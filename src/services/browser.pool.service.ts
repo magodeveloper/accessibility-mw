@@ -1,0 +1,271 @@
+import { Browser, BrowserContext, chromium, Page } from 'playwright';
+
+interface PooledBrowser {
+  browser: Browser;
+  lastUsed: number;
+  inUse: boolean;
+}
+
+class BrowserPool {
+  private pool: PooledBrowser[] = [];
+  private readonly maxPoolSize: number;
+  private readonly maxIdleTime: number;
+  private cleanupInterval?: NodeJS.Timeout;
+
+  constructor(maxPoolSize = 3, maxIdleTimeMs = 300000) {
+    // 5 min max idle
+    this.maxPoolSize = maxPoolSize;
+    this.maxIdleTime = maxIdleTimeMs;
+    this.startCleanupTimer();
+  }
+
+  private startCleanupTimer() {
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupIdleBrowsers();
+    }, 60000); // Limpia cada minuto
+  }
+
+  private async createBrowser(): Promise<Browser> {
+    const headlessEnv = String(
+      process.env.PLAYWRIGHT_HEADLESS ?? 'true'
+    ).toLowerCase();
+    const headless = headlessEnv !== 'false';
+
+    return await chromium.launch({
+      headless: headless || !process.env.DISPLAY,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-extensions',
+        '--disable-gpu',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        '--memory-pressure-off',
+      ],
+    });
+  }
+
+  async getBrowser(): Promise<Browser> {
+    // Buscar browser disponible
+    for (const pooledBrowser of this.pool) {
+      if (!pooledBrowser.inUse && pooledBrowser.browser.isConnected()) {
+        pooledBrowser.inUse = true;
+        pooledBrowser.lastUsed = Date.now();
+        return pooledBrowser.browser;
+      }
+    }
+
+    // Si no hay disponible y no hemos llegado al límite, crear nuevo
+    if (this.pool.length < this.maxPoolSize) {
+      const browser = await this.createBrowser();
+      const pooledBrowser: PooledBrowser = {
+        browser,
+        lastUsed: Date.now(),
+        inUse: true,
+      };
+      this.pool.push(pooledBrowser);
+      return browser;
+    }
+
+    // Si llegamos al límite, esperar hasta que uno esté disponible
+    return new Promise(resolve => {
+      const checkForAvailable = () => {
+        for (const pooledBrowser of this.pool) {
+          if (!pooledBrowser.inUse && pooledBrowser.browser.isConnected()) {
+            pooledBrowser.inUse = true;
+            pooledBrowser.lastUsed = Date.now();
+            resolve(pooledBrowser.browser);
+            return;
+          }
+        }
+        // Esperar 100ms y volver a intentar
+        setTimeout(checkForAvailable, 100);
+      };
+      checkForAvailable();
+    });
+  }
+
+  releaseBrowser(browser: Browser) {
+    const pooledBrowser = this.pool.find(p => p.browser === browser);
+    if (pooledBrowser) {
+      pooledBrowser.inUse = false;
+      pooledBrowser.lastUsed = Date.now();
+    }
+  }
+
+  private async cleanupIdleBrowsers() {
+    const now = Date.now();
+    for (let i = this.pool.length - 1; i >= 0; i--) {
+      const pooledBrowser = this.pool[i];
+      if (
+        !pooledBrowser.inUse &&
+        now - pooledBrowser.lastUsed > this.maxIdleTime
+      ) {
+        try {
+          await pooledBrowser.browser.close();
+        } catch (error) {
+          console.warn('Error closing idle browser:', error);
+        }
+        this.pool.splice(i, 1);
+      }
+    }
+  }
+
+  async shutdown() {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+    }
+
+    for (const pooledBrowser of this.pool) {
+      try {
+        await pooledBrowser.browser.close();
+      } catch (error) {
+        console.warn('Error closing browser during shutdown:', error);
+      }
+    }
+    this.pool = [];
+  }
+
+  getPoolStats() {
+    return {
+      total: this.pool.length,
+      inUse: this.pool.filter(p => p.inUse).length,
+      available: this.pool.filter(p => !p.inUse).length,
+      connected: this.pool.filter(p => p.browser.isConnected()).length,
+    };
+  }
+}
+
+// Instancia lazy del pool
+let _browserPool: BrowserPool | null = null;
+
+export const browserPool = {
+  get instance(): BrowserPool {
+    if (!_browserPool) {
+      const poolSize = Number(process.env.BROWSER_POOL_SIZE ?? 3);
+      _browserPool = new BrowserPool(poolSize);
+    }
+    return _browserPool;
+  },
+
+  async getBrowser(): Promise<Browser> {
+    return this.instance.getBrowser();
+  },
+
+  releaseBrowser(browser: Browser): void {
+    return this.instance.releaseBrowser(browser);
+  },
+
+  async shutdown(): Promise<void> {
+    if (_browserPool) {
+      await _browserPool.shutdown();
+      _browserPool = null;
+    }
+  },
+
+  getPoolStats() {
+    return _browserPool
+      ? _browserPool.getPoolStats()
+      : { total: 0, inUse: 0, available: 0, connected: 0 };
+  },
+};
+
+// Función optimizada para usar con el pool
+export async function withPooledPage<T>(
+  inputType: 'html' | 'url',
+  value: string,
+  fn: (page: Page) => Promise<T>,
+  opts?: {
+    overallTimeoutMs?: number;
+    navTimeoutMs?: number;
+    idleWaitMs?: number;
+  }
+): Promise<T> {
+  const overallTimeoutMs =
+    opts?.overallTimeoutMs ?? Number(process.env.ANALYZE_TIMEOUT_MS ?? 30000);
+  const navTimeoutMs =
+    opts?.navTimeoutMs ?? Number(process.env.NAVIGATION_TIMEOUT_MS ?? 15000);
+  const idleWaitMs =
+    opts?.idleWaitMs ?? Number(process.env.IDLE_WAIT_MS ?? 2000);
+
+  let browser: Browser | null = null;
+  let context: BrowserContext | null = null;
+  let page: Page | null = null;
+  let timeoutHit = false;
+
+  const timer = setTimeout(() => {
+    timeoutHit = true;
+  }, overallTimeoutMs);
+
+  try {
+    browser = await browserPool.getBrowser();
+
+    context = await browser.newContext({
+      javaScriptEnabled: true,
+      ignoreHTTPSErrors: true,
+      viewport: { width: 1280, height: 720 },
+    });
+
+    page = await context.newPage();
+    page.setDefaultNavigationTimeout(navTimeoutMs);
+
+    if (timeoutHit) {
+      throw new Error('Timeout: overall timeout exceeded before page setup');
+    }
+
+    if (inputType === 'url') {
+      await page.goto(value, { waitUntil: 'domcontentloaded' });
+      if (idleWaitMs > 0) {
+        await page.waitForTimeout(idleWaitMs);
+      }
+    } else {
+      await page.setContent(value);
+      await page.waitForTimeout(500); // Breve espera para que se renderice
+    }
+
+    if (timeoutHit) {
+      throw new Error('Timeout: overall timeout exceeded during navigation');
+    }
+
+    const result = await fn(page);
+
+    if (timeoutHit) {
+      throw new Error('Timeout: overall timeout exceeded during analysis');
+    }
+
+    return result;
+  } finally {
+    clearTimeout(timer);
+
+    // Limpiar recursos
+    try {
+      if (page) await page.close();
+      if (context) await context.close();
+    } catch (error) {
+      console.warn('Error cleaning up page/context:', error);
+    }
+
+    // Devolver browser al pool
+    if (browser) {
+      browserPool.releaseBrowser(browser);
+    }
+  }
+}
+
+// Graceful shutdown del pool - Solo en producción
+// Los event listeners se configuran en el servidor principal
+// process.on('SIGINT', async () => {
+//   if (process.env.NODE_ENV !== 'test') {
+//     console.info('Shutting down browser pool...');
+//   }
+//   await browserPool.shutdown();
+// });
+
+// process.on('SIGTERM', async () => {
+//   if (process.env.NODE_ENV !== 'test') {
+//     console.info('Shutting down browser pool...');
+//   }
+//   await browserPool.shutdown();
+// });

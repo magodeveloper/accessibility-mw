@@ -1,11 +1,69 @@
+# Dependencies
 node_modules
+npm-debug.log*
+.npm
+.cache
+# package-lock.json se necesita para npm ci
+
+# Build outputs (dist se genera durante el build)
 dist
+
+# Development files
 .git
 .gitignore
-.DS_Store
-npm-debug.log
+.github
 .vscode
+.DS_Store
+README.md
+REVIEW.md
+*.md
+
+# Environment files (se configuran en docker-compose)
+.env*
+!.achecker.yml
+
+# Test and coverage files
 coverage
+playwright-report
+test-results
+tests
+jest.config.js
+babel.config.js
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+
+# Temporary files
+*.log
+*.pid
 results
 .achecker_cache
-playwright-report
+temp_*
+debug_*
+*.tmp
+
+# Backup files
+backup/
+*.backup.*
+
+# Docker files except main Dockerfile
+Dockerfile.optimized
+docker-compose.*.yml
+!docker-compose.yml
+
+# Scripts y docs de desarrollo
+scripts/
+docs/
+config/coverage/
+
+# OS specific
+Thumbs.db
+.DS_Store
+*.swp
+*.swo
+
+# IDE files
+.idea/
+*.sublime-*
+*.code-workspace

@@ -1,0 +1,16 @@
+{
+  "analysis_saved": "Análisis y resultados guardados exitosamente en la base de datos.",
+  "analysis_partial": "Análisis guardado, pero algunos resultados o errores no se pudieron guardar.",
+  "analysis_error": "El análisis fue exitoso pero no se pudo guardar en la base de datos.",
+  "validation_error": "Error de validación.",
+  "internal_error": "Error interno.",
+  "timeout_error": "El análisis excedió el tiempo de espera.",
+  "no_tool_selected": "No se seleccionó ninguna herramienta válida.",
+  "error_saving_analysis": "Error al guardar análisis.",
+  "error_saving_result": "Error al guardar resultado individual.",
+  "error_saving_error": "Error al guardar error individual.",
+  "help_missing_alt": "La imagen no tiene atributo alt.",
+  "help_missing_label": "El campo de formulario no tiene etiqueta asociada.",
+  "help_low_contrast": "El contraste de color es insuficiente.",
+  "help_missing_lang": "El atributo de idioma (lang) falta en la etiqueta html."
+}

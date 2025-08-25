@@ -1,0 +1,43 @@
+# Ignorar archivos y directorios para Prettier
+node_modules/
+dist/
+build/
+coverage/
+test-results/
+playwright-report/
+blob-report/
+
+# Archivos de configuración del sistema
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# Archivos temporales
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Archivos de backup
+*.backup
+*.bak
+*~
+
+# Resultados de pruebas
+results/
+reports/
+screenshots/
+test-screenshots/
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+
+# Git
+.git/
+.gitignore
+*.patch
+
+# README y documentación markdown (mantener formato original)
+*.md

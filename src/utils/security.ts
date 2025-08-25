@@ -1,8 +1,8 @@
+import ipaddr from 'ipaddr.js';
+import dns from 'node:dns/promises';
 import http from 'node:http';
 import https from 'node:https';
 import { URL } from 'node:url';
-import ipaddr from 'ipaddr.js';
-import dns from 'node:dns/promises';
 
 export type UrlValidationResult = {
   ok: boolean;
@@ -13,7 +13,7 @@ export type UrlValidationResult = {
   ip?: string;
   port?: number;
   body?: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 };
 
 export type UrlValidationOptions = {
@@ -33,30 +33,46 @@ export async function validatePublicHttpUrl(
   rawUrl: string,
   options?: UrlValidationOptions
 ): Promise<UrlValidationResult> {
-
   const IS_DEV =
     /dev/i.test(process.env.NODE_ENV ?? '') ||
     /dev/i.test(process.env.APP_ENV ?? '') ||
     (process.env.BYPASS_SSRF_VALIDATION_IN_DEV ?? '').toLowerCase() === 'true';
 
-  const URL_LENGTH_LIMIT = options?.urlLengthLimit ?? Number(process.env.URL_LENGTH_LIMIT ?? 4096);
-  const REDIRECT_LIMIT   = options?.redirectLimit   ?? Number(process.env.REDIRECT_LIMIT   ?? 3);
-  const RESPONSE_BYTES_LIMIT = options?.responseBytesLimit ?? Number(process.env.RESPONSE_BYTES_LIMIT ?? 2_000_000);
-  const REQUEST_TIMEOUT_MS   = options?.requestTimeoutMs   ?? Number(process.env.REQUEST_TIMEOUT_MS   ?? 20_000);
-  const SOCKET_TIMEOUT_MS    = options?.socketTimeoutMs    ?? Number(process.env.SOCKET_TIMEOUT_MS    ?? 30_000);
+  const URL_LENGTH_LIMIT =
+    options?.urlLengthLimit ?? Number(process.env.URL_LENGTH_LIMIT ?? 4096);
+  const REDIRECT_LIMIT =
+    options?.redirectLimit ?? Number(process.env.REDIRECT_LIMIT ?? 3);
+  const RESPONSE_BYTES_LIMIT =
+    options?.responseBytesLimit ??
+    Number(process.env.RESPONSE_BYTES_LIMIT ?? 2_000_000);
+  const REQUEST_TIMEOUT_MS =
+    options?.requestTimeoutMs ??
+    Number(process.env.REQUEST_TIMEOUT_MS ?? 20_000);
+  const SOCKET_TIMEOUT_MS =
+    options?.socketTimeoutMs ?? Number(process.env.SOCKET_TIMEOUT_MS ?? 30_000);
 
   const defaultAllowedPorts = IS_DEV ? '80-65535' : '80,443';
-  const ALLOWED_PORTS_RAW = (options?.allowedPorts ?? process.env.ALLOWED_PORTS ?? defaultAllowedPorts).trim();
-  const USER_AGENT = options?.userAgent ?? 'Mozilla/5.0 (compatible; UrlValidator/1.0)';
+  const ALLOWED_PORTS_RAW = (
+    options?.allowedPorts ??
+    process.env.ALLOWED_PORTS ??
+    defaultAllowedPorts
+  ).trim();
+  const USER_AGENT =
+    options?.userAgent ?? 'Mozilla/5.0 (compatible; UrlValidator/1.0)';
   const REQUIRE_HTML_CT = Boolean(options?.requireHtmlContentType);
 
   function friendlyThrowOrReturn(
     status: number,
     message: string,
-    details: Record<string, any> = {}
+    details: Record<string, unknown> = {}
   ): UrlValidationResult {
     if (options?.throwOnError) {
-      const err: any = new Error(message);
+      const err = new Error(message) as Error & {
+        status: number;
+        expose: boolean;
+        code: string;
+        details: Record<string, unknown>;
+      };
       err.status = status;
       err.expose = true; // mostrar mensaje en prod
       err.code = status >= 500 ? 'URL_FETCH_ERROR' : 'URL_VALIDATION_ERROR';
@@ -67,28 +83,52 @@ export async function validatePublicHttpUrl(
     return { ok: false, reason: message, details };
   }
 
-  function normalizeNetError(e: any, ip?: string, port?: number, hostname?: string) {
-    const rawMessage = String(e?.message ?? e);
+  function normalizeNetError(
+    e: unknown,
+    ip?: string,
+    port?: number,
+    hostname?: string
+  ) {
+    const error = e as Record<string, unknown>;
+    const rawMessage = String(error?.message ?? e);
     const lower = rawMessage.toLowerCase();
     // Normaliza e.code a string si existe
-    let inferred: string | undefined = typeof e?.code === 'string' ? e.code : undefined;
+    let inferred: string | undefined =
+      typeof error?.code === 'string' ? error.code : undefined;
     // Si no hay e.code, intenta inferirlo desde el mensaje
     if (!inferred) {
       if (/\bECONNREFUSED\b/i.test(rawMessage) || lower.includes('refused')) {
         inferred = 'ECONNREFUSED';
-      } else if (/\bENOTFOUND\b/i.test(rawMessage) || lower.includes('dns') || lower.includes('getaddrinfo')) {
+      } else if (
+        /\bENOTFOUND\b/i.test(rawMessage) ||
+        lower.includes('dns') ||
+        lower.includes('getaddrinfo')
+      ) {
         inferred = 'ENOTFOUND';
-      } else if (/\bESOCKETTIMEDOUT\b/i.test(rawMessage) || /\bETIMEDOUT\b/i.test(rawMessage) || lower.includes('timeout')) {
+      } else if (
+        /\bESOCKETTIMEDOUT\b/i.test(rawMessage) ||
+        /\bETIMEDOUT\b/i.test(rawMessage) ||
+        lower.includes('timeout')
+      ) {
         inferred = 'ETIMEDOUT';
       } else if (/\bECONNRESET\b/i.test(rawMessage)) {
         inferred = 'ECONNRESET';
-      } else if (/\bEHOSTUNREACH\b/i.test(rawMessage) || lower.includes('host unreachable')) {
+      } else if (
+        /\bEHOSTUNREACH\b/i.test(rawMessage) ||
+        lower.includes('host unreachable')
+      ) {
         inferred = 'EHOSTUNREACH';
-      } else if (/\bENETUNREACH\b/i.test(rawMessage) || lower.includes('network is unreachable')) {
+      } else if (
+        /\bENETUNREACH\b/i.test(rawMessage) ||
+        lower.includes('network is unreachable')
+      ) {
         inferred = 'ENETUNREACH';
       } else if (/\bEPROTO\b/i.test(rawMessage)) {
         inferred = 'EPROTO';
-      } else if (/\bABORT_ERR\b/i.test(rawMessage) || e?.name === 'AbortError') {
+      } else if (
+        /\bABORT_ERR\b/i.test(rawMessage) ||
+        error?.name === 'AbortError'
+      ) {
         inferred = 'ETIMEDOUT';
       } else if (
         /\bERR_TLS_CERT_ALTNAME_INVALID\b/i.test(rawMessage) ||
@@ -105,49 +145,124 @@ export async function validatePublicHttpUrl(
     }
 
     const code = inferred || 'ENETERROR';
-    const base = { code, ip, port, hostname: hostname ?? e?.hostname, rawMessage };
+    const base = {
+      code,
+      ip,
+      port,
+      hostname: hostname ?? (error?.hostname as string),
+      rawMessage,
+    };
 
     switch (code) {
       case 'ECONNREFUSED':
-        return { status: 502, message: 'No se pudo conectar con la URL proporcionada', details: base };
+        return {
+          status: 502,
+          message: 'No se pudo conectar con la URL proporcionada',
+          details: base,
+        };
       case 'ETIMEDOUT':
-        return { status: 504, message: 'La conexión excedió el tiempo límite', details: base };
+        return {
+          status: 504,
+          message: 'La conexión excedió el tiempo límite',
+          details: base,
+        };
       case 'ESOCKETTIMEDOUT':
-        return { status: 504, message: 'La conexión excedió el tiempo límite', details: base };
+        return {
+          status: 504,
+          message: 'La conexión excedió el tiempo límite',
+          details: base,
+        };
       case 'ENOTFOUND':
-        return { status: 502, message: 'No se pudo resolver el host de la URL', details: base };
+        return {
+          status: 502,
+          message: 'No se pudo resolver el host de la URL',
+          details: base,
+        };
       case 'EAI_AGAIN':
-        return { status: 502, message: 'No se pudo resolver el host de la URL', details: base };
+        return {
+          status: 502,
+          message: 'No se pudo resolver el host de la URL',
+          details: base,
+        };
       case 'EHOSTUNREACH':
-        return { status: 502, message: 'No se puede alcanzar el host de destino', details: base };
+        return {
+          status: 502,
+          message: 'No se puede alcanzar el host de destino',
+          details: base,
+        };
       case 'ENETUNREACH':
-        return { status: 502, message: 'La red de destino es inalcanzable', details: base };
+        return {
+          status: 502,
+          message: 'La red de destino es inalcanzable',
+          details: base,
+        };
       case 'ECONNRESET':
-        return { status: 502, message: 'La conexión fue reiniciada por el servidor', details: base };
+        return {
+          status: 502,
+          message: 'La conexión fue reiniciada por el servidor',
+          details: base,
+        };
       case 'EPROTO':
-        return { status: 502, message: 'Error de protocolo en la conexión', details: base };
+        return {
+          status: 502,
+          message: 'Error de protocolo en la conexión',
+          details: base,
+        };
       case 'TLS_ERROR':
-        return { status: 502, message: 'Error de certificado/TLS al conectar con la URL', details: base };
+        return {
+          status: 502,
+          message: 'Error de certificado/TLS al conectar con la URL',
+          details: base,
+        };
       case 'ERR_TLS_CERT_ALTNAME_INVALID':
-        return { status: 502, message: 'Error de certificado/TLS al conectar con la URL', details: base };
+        return {
+          status: 502,
+          message: 'Error de certificado/TLS al conectar con la URL',
+          details: base,
+        };
       case 'CERT_HAS_EXPIRED':
-        return { status: 502, message: 'Error de certificado/TLS al conectar con la URL', details: base };
+        return {
+          status: 502,
+          message: 'Error de certificado/TLS al conectar con la URL',
+          details: base,
+        };
       case 'UNABLE_TO_VERIFY_LEAF_SIGNATURE':
-        return { status: 502, message: 'Error de certificado/TLS al conectar con la URL', details: base };
+        return {
+          status: 502,
+          message: 'Error de certificado/TLS al conectar con la URL',
+          details: base,
+        };
       case 'DEPTH_ZERO_SELF_SIGNED_CERT':
-        return { status: 502, message: 'Error de certificado/TLS al conectar con la URL', details: base };
+        return {
+          status: 502,
+          message: 'Error de certificado/TLS al conectar con la URL',
+          details: base,
+        };
       default:
         if ((process.env.DEBUG_URL_VALIDATOR ?? '').toLowerCase() === 'true') {
-          console.warn('[normalizeNetError:default]', { code, rawMessage, ip, port, hostname: base.hostname });
+          console.warn('[normalizeNetError:default]', {
+            code,
+            rawMessage,
+            ip,
+            port,
+            hostname: base.hostname,
+          });
         }
-        return { status: 502, message: 'Error de red al intentar acceder a la URL', details: base };
+        return {
+          status: 502,
+          message: 'Error de red al intentar acceder a la URL',
+          details: base,
+        };
     }
   }
 
   // Helpers
-  const isHttpLike = (u: URL) => u.protocol === 'http:' || u.protocol === 'https:';
+  const isHttpLike = (u: URL) =>
+    u.protocol === 'http:' || u.protocol === 'https:';
 
-  const normalizeHeaders = (h: http.IncomingHttpHeaders): Record<string, string> => {
+  const normalizeHeaders = (
+    h: http.IncomingHttpHeaders
+  ): Record<string, string> => {
     const out: Record<string, string> = {};
     for (const [k, v] of Object.entries(h)) {
       if (Array.isArray(v)) out[k.toLowerCase()] = v.join(', ');
@@ -157,30 +272,34 @@ export async function validatePublicHttpUrl(
   };
 
   const isLoopbackNotAllowed = (range: string | undefined) => {
-    const allowLoop = (process.env.ALLOW_LOOPBACK_IN_DEV ?? '').toLowerCase() === 'true';
+    const allowLoop =
+      (process.env.ALLOW_LOOPBACK_IN_DEV ?? '').toLowerCase() === 'true';
     return !allowLoop && range === 'loopback';
   };
 
   const isSpecialIpv4 = (v4: ipaddr.IPv4): boolean => {
     const inCidr = (cidr: string) => v4.match(ipaddr.parseCIDR(cidr));
     return (
-      inCidr('127.0.0.0/8')   || // loopback explícito
+      inCidr('127.0.0.0/8') || // loopback explícito
       inCidr('100.64.0.0/10') || // CGNAT
-      inCidr('0.0.0.0/8')     || // this network
-      inCidr('192.0.0.0/24')  || // IANA especiales
+      inCidr('0.0.0.0/8') || // this network
+      inCidr('192.0.0.0/24') || // IANA especiales
       inCidr('198.18.0.0/15') || // benchmark/tests
-      inCidr('224.0.0.0/4')   || // multicast
-      inCidr('240.0.0.0/4')   || // reservado
+      inCidr('224.0.0.0/4') || // multicast
+      inCidr('240.0.0.0/4') || // reservado
       v4.toString() === '255.255.255.255' // broadcast
     );
   };
 
   const isNonPublicIp = (ipStr: string): boolean => {
     // Permitir privados en dev si está habilitado (salvo loopback)
-    if (IS_DEV && (process.env.ALLOW_PRIVATE_IPS_IN_DEV ?? '').toLowerCase() === 'true') {
+    if (
+      IS_DEV &&
+      (process.env.ALLOW_PRIVATE_IPS_IN_DEV ?? '').toLowerCase() === 'true'
+    ) {
       try {
         const addr = ipaddr.parse(ipStr);
-        const range = (addr as any).range?.() as string | undefined;
+        const range = addr.range?.() as string | undefined;
         if (isLoopbackNotAllowed(range)) return true;
         return false;
       } catch {
@@ -189,13 +308,18 @@ export async function validatePublicHttpUrl(
     }
     try {
       let addr = ipaddr.parse(ipStr);
-      if (addr.kind() === 'ipv6' && (addr as ipaddr.IPv6).isIPv4MappedAddress()) {
+      if (
+        addr.kind() === 'ipv6' &&
+        (addr as ipaddr.IPv6).isIPv4MappedAddress()
+      ) {
         addr = (addr as ipaddr.IPv6).toIPv4Address();
       }
-      const range = (addr as any).range?.() as string;
+      const range = addr.range?.() as string;
       if (!range || range !== 'unicast') return true;
-      if (['loopback', 'linkLocal', 'private', 'reserved'].includes(range)) return true;
-      if (addr.kind() === 'ipv4' && isSpecialIpv4(addr as ipaddr.IPv4)) return true;
+      if (['loopback', 'linkLocal', 'private', 'reserved'].includes(range))
+        return true;
+      if (addr.kind() === 'ipv4' && isSpecialIpv4(addr as ipaddr.IPv4))
+        return true;
       return false;
     } catch {
       return true;
@@ -204,27 +328,38 @@ export async function validatePublicHttpUrl(
 
   const resolveToAllowedIp = async (hostname: string): Promise<string> => {
     const ips: string[] = [];
-    const [a4, a6] = await Promise.allSettled([dns.resolve4(hostname), dns.resolve6(hostname)]);
+    const [a4, a6] = await Promise.allSettled([
+      dns.resolve4(hostname),
+      dns.resolve6(hostname),
+    ]);
     if (a4.status === 'fulfilled') ips.push(...a4.value);
     if (a6.status === 'fulfilled') ips.push(...a6.value);
     if (ips.length === 0) {
       try {
         const { address } = await dns.lookup(hostname);
         ips.push(address);
-      } catch (e: any) { 
+      } catch (e: unknown) {
         // Log the error for debugging purposes
         console.error(`DNS lookup failed for ${hostname}:`, e);
       }
     }
     if (ips.length === 0) {
-      const err: any = new Error(`DNS failed for ${hostname}`);
+      const err = new Error(`DNS failed for ${hostname}`) as Error & {
+        code: string;
+        hostname: string;
+      };
       err.code = 'ENOTFOUND';
       err.hostname = hostname;
       throw err;
     }
     for (const ip of ips) if (!isNonPublicIp(ip)) return ip;
     {
-      const err: any = new Error(`All resolved IPs for ${hostname} are non-public`);
+      const err = new Error(
+        `All resolved IPs for ${hostname} are non-public`
+      ) as Error & {
+        code: string;
+        hostname: string;
+      };
       err.code = 'ENETUNREACH';
       err.hostname = hostname;
       throw err;
@@ -233,13 +368,25 @@ export async function validatePublicHttpUrl(
 
   // Puertos permitidos (preparse una vez)
   const ALLOWED_RANGES = ALLOWED_PORTS_RAW.split(',')
-    .map(s => s.trim()).filter(Boolean)
-    .map(p => /^\d+-\d+$/.test(p) ? p.split('-').map(Number) : [Number(p), Number(p)])
-    .filter(([min, max]) => Number.isFinite(min) && Number.isFinite(max) && min > 0 && max <= 65535 && min <= max)
+    .map(s => s.trim())
+    .filter(Boolean)
+    .map(p =>
+      /^\d+-\d+$/.test(p) ? p.split('-').map(Number) : [Number(p), Number(p)]
+    )
+    .filter(
+      ([min, max]) =>
+        Number.isFinite(min) &&
+        Number.isFinite(max) &&
+        min > 0 &&
+        max <= 65535 &&
+        min <= max
+    )
     .map(([min, max]) => ({ min, max }));
-  if (!ALLOWED_RANGES.length) ALLOWED_RANGES.push({ min: 80, max: 80 }, { min: 443, max: 443 });
+  if (!ALLOWED_RANGES.length)
+    ALLOWED_RANGES.push({ min: 80, max: 80 }, { min: 443, max: 443 });
 
-  const isPortAllowed = (port: number) => ALLOWED_RANGES.some(({ min, max }) => port >= min && port <= max);
+  const isPortAllowed = (port: number) =>
+    ALLOWED_RANGES.some(({ min, max }) => port >= min && port <= max);
   const getPort = (u: URL) => {
     if (u.port) {
       return Number(u.port);
@@ -254,14 +401,20 @@ export async function validatePublicHttpUrl(
     ip: string,
     port: number,
     maxBytes: number
-  ): Promise<{ status: number; headers: Record<string, string>; body?: string }> => {
+  ): Promise<{
+    status: number;
+    headers: Record<string, string>;
+    body?: string;
+  }> => {
     const isHttps = urlObj.protocol === 'https:';
     const agent = isHttps
       ? new https.Agent({
           servername: urlObj.hostname,
           timeout: SOCKET_TIMEOUT_MS,
           keepAlive: false,
-          rejectUnauthorized: !IS_DEV || (process.env.RELAX_TLS_IN_DEV ?? '').toLowerCase() !== 'true',
+          rejectUnauthorized:
+            !IS_DEV ||
+            (process.env.RELAX_TLS_IN_DEV ?? '').toLowerCase() !== 'true',
         })
       : new http.Agent({ timeout: SOCKET_TIMEOUT_MS, keepAlive: false });
 
@@ -289,18 +442,29 @@ export async function validatePublicHttpUrl(
           timeout: SOCKET_TIMEOUT_MS,
           signal: controller.signal,
         },
-        (res) => {
+        res => {
           const status = res.statusCode ?? 0;
           const respHeaders = normalizeHeaders(res.headers);
 
-          const cl = respHeaders['content-length'] ? Number(respHeaders['content-length']) : undefined;
+          const cl = respHeaders['content-length']
+            ? Number(respHeaders['content-length'])
+            : undefined;
           if (Number.isFinite(cl) && cl! > maxBytes) {
             res.resume();
             res.destroy();
             clearTimeout(totalTimer);
-            const err: any = new Error('Response exceeds byte limit (Content-Length)');
+            const err = new Error(
+              'Response exceeds byte limit (Content-Length)'
+            ) as Error & {
+              code: string;
+              ip: string;
+              port: number;
+              hostname: string;
+            };
             err.code = 'ERESPONSE_TOO_LARGE';
-            err.ip = ip; err.port = port; err.hostname = urlObj.hostname;
+            err.ip = ip;
+            err.port = port;
+            err.hostname = urlObj.hostname;
             return reject(err instanceof Error ? err : new Error(String(err)));
           }
 
@@ -317,10 +481,21 @@ export async function validatePublicHttpUrl(
               res.resume();
               res.destroy();
               clearTimeout(totalTimer);
-              const err: any = new Error(`Unexpected Content-Type: ${ct}`);
+              const err = new Error(
+                `Unexpected Content-Type: ${ct}`
+              ) as Error & {
+                code: string;
+                ip: string;
+                port: number;
+                hostname: string;
+              };
               err.code = 'EUNSUPPORTED_CONTENT_TYPE';
-              err.ip = ip; err.port = port; err.hostname = urlObj.hostname;
-              return reject(err instanceof Error ? err : new Error(String(err)));
+              err.ip = ip;
+              err.port = port;
+              err.hostname = urlObj.hostname;
+              return reject(
+                err instanceof Error ? err : new Error(String(err))
+              );
             }
           }
 
@@ -331,9 +506,16 @@ export async function validatePublicHttpUrl(
             received += chunk.length;
             if (received > maxBytes) {
               clearTimeout(totalTimer);
-              const err: any = new Error('Response exceeds byte limit');
+              const err = new Error('Response exceeds byte limit') as Error & {
+                code: string;
+                ip: string;
+                port: number;
+                hostname: string;
+              };
               err.code = 'ERESPONSE_TOO_LARGE';
-              err.ip = ip; err.port = port; err.hostname = urlObj.hostname;
+              err.ip = ip;
+              err.port = port;
+              err.hostname = urlObj.hostname;
               req.destroy(err);
               return;
             }
@@ -350,25 +532,38 @@ export async function validatePublicHttpUrl(
       // Añade metadata al error para que arriba podamos normalizar (normalizeNetError)
       req.on('timeout', () => {
         clearTimeout(totalTimer);
-        const err: any = new Error('Socket timeout');
+        const err = new Error('Socket timeout') as Error & {
+          code: string;
+          ip: string;
+          port: number;
+          hostname: string;
+        };
         err.code = 'ESOCKETTIMEDOUT';
         err.ip = ip;
         err.port = port;
         err.hostname = urlObj.hostname;
         req.destroy(err);
       });
-      req.on('error', (err) => {
+      req.on('error', err => {
         clearTimeout(totalTimer);
-        const anyErr: any = err;
-        anyErr.ip = anyErr.ip ?? ip;
-        anyErr.port = anyErr.port ?? port;
-        anyErr.hostname = anyErr.hostname ?? urlObj.hostname;
+        const extendedErr = err as Error & {
+          ip?: string;
+          port?: number;
+          hostname?: string;
+          code?: string;
+        };
+        extendedErr.ip = extendedErr.ip ?? ip;
+        extendedErr.port = extendedErr.port ?? port;
+        extendedErr.hostname = extendedErr.hostname ?? urlObj.hostname;
         // Normaliza aborts del AbortController a timeout
-        if (anyErr.name === 'AbortError' || anyErr.code === 'ABORT_ERR') {
-          anyErr.code = 'ETIMEDOUT';
-          anyErr.message = anyErr.message || 'Operation aborted';
+        if (
+          extendedErr.name === 'AbortError' ||
+          extendedErr.code === 'ABORT_ERR'
+        ) {
+          extendedErr.code = 'ETIMEDOUT';
+          extendedErr.message = extendedErr.message || 'Operation aborted';
         }
-        reject(anyErr instanceof Error ? anyErr : new Error(String(anyErr)));
+        reject(extendedErr);
       });
 
       req.end();
@@ -383,7 +578,9 @@ export async function validatePublicHttpUrl(
   ): Promise<UrlValidationResult> => {
     let current = start;
 
-    const getIpAndCheckPort = async (url: URL): Promise<{ ip: string; port: number } | UrlValidationResult> => {
+    const getIpAndCheckPort = async (
+      url: URL
+    ): Promise<{ ip: string; port: number } | UrlValidationResult> => {
       const port = getPort(url);
       if (!isPortAllowed(port)) {
         return friendlyThrowOrReturn(400, `Port ${port} not allowed`, { port });
@@ -391,18 +588,30 @@ export async function validatePublicHttpUrl(
       try {
         const ip = await resolveToAllowedIp(url.hostname);
         return { ip, port };
-      } catch (e: any) {
-        const { status, message, details } = normalizeNetError(e, e?.ip, e?.port ?? port, current.hostname);
+      } catch (e: unknown) {
+        const error = e as Record<string, unknown>;
+        const { status, message, details } = normalizeNetError(
+          e,
+          error?.ip as string,
+          (error?.port as number) ?? port,
+          current.hostname
+        );
         return friendlyThrowOrReturn(status, message, details);
       }
     };
 
-    const isRedirect = (resp: { status: number; headers: Record<string, string> }) =>
-      resp.status >= 300 && resp.status < 400 && !!resp.headers.location;
+    const isRedirect = (resp: {
+      status: number;
+      headers: Record<string, string>;
+    }) => resp.status >= 300 && resp.status < 400 && !!resp.headers.location;
 
     for (let i = 0; i < redirectLimit; i++) {
       if (!isHttpLike(current)) {
-        return friendlyThrowOrReturn(400, `Unsupported protocol: ${current.protocol}`, { protocol: current.protocol });
+        return friendlyThrowOrReturn(
+          400,
+          `Unsupported protocol: ${current.protocol}`,
+          { protocol: current.protocol }
+        );
       }
 
       const ipPort = await getIpAndCheckPort(current);
@@ -411,9 +620,20 @@ export async function validatePublicHttpUrl(
 
       let headResp;
       try {
-        headResp = await requestByIp('HEAD', current, ip, port, RESPONSE_BYTES_LIMIT);
-      } catch (e: any) {
-        const { status, message, details } = normalizeNetError(e, e?.ip ?? ip, e?.port ?? port);
+        headResp = await requestByIp(
+          'HEAD',
+          current,
+          ip,
+          port,
+          RESPONSE_BYTES_LIMIT
+        );
+      } catch (e: unknown) {
+        const error = e as Record<string, unknown>;
+        const { status, message, details } = normalizeNetError(
+          e,
+          (error?.ip as string) ?? ip,
+          (error?.port as number) ?? port
+        );
         return friendlyThrowOrReturn(status, message, details);
       }
 
@@ -421,17 +641,31 @@ export async function validatePublicHttpUrl(
         try {
           current = new URL(headResp.headers.location, current);
           if (!isHttpLike(current)) {
-            return friendlyThrowOrReturn(400, `Redirected to unsupported protocol: ${current.protocol}`, { protocol: current.protocol });
+            return friendlyThrowOrReturn(
+              400,
+              `Redirected to unsupported protocol: ${current.protocol}`,
+              { protocol: current.protocol }
+            );
           }
         } catch {
-          return friendlyThrowOrReturn(400, `Invalid redirect URL: ${headResp.headers.location}`, { location: headResp.headers.location });
+          return friendlyThrowOrReturn(
+            400,
+            `Invalid redirect URL: ${headResp.headers.location}`,
+            { location: headResp.headers.location }
+          );
         }
         continue;
       }
 
       if (fetchBody) {
         try {
-          const getResp = await requestByIp('GET', current, ip, port, RESPONSE_BYTES_LIMIT);
+          const getResp = await requestByIp(
+            'GET',
+            current,
+            ip,
+            port,
+            RESPONSE_BYTES_LIMIT
+          );
           return {
             ok: true,
             finalUrl: current.toString(),
@@ -441,8 +675,13 @@ export async function validatePublicHttpUrl(
             port,
             body: getResp.body,
           };
-        } catch (e: any) {
-          const { status, message, details } = normalizeNetError(e, e?.ip ?? ip, e?.port ?? port);
+        } catch (e: unknown) {
+          const error = e as Record<string, unknown>;
+          const { status, message, details } = normalizeNetError(
+            e,
+            (error?.ip as string) ?? ip,
+            (error?.port as number) ?? port
+          );
           return friendlyThrowOrReturn(status, message, details);
         }
       }
@@ -481,8 +720,13 @@ export async function validatePublicHttpUrl(
 
   try {
     return await handleRedirects(firstUrl, REDIRECT_LIMIT, options?.fetchBody);
-  } catch (e: any) {
-    const { status, message, details } = normalizeNetError(e, undefined, undefined, firstUrl.hostname);
+  } catch (e: unknown) {
+    const { status, message, details } = normalizeNetError(
+      e,
+      undefined,
+      undefined,
+      firstUrl.hostname
+    );
     return friendlyThrowOrReturn(status, message, details);
   }
 }
