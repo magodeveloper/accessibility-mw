@@ -8,6 +8,24 @@ export const AnalyzeRequestSchema = z
     wcagVersion: z.enum(['2.0', '2.1', '2.2']).default('2.2'),
     wcagLevel: z.enum(['A', 'AA', 'AAA']).default('AA'),
     cumulativeWcag: z.boolean().optional().default(false),
+    userId: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .refine(
+        val => {
+          if (val !== undefined) {
+            console.log(
+              '🚨 TESTING: userId validation called with value:',
+              val
+            );
+            return val > 0; // Should fail for negative numbers
+          }
+          return true;
+        },
+        { message: 'userId must be a positive integer' }
+      ),
   })
   .superRefine((data, ctx) => {
     // Si es URL, validar formato seguro

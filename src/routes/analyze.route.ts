@@ -98,25 +98,13 @@ interface AnalysisPayload {
 }
 
 interface ErrorPayload {
-  analysisId: string | number;
   resultId: number;
-  wcagCriterionId: string | number;
-  code: string;
+  wcagCriterionId: number;
   errorCode: string;
-  message: string;
   description: string;
   location: string;
-  tool: string;
-  type: string;
-  impact: string;
-  help?: string;
-  helpUrl: string;
-  target: string | null;
-  html: string | null;
-  failureSummary: string;
-  wcagVersion: string;
-  wcagLevel: string;
-  criterion: string;
+  message: string;
+  code: string;
   [key: string]: unknown; // Para compatibilidad con HttpClientData
 }
 
@@ -263,12 +251,13 @@ const createAnalysisPayload = (
   unified: ExtendedUnifiedResponse,
   stats: AnalysisStats,
   wcagVersion: string,
-  wcagLevel: string
+  wcagLevel: string,
+  userId?: number
 ) => {
   const { axeStats = {}, eaStats = {} } = stats;
 
   return {
-    userId: 1, // Hardcoded por ahora, podrías obtenerlo de auth headers
+    userId: userId ?? 1, // Usa el userId del request o default 1
     dateAnalysis: new Date().toISOString(),
     contentType: unified.meta?.inputType === 'html' ? 'html' : 'url',
     contentInput:
@@ -309,32 +298,34 @@ const createErrorPayload = (
   item: AnalysisItem,
   node: AnalysisNode,
   analysisId: string | number,
-  errorMessage: string
+  errorMessage: string,
+  resultId: number
 ) => {
   const wcagInfo = getWcagMapping(item);
   const criterionId = getWcagCriterionId(wcagInfo.criterion);
 
+  // Asegurar que todos los campos tengan valores no vacíos para pasar las validaciones
+  const safeErrorCode =
+    (item.id || item.ruleId || 'unknown').trim() || 'unknown';
+  const safeDescription =
+    (item.help || item.message || errorMessage || 'Error description').trim() ||
+    'Error description';
+  const safeLocation =
+    (node.target?.[0] ?? node.path?.dom ?? 'html').trim() || 'html';
+  const safeMessage =
+    (errorMessage || 'Error message').trim() || 'Error message';
+  const safeCode =
+    (node.html ?? node.snippet ?? item.id ?? 'html').trim() || 'html';
+
+  // Payload exacto para ErrorCreateDto del microservicio .NET
   return {
-    analysisId,
-    resultId: 1, // Debe ser mayor que 0
-    wcagCriterionId: criterionId,
-    code: item.id || item.ruleId || 'unknown',
-    errorCode: item.id || item.ruleId || 'unknown',
-    message: errorMessage,
-    description: item.help || item.message || errorMessage,
-    location: node.target?.[0] ?? node.path?.dom ?? 'unknown',
-    // Campos adicionales para compatibilidad
-    tool: item.tool || 'unknown',
-    type: item.type || 'violation',
-    impact: item.impact || 'moderate',
-    help: item.help || item.message,
-    helpUrl: item.helpUrl || '',
-    target: node.target?.[0] ?? node.path?.dom ?? null,
-    html: node.html ?? node.snippet ?? null,
-    failureSummary: errorMessage,
-    wcagVersion: wcagInfo.version,
-    wcagLevel: wcagInfo.level,
-    criterion: wcagInfo.criterion,
+    resultId: resultId, // int - ID del resultado en RESULTS
+    wcagCriterionId: criterionId, // int - ID del criterio WCAG
+    errorCode: safeErrorCode, // string - Código del error (ej: "document-title")
+    description: safeDescription, // string - Descripción del error
+    location: safeLocation, // string - Ubicación (ej: "html", "body")
+    message: safeMessage, // string - Mensaje detallado del error
+    code: safeCode, // string - Código HTML o identificador
   };
 };
 
@@ -392,12 +383,19 @@ async function saveAnalysis(
 async function saveResult(
   result: Record<string, unknown>,
   requestId = 'unknown'
-): Promise<void> {
+): Promise<number | null> {
   const logger = createOptimizedLogger(requestId);
+
+  console.log('🚨 SAVE_RESULT_FUNCTION_START:', {
+    resultKeys: Object.keys(result || {}),
+    analysisApiUrl: ANALYSIS_API_URL,
+    requestId,
+  });
 
   if (!ANALYSIS_API_URL) {
     logger.warn('saveResult: No ANALYSIS_API_URL configured');
-    return;
+    console.log('🚨 SAVE_RESULT_NO_URL');
+    return null;
   }
 
   logger.debug('saveResult called', {
@@ -405,15 +403,29 @@ async function saveResult(
   });
 
   try {
+    console.log(
+      '🚨 SAVE_RESULT_MAKING_REQUEST to:',
+      `${ANALYSIS_API_URL}/api/result`
+    );
+
     const resp = await httpClient.post(
       `${ANALYSIS_API_URL}/api/result`,
       result
     );
 
+    console.log('🚨 SAVE_RESULT_RESPONSE:', {
+      status: resp.status,
+      ok: resp.ok,
+    });
+
     logger.info('saveResult response', { status: resp.status, ok: resp.ok });
 
     if (!resp.ok) {
       const errorText = await resp.text();
+      console.log('🚨 SAVE_RESULT_ERROR_RESPONSE:', {
+        status: resp.status,
+        error: errorText,
+      });
       logger.error('saveResult error response', {
         status: resp.status,
         error: errorText,
@@ -422,11 +434,23 @@ async function saveResult(
     }
 
     const responseData = await resp.json();
+    console.log('🚨 SAVE_RESULT_SUCCESS_DATA:', { responseData });
     logger.info('saveResult success', { hasData: !!responseData });
+
+    // Retornar el ID del resultado guardado
+    const resultId = responseData?.data?.id || responseData?.id || null;
+    console.log('🚨 SAVE_RESULT_RETURNING:', {
+      resultId,
+      hasData: !!responseData?.data,
+      hasDirectId: !!responseData?.id,
+    });
+    return resultId;
   } catch (err) {
     const error = err as Error;
+    console.log('🚨 SAVE_RESULT_CATCH_ERROR:', { error: error.message });
     logger.error('Error al guardar resultado', { error: error.message });
     // No re-throw para permitir que el análisis continúe
+    return null;
   }
 }
 
@@ -441,8 +465,10 @@ async function saveError(
     return;
   }
 
-  logger.debug('saveError called', {
+  logger.info('🔥 saveError called', {
+    payload: errorPayload,
     payloadSize: JSON.stringify(errorPayload).length,
+    payloadJson: JSON.stringify(errorPayload, null, 2),
   });
 
   try {
@@ -488,7 +514,24 @@ async function saveResultsAndErrors(
   }> = [];
   const failedErrors: Array<{ errorPayload: ErrorPayload; error: string }> = [];
 
-  logger.info('Starting to save results and errors', {
+  // DEBUG: Log inicial MUY específico
+  console.log('🚨 SAVE_RESULTS_AND_ERRORS_START:', {
+    resultCount: resultsPayload.length,
+    itemsCount: itemsList.length,
+    analysisId,
+    requestId,
+    firstItemType: itemsList[0]?.type,
+    firstItemId: (itemsList[0] as any)?.id,
+  });
+
+  logger.info('🔧 Starting to save results and errors', {
+    resultCount: resultsPayload.length,
+    itemsCount: itemsList.length,
+    analysisId,
+    requestId,
+  });
+
+  logger.info('🔧 Starting to save results and errors', {
     resultCount: resultsPayload.length,
     analysisId,
   });
@@ -502,21 +545,80 @@ async function saveResultsAndErrors(
 
     const batchPromises = batch.map(async (result, batchIndex) => {
       const item = batchItems[batchIndex];
+      let resultId: number | null = null;
 
-      // Guardar resultado
+      console.log('🚨 ABOUT_TO_SAVE_RESULT:', {
+        batchIndex,
+        itemId: (item as any)?.id,
+        itemType: item.type,
+        resultSize: JSON.stringify(result).length,
+      });
+
+      // Guardar resultado y capturar el ID
       try {
-        await saveResult(result, requestId);
+        console.log('🚨 CALLING_SAVE_RESULT for item:', (item as any)?.id);
+        resultId = await saveResult(result, requestId);
+        console.log('🚨 SAVE_RESULT_RETURNED:', {
+          itemId: (item as any)?.id,
+          resultId,
+        });
+        logger.info(`Result saved with ID: ${resultId}`, { requestId });
       } catch (err) {
+        console.log('🚨 SAVE_RESULT_FAILED:', {
+          itemId: (item as any)?.id,
+          error: String(err),
+        });
         failedResults.push({ result, error: String(err) });
+        logger.error(`Failed to save result: ${err}`, { requestId });
       }
 
-      // Procesar errores si aplica
-      const errorTypes = ['violation', 'needsReview', 'recommendation'];
-      if (errorTypes.includes((item.type || '').toLowerCase())) {
+      // Procesar errores si aplica (solo si el resultado se guardó exitosamente)
+      const errorTypes = ['violation', 'needsreview', 'recommendation'];
+
+      console.log('🚨 ERROR_PROCESSING_CHECK:', {
+        itemId: (item as any)?.id,
+        itemType: item.type,
+        resultId,
+        errorTypes,
+        typeIncluded: errorTypes.includes((item.type || '').toLowerCase()),
+        hasResultId: !!resultId,
+      });
+
+      logger.info(
+        `🔍 Checking error processing for item: ${
+          (item as any)?.id || 'unknown'
+        }, type: "${item.type}", resultId: ${resultId}`,
+        { requestId }
+      );
+
+      if (resultId && errorTypes.includes((item.type || '').toLowerCase())) {
         const node = item.nodes?.[0] ?? {};
         const errorMessage = node.failureSummary || item.help || null;
 
+        console.log('🚨 ERROR_CONDITIONS_MET:', {
+          itemId: item.id,
+          itemType: item.type,
+          resultId,
+          hasNodes: !!item.nodes?.length,
+          hasFailureSummary: !!node.failureSummary,
+          hasHelp: !!item.help,
+          errorMessage: errorMessage ? 'EXISTS' : 'NULL',
+          errorMessagePreview: errorMessage?.substring(0, 50),
+        });
+
+        logger.info(
+          `Processing error for item ID: ${item.id}, type: ${
+            item.type
+          }, has failureSummary: ${!!node.failureSummary}, has help: ${!!item.help}`,
+          { requestId }
+        );
+
         if (errorMessage) {
+          console.log('🚨 ABOUT_TO_SAVE_ERROR:', {
+            itemId: item.id,
+            resultId,
+            errorMessageLength: errorMessage.length,
+          });
           const errorPayload = createErrorPayload(
             item,
             node,
@@ -525,14 +627,68 @@ async function saveResultsAndErrors(
                 analysisId: string | number;
               }
             ).analysisId,
-            errorMessage
+            errorMessage,
+            resultId // Usar el ID real del resultado guardado
           );
+          logger.info(`Created error payload for resultId: ${resultId}`, {
+            requestId,
+          });
+
+          console.log('🚨 CREATED_ERROR_PAYLOAD:', {
+            itemId: item.id,
+            resultId,
+            hasErrorPayload: !!errorPayload,
+            errorPayloadKeys: Object.keys(errorPayload || {}),
+            payloadSize: JSON.stringify(errorPayload).length,
+          });
+
           try {
+            console.log('🚨 CALLING_SAVE_ERROR:', {
+              itemId: item.id,
+              resultId,
+            });
             await saveError(errorPayload, requestId);
+            console.log('🚨 SAVE_ERROR_COMPLETED:', {
+              itemId: item.id,
+              resultId,
+            });
+            logger.info(`Error saved successfully for resultId: ${resultId}`, {
+              requestId,
+            });
           } catch (err) {
+            console.log('🚨 SAVE_ERROR_FAILED:', {
+              itemId: item.id,
+              resultId,
+              error: String(err),
+            });
             failedErrors.push({ errorPayload, error: String(err) });
+            logger.error(`Failed to save error: ${err}`, { requestId });
           }
+        } else {
+          console.log('🚨 NO_ERROR_MESSAGE:', {
+            itemId: item.id,
+            itemType: item.type,
+            resultId,
+            hasNodes: !!item.nodes?.length,
+            nodeKeys: Object.keys(node),
+            itemKeys: Object.keys(item).filter(key => key !== 'nodes'),
+            failureSummary: node.failureSummary,
+            help: item.help,
+          });
+          logger.warn(`No error message found for item ID: ${item.id}`, {
+            requestId,
+          });
         }
+      } else if (resultId) {
+        logger.info(
+          `Skipping error processing for item ID: ${item.id}, type: ${item.type} (not a violation type)`,
+          { requestId }
+        );
+      } else {
+        logger.warn(
+          `Skipping error processing because result was not saved for item ID: ${item.id}`,
+          { requestId }
+        );
       }
     });
 
@@ -820,8 +976,15 @@ analyzeRouter.post('/', async (req: express.Request, res: express.Response) => {
       );
   }
 
-  const { inputType, value, tool, wcagVersion, wcagLevel, cumulativeWcag } =
-    validated;
+  const {
+    inputType,
+    value,
+    tool,
+    wcagVersion,
+    wcagLevel,
+    cumulativeWcag,
+    userId,
+  } = validated;
 
   try {
     logger.info('Starting analysis', {
@@ -851,6 +1014,7 @@ analyzeRouter.post('/', async (req: express.Request, res: express.Response) => {
       wcagLevel,
       req,
       requestId,
+      userId,
     });
 
     const { statusCode, message, analysisId, failedResults, failedErrors } =
@@ -982,6 +1146,7 @@ async function saveAndFormatResults({
   wcagLevel,
   req,
   requestId,
+  userId,
 }: {
   unified: ExtendedUnifiedResponse;
   wcagVersions: WcagVersion[];
@@ -990,6 +1155,7 @@ async function saveAndFormatResults({
   wcagLevel: WcagLevel;
   req: express.Request;
   requestId: string;
+  userId?: number;
 }) {
   const logger = createOptimizedLogger(requestId, req);
   const stats = extractStats(unified) || { axeStats: {}, eaStats: {} };
@@ -997,7 +1163,8 @@ async function saveAndFormatResults({
     unified,
     stats,
     wcagVersion,
-    wcagLevel
+    wcagLevel,
+    userId
   );
 
   let saveData;
@@ -1058,10 +1225,26 @@ async function saveAndFormatResults({
 
   // Procesamiento de resultados con mapeo WCAG corregido
   const itemsList: AnalysisItem[] = [];
+
+  // DEBUG: Log filtros WCAG
+  logger.info('🔍 WCAG Filters:', {
+    wcagVersions,
+    wcagLevels,
+    requestId,
+  });
+
   const resultsPayload = unified.results.flatMap(toolResult =>
     toolResult.items
       .filter(item => {
         const wcagInfo = getWcagMapping(item as AnalysisItem);
+
+        // DEBUG: Log cada item antes del filtro
+        logger.info('🔍 Checking item:', {
+          rule: (item as any).id || (item as any).ruleId || 'unknown',
+          wcagInfo,
+          requestId,
+        });
+
         // Filtrar por versiones y niveles WCAG solicitados
         // Si no hay información WCAG específica, usar valores por defecto inclusivos
         const versionMatch =
@@ -1072,7 +1255,19 @@ async function saveAndFormatResults({
           wcagLevels.includes(wcagInfo.level) ||
           (wcagInfo.level === 'A' &&
             wcagLevels.some((l: string) => ['AA', 'AAA'].includes(l)));
-        return versionMatch && levelMatch;
+
+        const passes = versionMatch && levelMatch;
+
+        // DEBUG: Log resultado del filtro
+        logger.info('🔍 Filter result:', {
+          rule: (item as any).id || (item as any).ruleId || 'unknown',
+          versionMatch,
+          levelMatch,
+          passes,
+          requestId,
+        });
+
+        return passes;
       })
       .map(item => {
         itemsList.push(item as AnalysisItem);
@@ -1092,6 +1287,14 @@ async function saveAndFormatResults({
         };
       })
   );
+
+  // Debug logging antes de saveResultsAndErrors
+  logger.info('📊 About to call saveResultsAndErrors', {
+    resultsPayloadLength: resultsPayload.length,
+    itemsListLength: itemsList.length,
+    analysisId,
+    hasAnalysisId: !!analysisId,
+  });
 
   const { failedResults, failedErrors } = await saveResultsAndErrors(
     resultsPayload,

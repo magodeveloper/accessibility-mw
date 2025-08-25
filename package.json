@@ -4,7 +4,7 @@
   "description": "accessibility-mw",
   "main": "server.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp -f src/routes/*.yaml dist/routes/",
     "build:check": "tsc --noEmit --incremental",
     "type-check": "tsc --noEmit",
     "dev": "tsx watch src/server.ts",

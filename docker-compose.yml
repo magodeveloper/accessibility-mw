@@ -12,6 +12,7 @@ services:
       - .env.production
     environment:
       - NODE_OPTIONS=--enable-source-maps --max-old-space-size=2048
+      - ANALYSIS_API_URL=http://host.docker.internal:8082
     ports:
       - '3001:3001'
     restart: unless-stopped

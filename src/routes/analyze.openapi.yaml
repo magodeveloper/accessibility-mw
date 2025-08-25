@@ -43,6 +43,7 @@ paths:
                   tool: both
                   wcagVersion: '2.2'
                   wcagLevel: 'AA'
+                  userId: 123
               axe-html-basic:
                 summary: axe-core · HTML básico
                 value:
@@ -51,6 +52,7 @@ paths:
                   tool: axe-core
                   wcagVersion: '2.2'
                   wcagLevel: 'AA'
+                  userId: 1
               axe-html-medium:
                 summary: axe-core · HTML complejidad media (algunos problemas comunes)
                 value:

@@ -128,10 +128,25 @@ export async function validateAndSanitizeInput(
     );
     return { error: message, details };
   }
-  let { inputType, value, tool, wcagVersion, wcagLevel, cumulativeWcag } =
-    parse.data;
+  let {
+    inputType,
+    value,
+    tool,
+    wcagVersion,
+    wcagLevel,
+    cumulativeWcag,
+    userId,
+  } = parse.data;
   if (typeof value === 'string') value = value.trim();
-  return { inputType, value, tool, wcagVersion, wcagLevel, cumulativeWcag };
+  return {
+    inputType,
+    value,
+    tool,
+    wcagVersion,
+    wcagLevel,
+    cumulativeWcag,
+    userId,
+  };
 }
 
 export async function validateUrlIfNeeded(inputType: string, value: string) {
