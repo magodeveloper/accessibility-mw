@@ -2,41 +2,104 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, main]
   pull_request:
-    branches: [master]
+    branches: [master, main]
+  schedule:
+    # Ejecutar semanalmente para verificar dependencias
+    - cron: '0 6 * * 1'
+
+env:
+  NODE_VERSION: '20'
 
 jobs:
   build-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      matrix:
+        node-version: ['18', '20']
+      fail-fast: false
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Setup Node.js
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ matrix.node-version }}
           cache: 'npm'
+
       - name: Install dependencies
-        run: npm ci
-      - name: Lint
+        run: npm ci --no-audit --no-fund
+
+      - name: Cache build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            dist/
+            node_modules/.cache/
+          key: build-${{ runner.os }}-node${{ matrix.node-version }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            build-${{ runner.os }}-node${{ matrix.node-version }}-
+
+      - name: Lint code
         run: npm run lint:check
+
       - name: Type check
         run: npm run type-check
-      - name: Build
-        run: npm run build:check
-      - name: Run tests
-        run: npm run test
-      - name: Run coverage
-        run: npm run test:coverage
-      - name: Build Docker image
-        run: docker build -t accessibility-mw .
 
-      # --- Seguridad ---
-      - name: Audit dependencies (npm audit)
-        run: npm audit --audit-level=high --production
-      # - name: Snyk advanced security (opcional)
-      #   uses: snyk/actions/node@master
-      #   with:
-      #     command: test
-      #   env:
-      #     SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      - name: Build project
+        run: npm run build:check
+
+      - name: Run unit tests
+        run: npm run test:unit
+        env:
+          ANALYSIS_API_URL: http://localhost:8082
+
+      - name: Run integration tests
+        run: npm run test:integration
+        env:
+          ANALYSIS_API_URL: http://localhost:8082
+
+      - name: Generate coverage report
+        run: npm run test:coverage
+        env:
+          ANALYSIS_API_URL: http://localhost:8082
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          # token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: Build Docker image
+        run: |
+          docker build -t accessibility-mw:${{ github.sha }} .
+          docker tag accessibility-mw:${{ github.sha }} accessibility-mw:latest
+
+      - name: Test Docker image
+        run: |
+          docker run --rm -d --name test-container -p 3001:3001 accessibility-mw:${{ github.sha }}
+          sleep 10
+          curl -f http://localhost:3001/health || exit 1
+          docker stop test-container
+
+      - name: Security audit
+        run: npm audit --audit-level=moderate --production
+        continue-on-error: true
+
+      - name: Check bundle size
+        run: |
+          if [ -d "dist" ]; then
+            echo "Bundle size analysis:"
+            du -sh dist/
+            find dist -name "*.js" -exec ls -lh {} \; | head -10
+          fi

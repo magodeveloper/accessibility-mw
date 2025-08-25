@@ -41,7 +41,9 @@
     "docker:test": "docker compose -f docker-compose.test.yml up",
     "docker:stop": "docker compose down && docker compose -f docker-compose.dev.yml down && docker compose -f docker-compose.test.yml down",
     "docker:clean": "pwsh docker-cleanup.ps1",
-    "docker:size": "docker images | findstr accessibility-mw && docker system df"
+    "docker:size": "docker images | findstr accessibility-mw && docker system df",
+    "analyze:bundle": "pwsh analyze-bundle.ps1",
+    "validate:project": "pwsh validate-project.ps1"
   },
   "repository": {
     "type": "git",
@@ -68,7 +70,6 @@
     "pino": "9.9.0",
     "pino-http": "10.5.0",
     "playwright": "^1.55.0",
-    "swagger-jsdoc": "6.2.8",
     "swagger-ui-express": "5.0.1",
     "zod": "4.1.1"
   },
@@ -79,7 +80,6 @@
     "@types/jest": "30.0.0",
     "@types/node": "24.3.0",
     "@types/supertest": "6.0.3",
-    "@types/swagger-jsdoc": "6.0.4",
     "@types/swagger-ui-express": "4.1.8",
     "@typescript-eslint/eslint-plugin": "8.40.0",
     "@typescript-eslint/parser": "8.40.0",

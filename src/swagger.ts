@@ -14,7 +14,7 @@ const yamlPath = path.resolve(
 let yamlSpec = {};
 try {
   const yamlContent = fs.readFileSync(yamlPath, 'utf8');
-  yamlSpec = yaml.load(yamlContent) as any;
+  yamlSpec = yaml.load(yamlContent) as Record<string, unknown>;
   console.log('✅ OpenAPI YAML loaded successfully from:', yamlPath);
 } catch (error) {
   console.warn('❌ Could not load OpenAPI YAML file from:', yamlPath, error);

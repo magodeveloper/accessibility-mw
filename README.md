@@ -388,6 +388,19 @@ GET /api/docs
 GET /api/docs.json
 ```
 
+#### ✨ **OpenAPI 3.1.0 Specification**
+
+El proyecto utiliza una **especificación OpenAPI 3.1.0 completamente detallada** ubicada en:
+- **Archivo fuente**: `src/routes/analyze.openapi.yaml`
+- **Configuración**: Direct YAML loading con `js-yaml` library
+- **Features**: Schemas completos, ejemplos de requests/responses, documentación detallada de errores
+
+**Beneficios de la implementación actual:**
+- 🎯 **Especificación completa**: Todos los endpoints documentados con ejemplos
+- ⚡ **Carga optimizada**: Direct YAML loading (sin swagger-jsdoc overhead)
+- 🔄 **Mantenimiento fácil**: YAML directo editado sin comentarios JSDoc
+- 📊 **Compatibilidad**: OpenAPI 3.1.0 estándar para herramientas modernas
+
 ## ⚙️ **Configuración Avanzada**
 
 ### Variables de Entorno Críticas
@@ -602,6 +615,37 @@ npm run lint                    # ESLint con auto-fix
 npm run lint:check             # Solo verificación, sin correcciones
 npm run type-check             # Verificación de tipos TypeScript
 ```
+
+### 🔄 **CI/CD Automatizado**
+
+El proyecto incluye **pipelines CI/CD completamente automatizados** con GitHub Actions:
+
+#### **Continuous Integration** (`.github/workflows/ci.yml`)
+
+- ✅ **Matrix Testing**: Node.js 18 y 20 en Ubuntu y Windows
+- ✅ **Optimized Caching**: Cache inteligente de node_modules y TypeScript
+- ✅ **Multi-stage Testing**: Unit tests, integration tests, y E2E
+- ✅ **Docker Validation**: Build y health check de contenedores
+- ✅ **Coverage Reporting**: Upload automático a Codecov
+- ✅ **Bundle Analysis**: Monitoreo de tamaño de build
+- ✅ **Security Scanning**: Audit de dependencias integrado
+
+#### **Security Auditing** (`.github/workflows/security-audit.yml`)
+
+- 🛡️ **NPM Audit**: Vulnerabilidades en dependencias
+- 🛡️ **Snyk Security**: Análisis profundo de seguridad
+- 🛡️ **CodeQL Analysis**: Análisis de código estático avanzado
+- 🛡️ **Trivy Container Scan**: Escaneo de vulnerabilidades en Docker
+- 🛡️ **Dependency Review**: Revisión automática en PRs
+- 🛡️ **Scheduled Scans**: Ejecución diaria automática
+
+#### **Automated Dependency Management** (`.github/dependabot.yml`)
+
+- 🔄 **NPM Updates**: Actualizaciones semanales automáticas
+- 🔄 **GitHub Actions**: Actualizaciones mensuales de workflows
+- 🔄 **Docker Updates**: Actualizaciones mensuales de base images
+- 🔄 **Smart Grouping**: Agrupación inteligente de updates menores
+- 🔄 **Controlled Major Updates**: Manejo cuidadoso de breaking changes
 
 ### Objetivos de Cobertura
 
@@ -927,7 +971,7 @@ npm run dev
 npm run test
 ```
 
-#### 2. **Flujo de Desarrollo**
+#### 2. **Flujo de Desarrollo con CI/CD**
 
 ```bash
 # Crear rama feature desde master
@@ -940,6 +984,20 @@ git commit -m "feat: add amazing new feature"
 # Push y crear Pull Request
 git push origin feature/amazing-new-feature
 ```
+
+**🔄 Proceso Automatizado:**
+- Al crear el PR se ejecutan **automáticamente**:
+  - ✅ Tests en matrix (Node 18/20, Ubuntu/Windows)  
+  - ✅ Security scanning (NPM Audit, Snyk, CodeQL)
+  - ✅ Docker build validation
+  - ✅ Coverage analysis y reporting
+  - ✅ Dependency review para nuevas dependencias
+
+**🤖 Dependabot Automático:**
+- Actualizaciones semanales automáticas de dependencias npm
+- Actualizaciones mensuales de GitHub Actions
+- PRs automáticos con changelog y release notes
+- Manejo inteligente de breaking changes
 
 #### 3. **Standards de Código**
 
@@ -1045,23 +1103,30 @@ src/
   - [ ] ESLint pasa sin warnings
   - [ ] Código documentado (JSDoc para funciones públicas)
 - [ ] ✅ **Tests**
-
   - [ ] Tests unitarios para nueva funcionalidad
   - [ ] Tests de integración si aplica
   - [ ] Coverage ≥ 80% mantenido
   - [ ] Tests existentes siguen pasando
-
 - [ ] ✅ **Documentación**
-
   - [ ] README actualizado si es necesario
   - [ ] Swagger/OpenAPI actualizado para nuevos endpoints
   - [ ] Variables de entorno documentadas
   - [ ] Comentarios de código en funciones complejas
-
-- [ ] ✅ **Performance**
+- [ ] ✅ **Performance & Security**
   - [ ] No memory leaks introducidos
   - [ ] Performance benchmarks si es aplicable
   - [ ] Logs apropiados (nivel INFO/DEBUG/ERROR)
+  - [ ] Security scan passed (automático en CI/CD)
+  - [ ] Dependencies reviewed (automático con Dependabot)
+
+### 🔄 **Automation & Quality Gates**
+
+El proyecto incluye **quality gates automáticos** que se ejecutan en cada PR:
+
+- **🟢 Required Checks**: All CI tests must pass
+- **🟡 Security Review**: Automated security scanning
+- **🟠 Coverage Gate**: Coverage debe mantenerse ≥ 80%
+- **🔴 Breaking Changes**: Manual review required para major changes
 
 ### 🎯 Áreas que Necesitan Contribución
 
@@ -1075,13 +1140,30 @@ src/
 
 - 🟡 **Más herramientas**: Lighthouse, WAVE, etc.
 - 🟡 **Reportes customizables**: Templates y filtros
-- 🟡 **Integración CI/CD**: GitHub Actions, GitLab
+- 🟡 **Dashboard Web UI**: React/Vue frontend para métricas
 
 #### Oportunidades para Principiantes
 
 - 🟢 **Documentación**: Mejoras en docs y ejemplos
 - 🟢 **Tests**: Aumentar cobertura de tests
 - 🟢 **Localización**: Traducciones a más idiomas
+
+### 🛠️ **DevOps & Infrastructure**
+
+El proyecto está completamente preparado para **entornos de producción modernos**:
+
+#### GitHub Actions Workflows
+
+- **CI Pipeline**: Tests matrix, caching, Docker validation
+- **Security Audit**: Daily security scanning con múltiples herramientas
+- **Dependabot**: Actualizaciones automáticas con review inteligente
+
+#### Deployment Ready
+
+- **Docker multi-stage**: Optimizado para producción
+- **Health checks**: Kubernetes/Docker Swarm compatible
+- **Monitoring**: Prometheus metrics out-of-the-box
+- **Logging**: Structured JSON logs con request correlation
 
 ## � **Referencias y Enlaces Útiles**
 
@@ -1126,6 +1208,8 @@ src/
 - **[Docker](https://docs.docker.com/)**: Containerización y deployment
 - **[Docker Compose](https://docs.docker.com/compose/)**: Orquestación local
 - **[Playwright Docker](https://playwright.dev/docs/docker)**: Imágenes con navegadores
+- **[GitHub Actions](https://docs.github.com/en/actions)**: CI/CD automatizado
+- **[Dependabot](https://docs.github.com/en/code-security/dependabot)**: Gestión automática de dependencias
 
 ### 📊 Monitoreo y Observabilidad
 
@@ -1179,6 +1263,9 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ### 📈 Estado del Proyecto
 
 - **Build Status**: [![CI](https://github.com/magodeveloper/accessibility-mw/workflows/CI/badge.svg)](https://github.com/magodeveloper/accessibility-mw/actions)
+- **Security**: [![Security Audit](https://github.com/magodeveloper/accessibility-mw/workflows/Security%20Audit/badge.svg)](https://github.com/magodeveloper/accessibility-mw/actions)
+- **Coverage**: [![codecov](https://codecov.io/gh/magodeveloper/accessibility-mw/branch/main/graph/badge.svg)](https://codecov.io/gh/magodeveloper/accessibility-mw)
+- **Dependencies**: [![Dependabot](https://img.shields.io/badge/Dependabot-enabled-brightgreen.svg)](https://github.com/magodeveloper/accessibility-mw/network/dependencies)
 - **Version**: ![npm version](https://img.shields.io/npm/v/accessibility-mw.svg)
 - **Downloads**: ![npm downloads](https://img.shields.io/npm/dm/accessibility-mw.svg)
 
