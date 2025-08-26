@@ -52,8 +52,9 @@ Dockerfile.optimized
 docker-compose.*.yml
 !docker-compose.yml
 
-# Scripts y docs de desarrollo
+# Scripts y docs de desarrollo (excepto copy-yaml.js necesario para build)
 scripts/
+!scripts/copy-yaml.js
 docs/
 config/coverage/
 

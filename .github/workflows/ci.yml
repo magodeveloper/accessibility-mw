@@ -19,7 +19,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: ['18', '20']
+        node-version: ['20'] # Reducido a solo Node.js 20 para optimizar CI
       fail-fast: false
 
     steps:
@@ -36,6 +36,11 @@ jobs:
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
+
+      - name: Setup Playwright browsers
+        run: npx playwright install chromium --with-deps
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: /home/runner/.cache/playwright
 
       - name: Cache build artifacts
         uses: actions/cache@v4
@@ -75,11 +80,17 @@ jobs:
         run: npm run test:unit
         env:
           ANALYSIS_API_URL: http://localhost:8082
+          CI: true
+          PLAYWRIGHT_BROWSERS_PATH: /home/runner/.cache/playwright
+          PLAYWRIGHT_HEADLESS: true
 
       - name: Run integration tests
         run: npm run test:integration
         env:
           ANALYSIS_API_URL: http://localhost:8082
+          CI: true
+          PLAYWRIGHT_BROWSERS_PATH: /home/runner/.cache/playwright
+          PLAYWRIGHT_HEADLESS: true
 
       - name: Generate coverage report
         run: npm run test:coverage

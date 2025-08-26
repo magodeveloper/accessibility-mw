@@ -4,7 +4,7 @@
   "description": "accessibility-mw",
   "main": "server.js",
   "scripts": {
-    "build": "tsc && pwsh -Command \"Copy-Item src/routes/*.yaml dist/routes/ -Force\"",
+    "build": "tsc && node scripts/copy-yaml.js",
     "build:check": "tsc --noEmit --incremental",
     "type-check": "tsc --noEmit",
     "dev": "tsx watch src/server.ts",

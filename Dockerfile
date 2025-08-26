@@ -14,6 +14,7 @@ RUN npm ci --no-audit --no-fund --ignore-scripts && \
 # Copiar código fuente y compilar
 COPY tsconfig*.json ./
 COPY config ./config
+COPY scripts ./scripts
 COPY src ./src
 RUN npm run build
 
