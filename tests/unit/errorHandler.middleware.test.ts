@@ -1,5 +1,7 @@
-import { Request, Response, NextFunction } from 'express';
-import { notFoundHandler, errorHandler } from '../../src/middlewares/errorHandler';
+import {
+  errorHandler,
+  notFoundHandler,
+} from '../../src/middlewares/errorHandler';
 
 describe('Error Handler Middleware', () => {
   let mockRequest: any;
@@ -72,20 +74,20 @@ describe('Error Handler Middleware', () => {
 
     it('debe funcionar con diferentes métodos HTTP', () => {
       const methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
-      
-      methods.forEach((method) => {
-        const request = { 
-          ...mockRequest, 
+
+      methods.forEach(method => {
+        const request = {
+          ...mockRequest,
           method,
-          id: `test-id-${method}`
+          id: `test-id-${method}`,
         } as any;
         const response = {
           status: jest.fn().mockReturnThis(),
           json: jest.fn().mockReturnThis(),
         };
-        
+
         notFoundHandler(request, response as any);
-        
+
         expect(response.json).toHaveBeenCalledWith(
           expect.objectContaining({
             details: expect.objectContaining({ method }),
@@ -105,7 +107,11 @@ describe('Error Handler Middleware', () => {
         operation: 'page-load',
       };
 
-      errorHandler(timeoutError as any, mockRequest as any, mockResponse as any);
+      errorHandler(
+        timeoutError as any,
+        mockRequest as any,
+        mockResponse as any
+      );
 
       expect(mockResponse.status).toHaveBeenCalledWith(504);
       expect(mockResponse.json).toHaveBeenCalledWith({
@@ -126,7 +132,11 @@ describe('Error Handler Middleware', () => {
         message: 'Operation timed out',
       };
 
-      errorHandler(timeoutError as any, mockRequest as any, mockResponse as any);
+      errorHandler(
+        timeoutError as any,
+        mockRequest as any,
+        mockResponse as any
+      );
 
       expect(mockRequest.log.warn).toHaveBeenCalledWith(
         {
@@ -144,7 +154,11 @@ describe('Error Handler Middleware', () => {
         details: { url: 'https://example.com' },
       };
 
-      errorHandler(analysisError as any, mockRequest as any, mockResponse as any);
+      errorHandler(
+        analysisError as any,
+        mockRequest as any,
+        mockResponse as any
+      );
 
       expect(mockResponse.status).toHaveBeenCalledWith(422);
       expect(mockResponse.json).toHaveBeenCalledWith({

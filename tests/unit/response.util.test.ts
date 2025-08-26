@@ -1,12 +1,12 @@
-import { success, error, ApiResponse } from '../../src/utils/response';
+import { ApiResponse, error, success } from '../../src/utils/response';
 
 describe('Response Utility', () => {
   describe('success', () => {
     it('debe crear una respuesta exitosa básica', () => {
       const data = { message: 'Test data' };
-      
+
       const result = success(data);
-      
+
       expect(result).toEqual({
         ok: true,
         data: { message: 'Test data' },
@@ -16,9 +16,9 @@ describe('Response Utility', () => {
     it('debe crear una respuesta exitosa con requestId', () => {
       const data = { value: 123 };
       const requestId = 'req-12345';
-      
+
       const result = success(data, requestId);
-      
+
       expect(result).toEqual({
         ok: true,
         data: { value: 123 },
@@ -77,9 +77,9 @@ describe('Response Utility', () => {
   describe('error', () => {
     it('debe crear una respuesta de error básica', () => {
       const errorMessage = 'Something went wrong';
-      
+
       const result = error(errorMessage);
-      
+
       expect(result).toEqual({
         ok: false,
         error: 'Something went wrong',
@@ -89,9 +89,9 @@ describe('Response Utility', () => {
     it('debe crear una respuesta de error con código', () => {
       const errorMessage = 'Validation failed';
       const errorCode = 'VALIDATION_ERROR';
-      
+
       const result = error(errorMessage, errorCode);
-      
+
       expect(result).toEqual({
         ok: false,
         error: 'Validation failed',
@@ -107,9 +107,9 @@ describe('Response Utility', () => {
         value: 'invalid-email',
         constraint: 'Must be a valid email address',
       };
-      
+
       const result = error(errorMessage, errorCode, details);
-      
+
       expect(result).toEqual({
         ok: false,
         error: 'Invalid input',
@@ -127,9 +127,9 @@ describe('Response Utility', () => {
       const errorCode = 'INTERNAL_ERROR';
       const details = { timestamp: '2024-01-01T00:00:00Z' };
       const requestId = 'req-error-123';
-      
+
       const result = error(errorMessage, errorCode, details, requestId);
-      
+
       expect(result).toEqual({
         ok: false,
         error: 'Server error',
@@ -142,9 +142,9 @@ describe('Response Utility', () => {
     it('debe manejar errores con solo mensaje y requestId', () => {
       const errorMessage = 'Not found';
       const requestId = 'req-notfound-456';
-      
+
       const result = error(errorMessage, undefined, undefined, requestId);
-      
+
       expect(result).toEqual({
         ok: false,
         error: 'Not found',
@@ -166,9 +166,9 @@ describe('Response Utility', () => {
           action: 'create_user',
         },
       };
-      
+
       const result = error(errorMessage, errorCode, details);
-      
+
       expect(result.ok).toBe(false);
       expect(result.error).toBe('Multiple validation errors');
       expect(result.code).toBe('VALIDATION_FAILED');

@@ -92,14 +92,16 @@ describe('Timing Utility', () => {
 
     it('debe manejar promesas que se resuelven exactamente en el timeout', async () => {
       const promise = new Promise<string>(resolve => {
-        setTimeout(() => resolve('on-time'), 400);
+        setTimeout(() => resolve('on-time'), 500);
       });
 
       const result = abortAfter(500, promise);
 
-      jest.advanceTimersByTime(400);
+      jest.advanceTimersByTime(499);
+      jest.advanceTimersByTime(1);
 
-      // La promesa se resuelve antes del timeout
+      // Esto es una condición de carrera, pero en nuestro caso controlado
+      // la promesa debería resolver antes del timeout
       await expect(result).resolves.toBe('on-time');
     });
 

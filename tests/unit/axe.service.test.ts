@@ -2,7 +2,8 @@ import { Page } from 'playwright';
 import { runAxeOnPage } from '../../src/services/axe.service';
 
 // Mock de require.resolve
-const mockAxePath = 'C:\\Git\\accessibility-mw\\node_modules\\axe-core\\axe.min.js';
+const mockAxePath =
+  'C:\\Git\\accessibility-mw\\node_modules\\axe-core\\axe.min.js';
 
 describe('Axe Service', () => {
   let mockPage: jest.Mocked<Page>;
@@ -53,7 +54,10 @@ describe('Axe Service', () => {
 
       await runAxeOnPage(mockPage);
 
-      expect(consoleSpy).toHaveBeenCalledWith('Fallback to CDN for axe-core:', expect.any(Error));
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Fallback to CDN for axe-core:',
+        expect.any(Error)
+      );
       expect(mockPage.addScriptTag).toHaveBeenCalledWith({
         url: 'https://unpkg.com/axe-core@4.10.3/axe.min.js',
       });
@@ -75,10 +79,9 @@ describe('Axe Service', () => {
 
       await runAxeOnPage(mockPage);
 
-      expect(mockPage.evaluate).toHaveBeenCalledWith(
-        expect.any(Function),
-        { iframes: true }
-      );
+      expect(mockPage.evaluate).toHaveBeenCalledWith(expect.any(Function), {
+        iframes: true,
+      });
     });
 
     it('debe aplicar opciones personalizadas', async () => {
@@ -105,19 +108,16 @@ describe('Axe Service', () => {
 
       await runAxeOnPage(mockPage, customOptions);
 
-      expect(mockPage.evaluate).toHaveBeenCalledWith(
-        expect.any(Function),
-        {
-          iframes: true,
-          runOnly: {
-            type: 'tag',
-            values: ['wcag2a', 'wcag2aa'],
-          },
-          rules: {
-            'color-contrast': { enabled: false },
-          },
-        }
-      );
+      expect(mockPage.evaluate).toHaveBeenCalledWith(expect.any(Function), {
+        iframes: true,
+        runOnly: {
+          type: 'tag',
+          values: ['wcag2a', 'wcag2aa'],
+        },
+        rules: {
+          'color-contrast': { enabled: false },
+        },
+      });
     });
 
     it('debe manejar violaciones con impacts', async () => {
@@ -127,7 +127,8 @@ describe('Axe Service', () => {
             id: 'color-contrast',
             description: 'Elements must have sufficient color contrast',
             help: 'Elements must meet enhanced color contrast ratio thresholds',
-            helpUrl: 'https://dequeuniversity.com/rules/axe/4.10/color-contrast-enhanced',
+            helpUrl:
+              'https://dequeuniversity.com/rules/axe/4.10/color-contrast-enhanced',
             impact: 'serious',
             tags: ['cat.color', 'wcag2aa'],
             nodes: [
@@ -135,7 +136,8 @@ describe('Axe Service', () => {
                 impact: 'serious',
                 target: ['#main'],
                 html: '<div id="main">Content</div>',
-                failureSummary: 'Fix any of the following:\n  Element has insufficient color contrast',
+                failureSummary:
+                  'Fix any of the following:\n  Element has insufficient color contrast',
               },
             ],
           },
@@ -287,11 +289,15 @@ describe('Axe Service', () => {
         .mockResolvedValueOnce(undefined) // DOM ready
         .mockRejectedValueOnce(new Error('axe execution failed'));
 
-      await expect(runAxeOnPage(mockPage)).rejects.toThrow('axe execution failed');
+      await expect(runAxeOnPage(mockPage)).rejects.toThrow(
+        'axe execution failed'
+      );
     });
 
     it('debe crear error extendido cuando axe.run falla', async () => {
-      const customOptions = { runOnly: { type: 'tag' as const, values: ['wcag2a'] } };
+      const customOptions = {
+        runOnly: { type: 'tag' as const, values: ['wcag2a'] },
+      };
 
       mockPage.evaluate
         .mockResolvedValueOnce(undefined)
@@ -304,7 +310,10 @@ describe('Axe Service', () => {
         expect(error.message).toBe('Custom axe error');
         expect(error.code).toBe('AXE_RUN_ERROR');
         expect(error.details).toEqual({
-          options: { iframes: true, runOnly: { type: 'tag', values: ['wcag2a'] } },
+          options: {
+            iframes: true,
+            runOnly: { type: 'tag', values: ['wcag2a'] },
+          },
         });
       }
     });

@@ -183,7 +183,6 @@ healthRouter.get('/', async (req, res) => {
       cacheCheck,
       metricsCheck,
       playwrightAxe,
-      writableTmp,
     ] = checks.map(extractResult);
 
     const results = {
@@ -193,7 +192,6 @@ healthRouter.get('/', async (req, res) => {
       cache: cacheCheck,
       metrics: metricsCheck,
       playwrightAxe,
-      writableTmp,
     };
 
     const overallOk = Object.values(results).every(r => r.ok);
