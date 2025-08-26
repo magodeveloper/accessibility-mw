@@ -521,7 +521,7 @@ async function saveResultsAndErrors(
     analysisId,
     requestId,
     firstItemType: itemsList[0]?.type,
-    firstItemId: (itemsList[0] as any)?.id,
+    firstItemId: (itemsList[0] as AnalysisItem)?.id,
   });
 
   logger.info('🔧 Starting to save results and errors', {
@@ -549,23 +549,23 @@ async function saveResultsAndErrors(
 
       console.log('🚨 ABOUT_TO_SAVE_RESULT:', {
         batchIndex,
-        itemId: (item as any)?.id,
+        itemId: (item as AnalysisItem)?.id,
         itemType: item.type,
         resultSize: JSON.stringify(result).length,
       });
 
       // Guardar resultado y capturar el ID
       try {
-        console.log('🚨 CALLING_SAVE_RESULT for item:', (item as any)?.id);
+        console.log('🚨 CALLING_SAVE_RESULT for item:', (item as AnalysisItem)?.id);
         resultId = await saveResult(result, requestId);
         console.log('🚨 SAVE_RESULT_RETURNED:', {
-          itemId: (item as any)?.id,
+          itemId: (item as AnalysisItem)?.id,
           resultId,
         });
         logger.info(`Result saved with ID: ${resultId}`, { requestId });
       } catch (err) {
         console.log('🚨 SAVE_RESULT_FAILED:', {
-          itemId: (item as any)?.id,
+          itemId: (item as AnalysisItem)?.id,
           error: String(err),
         });
         failedResults.push({ result, error: String(err) });
@@ -576,7 +576,7 @@ async function saveResultsAndErrors(
       const errorTypes = ['violation', 'needsreview', 'recommendation'];
 
       console.log('🚨 ERROR_PROCESSING_CHECK:', {
-        itemId: (item as any)?.id,
+        itemId: (item as AnalysisItem)?.id,
         itemType: item.type,
         resultId,
         errorTypes,
@@ -586,7 +586,7 @@ async function saveResultsAndErrors(
 
       logger.info(
         `🔍 Checking error processing for item: ${
-          (item as any)?.id || 'unknown'
+          (item as AnalysisItem)?.id || 'unknown'
         }, type: "${item.type}", resultId: ${resultId}`,
         { requestId }
       );
@@ -1240,7 +1240,7 @@ async function saveAndFormatResults({
 
         // DEBUG: Log cada item antes del filtro
         logger.info('🔍 Checking item:', {
-          rule: (item as any).id || (item as any).ruleId || 'unknown',
+          rule: (item as AnalysisItem).id || (item as AnalysisItem).ruleId || 'unknown',
           wcagInfo,
           requestId,
         });
@@ -1260,7 +1260,7 @@ async function saveAndFormatResults({
 
         // DEBUG: Log resultado del filtro
         logger.info('🔍 Filter result:', {
-          rule: (item as any).id || (item as any).ruleId || 'unknown',
+          rule: (item as AnalysisItem).id || (item as AnalysisItem).ruleId || 'unknown',
           versionMatch,
           levelMatch,
           passes,
