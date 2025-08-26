@@ -386,15 +386,8 @@ async function saveResult(
 ): Promise<number | null> {
   const logger = createOptimizedLogger(requestId);
 
-  console.log('🚨 SAVE_RESULT_FUNCTION_START:', {
-    resultKeys: Object.keys(result || {}),
-    analysisApiUrl: ANALYSIS_API_URL,
-    requestId,
-  });
-
   if (!ANALYSIS_API_URL) {
     logger.warn('saveResult: No ANALYSIS_API_URL configured');
-    console.log('🚨 SAVE_RESULT_NO_URL');
     return null;
   }
 
@@ -403,10 +396,6 @@ async function saveResult(
   });
 
   try {
-    console.log(
-      '🚨 SAVE_RESULT_MAKING_REQUEST to:',
-      `${ANALYSIS_API_URL}/api/result`
-    );
 
     const resp = await httpClient.post(
       `${ANALYSIS_API_URL}/api/result`,
@@ -422,10 +411,6 @@ async function saveResult(
 
     if (!resp.ok) {
       const errorText = await resp.text();
-      console.log('🚨 SAVE_RESULT_ERROR_RESPONSE:', {
-        status: resp.status,
-        error: errorText,
-      });
       logger.error('saveResult error response', {
         status: resp.status,
         error: errorText,
@@ -434,20 +419,13 @@ async function saveResult(
     }
 
     const responseData = await resp.json();
-    console.log('🚨 SAVE_RESULT_SUCCESS_DATA:', { responseData });
     logger.info('saveResult success', { hasData: !!responseData });
 
     // Retornar el ID del resultado guardado
     const resultId = responseData?.data?.id || responseData?.id || null;
-    console.log('🚨 SAVE_RESULT_RETURNING:', {
-      resultId,
-      hasData: !!responseData?.data,
-      hasDirectId: !!responseData?.id,
-    });
     return resultId;
   } catch (err) {
     const error = err as Error;
-    console.log('🚨 SAVE_RESULT_CATCH_ERROR:', { error: error.message });
     logger.error('Error al guardar resultado', { error: error.message });
     // No re-throw para permitir que el análisis continúe
     return null;
@@ -514,26 +492,11 @@ async function saveResultsAndErrors(
   }> = [];
   const failedErrors: Array<{ errorPayload: ErrorPayload; error: string }> = [];
 
-  // DEBUG: Log inicial MUY específico
-  console.log('🚨 SAVE_RESULTS_AND_ERRORS_START:', {
-    resultCount: resultsPayload.length,
-    itemsCount: itemsList.length,
-    analysisId,
-    requestId,
-    firstItemType: itemsList[0]?.type,
-    firstItemId: (itemsList[0] as any)?.id,
-  });
-
   logger.info('🔧 Starting to save results and errors', {
     resultCount: resultsPayload.length,
     itemsCount: itemsList.length,
     analysisId,
     requestId,
-  });
-
-  logger.info('🔧 Starting to save results and errors', {
-    resultCount: resultsPayload.length,
-    analysisId,
   });
 
   // Procesar resultados en paralelo (pero limitado para no sobrecargar la API)
@@ -556,33 +519,15 @@ async function saveResultsAndErrors(
 
       // Guardar resultado y capturar el ID
       try {
-        console.log('🚨 CALLING_SAVE_RESULT for item:', (item as any)?.id);
         resultId = await saveResult(result, requestId);
-        console.log('🚨 SAVE_RESULT_RETURNED:', {
-          itemId: (item as any)?.id,
-          resultId,
-        });
         logger.info(`Result saved with ID: ${resultId}`, { requestId });
       } catch (err) {
-        console.log('🚨 SAVE_RESULT_FAILED:', {
-          itemId: (item as any)?.id,
-          error: String(err),
-        });
         failedResults.push({ result, error: String(err) });
         logger.error(`Failed to save result: ${err}`, { requestId });
       }
 
       // Procesar errores si aplica (solo si el resultado se guardó exitosamente)
       const errorTypes = ['violation', 'needsreview', 'recommendation'];
-
-      console.log('🚨 ERROR_PROCESSING_CHECK:', {
-        itemId: (item as any)?.id,
-        itemType: item.type,
-        resultId,
-        errorTypes,
-        typeIncluded: errorTypes.includes((item.type || '').toLowerCase()),
-        hasResultId: !!resultId,
-      });
 
       logger.info(
         `🔍 Checking error processing for item: ${
@@ -595,17 +540,6 @@ async function saveResultsAndErrors(
         const node = item.nodes?.[0] ?? {};
         const errorMessage = node.failureSummary || item.help || null;
 
-        console.log('🚨 ERROR_CONDITIONS_MET:', {
-          itemId: item.id,
-          itemType: item.type,
-          resultId,
-          hasNodes: !!item.nodes?.length,
-          hasFailureSummary: !!node.failureSummary,
-          hasHelp: !!item.help,
-          errorMessage: errorMessage ? 'EXISTS' : 'NULL',
-          errorMessagePreview: errorMessage?.substring(0, 50),
-        });
-
         logger.info(
           `Processing error for item ID: ${item.id}, type: ${
             item.type
@@ -614,11 +548,6 @@ async function saveResultsAndErrors(
         );
 
         if (errorMessage) {
-          console.log('🚨 ABOUT_TO_SAVE_ERROR:', {
-            itemId: item.id,
-            resultId,
-            errorMessageLength: errorMessage.length,
-          });
           const errorPayload = createErrorPayload(
             item,
             node,
@@ -634,47 +563,16 @@ async function saveResultsAndErrors(
             requestId,
           });
 
-          console.log('🚨 CREATED_ERROR_PAYLOAD:', {
-            itemId: item.id,
-            resultId,
-            hasErrorPayload: !!errorPayload,
-            errorPayloadKeys: Object.keys(errorPayload || {}),
-            payloadSize: JSON.stringify(errorPayload).length,
-          });
-
           try {
-            console.log('🚨 CALLING_SAVE_ERROR:', {
-              itemId: item.id,
-              resultId,
-            });
             await saveError(errorPayload, requestId);
-            console.log('🚨 SAVE_ERROR_COMPLETED:', {
-              itemId: item.id,
-              resultId,
-            });
             logger.info(`Error saved successfully for resultId: ${resultId}`, {
               requestId,
             });
           } catch (err) {
-            console.log('🚨 SAVE_ERROR_FAILED:', {
-              itemId: item.id,
-              resultId,
-              error: String(err),
-            });
             failedErrors.push({ errorPayload, error: String(err) });
             logger.error(`Failed to save error: ${err}`, { requestId });
           }
         } else {
-          console.log('🚨 NO_ERROR_MESSAGE:', {
-            itemId: item.id,
-            itemType: item.type,
-            resultId,
-            hasNodes: !!item.nodes?.length,
-            nodeKeys: Object.keys(node),
-            itemKeys: Object.keys(item).filter(key => key !== 'nodes'),
-            failureSummary: node.failureSummary,
-            help: item.help,
-          });
           logger.warn(`No error message found for item ID: ${item.id}`, {
             requestId,
           });
