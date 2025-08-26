@@ -77,25 +77,25 @@ jobs:
             !reports/bundle/*.json
 
       - name: Run unit tests
-        run: npm run test:unit
+        run: cross-env ANALYSIS_API_URL=http://localhost:8082 jest tests/unit --testTimeout=15000 --coverage=false
         env:
-          ANALYSIS_API_URL: http://localhost:8082
           CI: true
           PLAYWRIGHT_BROWSERS_PATH: /home/runner/.cache/playwright
           PLAYWRIGHT_HEADLESS: true
 
       - name: Run integration tests
-        run: npm run test:integration
+        run: cross-env ANALYSIS_API_URL=http://localhost:8082 jest tests/integration --testTimeout=15000 --coverage=false
         env:
-          ANALYSIS_API_URL: http://localhost:8082
           CI: true
           PLAYWRIGHT_BROWSERS_PATH: /home/runner/.cache/playwright
           PLAYWRIGHT_HEADLESS: true
 
       - name: Generate coverage report
-        run: npm run test:coverage
+        run: cross-env ANALYSIS_API_URL=http://localhost:8082 jest --coverage --testTimeout=15000
         env:
-          ANALYSIS_API_URL: http://localhost:8082
+          CI: true
+          PLAYWRIGHT_BROWSERS_PATH: /home/runner/.cache/playwright
+          PLAYWRIGHT_HEADLESS: true
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

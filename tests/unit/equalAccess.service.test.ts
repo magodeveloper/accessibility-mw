@@ -28,9 +28,11 @@ describe('runEqualAccess', () => {
       if (
         error.message.includes('sandbox') ||
         error.message.includes('Failed to launch') ||
-        error.message.includes('Executable doesn\'t exist')
+        error.message.includes("Executable doesn't exist")
       ) {
-        console.log('⚠️ Expected sandbox/executable error in CI environment, test passed');
+        console.log(
+          '⚠️ Expected sandbox/executable error in CI environment, test passed'
+        );
         expect(true).toBe(true); // Test passes
       } else {
         throw error; // Re-throw unexpected errors
