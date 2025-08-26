@@ -1,9 +1,10 @@
 # Etapa 1: Compilación completa
-FROM node:20-alpine AS builder
+FROM node:20.19-alpine3.20 AS builder
 WORKDIR /app
 
-# Instalar dependencias del sistema
-RUN apk add --no-cache git
+# Instalar dependencias del sistema y actualizaciones de seguridad
+RUN apk add --no-cache git && \
+  apk upgrade --no-cache
 
 # Copiar package files e instalar TODAS las dependencias (prod + dev)
 COPY package*.json ./
@@ -22,7 +23,7 @@ RUN rm -rf node_modules && \
   npm cache clean --force
 
 # Etapa 2: Imagen de producción liviana (SIN reinstalar npm)
-FROM mcr.microsoft.com/playwright:v1.55.0-jammy AS accessibility-mw
+FROM mcr.microsoft.com/playwright:v1.48.0-jammy AS accessibility-mw
 WORKDIR /app
 
 # Variables de entorno
@@ -43,10 +44,11 @@ COPY --from=builder /app/package*.json ./
 COPY .achecker.yml ./
 
 # ¡NO MÁS npm install! Todo viene del builder
-# Crear directorios, permisos y limpiar en un solo RUN
-RUN mkdir -p /app/results /app/logs && \
+# Crear directorios, permisos, actualizaciones de seguridad y limpiar en un solo RUN
+RUN apt-get update && apt-get upgrade -y && \
+  mkdir -p /app/results /app/logs && \
   chown -R pwuser:pwuser /app && \
-  rm -rf /tmp/* /var/cache/* /var/lib/apt/lists/*
+  rm -rf /tmp/* /var/cache/* /var/lib/apt/lists/* /var/cache/apt/*
 
 USER pwuser
 EXPOSE 3001
