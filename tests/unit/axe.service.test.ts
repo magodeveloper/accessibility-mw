@@ -1,9 +1,14 @@
+import path from 'path';
 import { Page } from 'playwright';
 import { runAxeOnPage } from '../../src/services/axe.service';
 
-// Mock de require.resolve
-const mockAxePath =
-  'C:\\Git\\accessibility-mw\\node_modules\\axe-core\\axe.min.js';
+// Mock de require.resolve - path dinámico para CI/local
+const mockAxePath = path.join(
+  process.cwd(),
+  'node_modules',
+  'axe-core',
+  'axe.min.js'
+);
 
 describe('Axe Service', () => {
   let mockPage: jest.Mocked<Page>;

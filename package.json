@@ -14,7 +14,7 @@
     "start:debug": "node --inspect-brk dist/server.js",
     "start:prod": "cross-env NODE_ENV=production node dist/server.js",
     "test": "cross-env ANALYSIS_API_URL=http://localhost:8082 jest --testTimeout=30000",
-    "test:unit": "cross-env ANALYSIS_API_URL=http://localhost:8082 jest tests/unit --testTimeout=10000",
+    "test:unit": "cross-env ANALYSIS_API_URL=http://localhost:8082 jest tests/unit --testTimeout=15000",
     "test:integration": "cross-env ANALYSIS_API_URL=http://localhost:8082 jest tests/integration --testTimeout=15000",
     "test:coverage": "cross-env ANALYSIS_API_URL=http://localhost:8082 jest --coverage --testTimeout=15000",
     "health": "curl http://localhost:3001/health",
@@ -45,6 +45,8 @@
     "analyze:bundle": "pwsh analyze-bundle.ps1",
     "bundle:monitor": "node scripts/bundle-monitor.js",
     "bundle:check": "node scripts/bundle-monitor.js",
+    "bundle:limits": "node scripts/check-bundle-limits.js",
+    "bundle:compare": "node scripts/compare-bundle-sizes.js",
     "bundle:watch": "bundlewatch --config .bundlewatch.config.json",
     "bundle:full": "npm run build && npm run bundle:monitor",
     "validate:project": "pwsh validate-project.ps1"

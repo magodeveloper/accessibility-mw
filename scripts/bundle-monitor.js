@@ -160,21 +160,140 @@ class BundleMonitor {
   }
 
   /**
-   * Ejecuta size-limit para análisis avanzado
+   * Ejecuta size-limit para análisis avanzado (adaptado para Node.js)
    */
   runSizeLimit() {
     console.log('📏 Ejecutando Size Limit...');
 
     try {
-      const output = execSync('npx size-limit --json', {
-        encoding: 'utf8',
-        cwd: path.join(__dirname, '..'),
-      });
-
-      return JSON.parse(output);
+      // Intentar primero con --json
+      let output;
+      try {
+        output = execSync('npx size-limit --json', {
+          encoding: 'utf8',
+          cwd: path.join(__dirname, '..'),
+          timeout: 30000, // 30 segundos timeout
+          env: {
+            ...process.env,
+            NODE_ENV: 'production',
+          },
+        });
+        return JSON.parse(output);
+      } catch (jsonError) {
+        // Si falla JSON, intentar con output normal
+        console.warn('⚠️ JSON output falló, intentando análisis básico...');
+        return this.getBasicSizeAnalysis();
+      }
     } catch (error) {
-      console.warn('⚠️ Size Limit no configurado o falló:', error.message);
-      return null;
+      console.warn('⚠️ Size Limit falló (común en aplicaciones Node.js)');
+      console.warn('Usando análisis básico de archivos...');
+      return this.getBasicSizeAnalysis();
+    }
+  }
+
+  /**
+   * Análisis básico de tamaño sin size-limit
+   */
+  getBasicSizeAnalysis() {
+    const distPath = path.join(__dirname, '..', 'dist');
+
+    if (!fs.existsSync(distPath)) {
+      return { error: 'Directorio dist no encontrado' };
+    }
+
+    const analysis = [];
+
+    // Analizar archivos principales con límites simulados
+    const filesToCheck = [
+      { name: '📁 Total Distribution', path: 'dist/**/*.js', limit: '10 MB' },
+      { name: '🚀 Main Server', path: 'server.js', limit: '5 MB' },
+      { name: '🛣️ Main Route', path: 'routes/analyze.route.js', limit: '2 MB' },
+      { name: '🔧 Utils Bundle', path: 'utils/security.js', limit: '1 MB' },
+      { name: '🎯 Services Bundle', path: 'services/**/*.js', limit: '2 MB' },
+    ];
+
+    for (const fileInfo of filesToCheck) {
+      let totalSize = 0;
+      let files = [];
+
+      if (fileInfo.path.includes('**')) {
+        // Analizar patrón glob
+        const basePath = fileInfo.path.split('/**')[0];
+        const fullBasePath = path.join(distPath, basePath);
+
+        if (fs.existsSync(fullBasePath)) {
+          const allFiles = this.getFilesRecursive(fullBasePath);
+          totalSize = allFiles.reduce((sum, file) => sum + file.size, 0);
+          files = allFiles.length;
+        }
+      } else {
+        // Analizar archivo específico
+        const fullPath = path.join(distPath, fileInfo.path);
+        if (fs.existsSync(fullPath)) {
+          const stats = fs.statSync(fullPath);
+          totalSize = stats.size;
+          files = 1;
+        }
+      }
+
+      analysis.push({
+        name: fileInfo.name,
+        size: totalSize,
+        limit: this.parseLimit(fileInfo.limit),
+        files: files,
+        passed: totalSize < this.parseLimit(fileInfo.limit),
+      });
+    }
+
+    return analysis;
+  }
+
+  /**
+   * Obtener archivos recursivamente
+   */
+  getFilesRecursive(dirPath) {
+    let files = [];
+
+    if (!fs.existsSync(dirPath)) return files;
+
+    const items = fs.readdirSync(dirPath);
+
+    for (const item of items) {
+      const fullPath = path.join(dirPath, item);
+      const stats = fs.statSync(fullPath);
+
+      if (stats.isDirectory()) {
+        files = files.concat(this.getFilesRecursive(fullPath));
+      } else if (stats.isFile() && item.endsWith('.js')) {
+        files.push({
+          path: fullPath,
+          size: stats.size,
+        });
+      }
+    }
+
+    return files;
+  }
+
+  /**
+   * Parsear límite de tamaño
+   */
+  parseLimit(limitStr) {
+    const match = limitStr.match(/(\d+(?:\.\d+)?)\s*(KB|MB|GB)/i);
+    if (!match) return 0;
+
+    const value = parseFloat(match[1]);
+    const unit = match[2].toUpperCase();
+
+    switch (unit) {
+      case 'KB':
+        return value * 1024;
+      case 'MB':
+        return value * 1024 * 1024;
+      case 'GB':
+        return value * 1024 * 1024 * 1024;
+      default:
+        return value;
     }
   }
 
@@ -371,6 +490,25 @@ class BundleMonitor {
       });
     }
     markdown += `\n`;
+
+    // Size Limit Results
+    if (report.sizeLimit && Array.isArray(report.sizeLimit)) {
+      markdown += `## 📏 Size Limit Analysis\n\n`;
+      markdown += `| Bundle | Size | Limit | Status |\n`;
+      markdown += `|--------|------|-------|--------|\n`;
+
+      report.sizeLimit.forEach(item => {
+        const status = item.passed ? '✅ Pass' : '❌ Exceed';
+        const sizeFormatted = this.formatBytes(item.size);
+        const limitFormatted = this.formatBytes(item.limit);
+
+        markdown += `| ${item.name} | ${sizeFormatted} | ${limitFormatted} | ${status} |\n`;
+      });
+      markdown += `\n`;
+    } else if (report.sizeLimit && report.sizeLimit.error) {
+      markdown += `## 📏 Size Limit Analysis\n\n`;
+      markdown += `⚠️ **Size Limit Analysis Failed:** ${report.sizeLimit.error}\n\n`;
+    }
 
     // Recomendaciones
     if (report.recommendations.length > 0) {

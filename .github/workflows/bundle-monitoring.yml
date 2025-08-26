@@ -113,29 +113,7 @@ jobs:
             }
 
       - name: Check bundle size limits
-        run: |
-          # Verificar si el bundle excede los límites
-          if [ -f "reports/bundle/latest.json" ]; then
-            node -e "
-              const report = JSON.parse(require('fs').readFileSync('reports/bundle/latest.json', 'utf8'));
-              const maxSizeMB = 50; // 50MB límite máximo
-              const currentSizeMB = report.bundle.totalSize / (1024 * 1024);
-              
-              console.log(\`Current bundle size: \${currentSizeMB.toFixed(2)} MB\`);
-              console.log(\`Maximum allowed size: \${maxSizeMB} MB\`);
-              
-              if (currentSizeMB > maxSizeMB) {
-                console.log('❌ Bundle size exceeds maximum limit!');
-                process.exit(1);
-              }
-              
-              // Warning si está cerca del límite
-              if (currentSizeMB > maxSizeMB * 0.8) {
-                console.log('⚠️  Bundle size is approaching the limit (80% of maximum)');
-              } else {
-                console.log('✅ Bundle size is within acceptable limits');
-              }
-            "
+        run: node scripts/check-bundle-limits.js
 
       - name: Upload bundle reports
         uses: actions/upload-artifact@v4
@@ -195,36 +173,4 @@ jobs:
           cp reports/bundle/latest.json /tmp/base-bundle.json
 
       - name: Compare bundle sizes
-        run: |
-          node -e "
-            const fs = require('fs');
-            
-            try {
-              const currentBundle = JSON.parse(fs.readFileSync('/tmp/current-bundle.json', 'utf8'));
-              const baseBundle = JSON.parse(fs.readFileSync('/tmp/base-bundle.json', 'utf8'));
-              
-              const currentSize = currentBundle.bundle.totalSize;
-              const baseSize = baseBundle.bundle.totalSize;
-              const difference = currentSize - baseSize;
-              const percentageChange = ((difference / baseSize) * 100).toFixed(2);
-              
-              console.log('=== Bundle Size Comparison ===');
-              console.log(\`Base branch size: \${(baseSize / (1024 * 1024)).toFixed(2)} MB\`);
-              console.log(\`Current branch size: \${(currentSize / (1024 * 1024)).toFixed(2)} MB\`);
-              console.log(\`Difference: \${(difference / (1024 * 1024)).toFixed(2)} MB (\${percentageChange}%)\`);
-              
-              if (Math.abs(difference) < 1024) {
-                console.log('✅ No significant change in bundle size');
-              } else if (difference > 0) {
-                console.log('📈 Bundle size increased');
-                if (parseFloat(percentageChange) > 10) {
-                  console.log('⚠️  Significant size increase detected!');
-                }
-              } else {
-                console.log('📉 Bundle size decreased - Great job!');
-              }
-              
-            } catch (error) {
-              console.log('⚠️  Could not compare bundle sizes:', error.message);
-            }
-          "
+        run: node scripts/compare-bundle-sizes.js

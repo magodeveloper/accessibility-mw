@@ -556,7 +556,10 @@ async function saveResultsAndErrors(
 
       // Guardar resultado y capturar el ID
       try {
-        console.log('🚨 CALLING_SAVE_RESULT for item:', (item as AnalysisItem)?.id);
+        console.log(
+          '🚨 CALLING_SAVE_RESULT for item:',
+          (item as AnalysisItem)?.id
+        );
         resultId = await saveResult(result, requestId);
         console.log('🚨 SAVE_RESULT_RETURNED:', {
           itemId: (item as AnalysisItem)?.id,
@@ -1240,7 +1243,10 @@ async function saveAndFormatResults({
 
         // DEBUG: Log cada item antes del filtro
         logger.info('🔍 Checking item:', {
-          rule: (item as AnalysisItem).id || (item as AnalysisItem).ruleId || 'unknown',
+          rule:
+            (item as AnalysisItem).id ||
+            (item as AnalysisItem).ruleId ||
+            'unknown',
           wcagInfo,
           requestId,
         });
@@ -1260,7 +1266,10 @@ async function saveAndFormatResults({
 
         // DEBUG: Log resultado del filtro
         logger.info('🔍 Filter result:', {
-          rule: (item as AnalysisItem).id || (item as AnalysisItem).ruleId || 'unknown',
+          rule:
+            (item as AnalysisItem).id ||
+            (item as AnalysisItem).ruleId ||
+            'unknown',
           versionMatch,
           levelMatch,
           passes,

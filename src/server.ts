@@ -11,6 +11,7 @@ import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 import { analyzeLimiter, generalLimiter } from './middlewares/rateLimit';
 import { attachRequestId } from './middlewares/requestId';
 import analyzeRouter from './routes/analyze.route';
+import bundleRouter from './routes/bundle.route';
 import healthRouter from './routes/health.route';
 import { monitoringRouter } from './routes/monitoring.route';
 import { browserPool } from './services/browser.pool.service';
@@ -23,7 +24,6 @@ import {
 import { performanceMonitor } from './services/performance.service';
 import { swaggerSpec } from './swagger';
 import { ENV, FeatureFlags } from './utils/environment';
-const bundleRouter = require('./routes/bundle.route');
 
 // Interfaces y tipos para el servidor
 type RequestWithId = Request & {
