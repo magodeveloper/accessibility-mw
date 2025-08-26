@@ -23,6 +23,7 @@ import {
 import { performanceMonitor } from './services/performance.service';
 import { swaggerSpec } from './swagger';
 import { ENV, FeatureFlags } from './utils/environment';
+const bundleRouter = require('./routes/bundle.route');
 
 // Interfaces y tipos para el servidor
 type RequestWithId = Request & {
@@ -175,6 +176,9 @@ app.get('/api/docs.json', (_req, res) => {
 
 // Rutas de análisis
 app.use('/api/analyze', analyzeLimiter, analyzeRouter);
+
+// Bundle monitoring routes
+app.use('/api/bundle', bundleRouter);
 
 // Health shallow/deep
 app.use('/health', healthRouter);

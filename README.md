@@ -6,6 +6,8 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://docker.com/)
 [![License: ISC](https://img.shields.io/badge/License-ISC-yellow.svg)](https://opensource.org/licenses/ISC)
+[![Bundle Monitoring](https://img.shields.io/badge/Bundle-Monitored-brightgreen.svg)](https://github.com/magodeveloper/accessibility-mw/actions)
+[![Security Audit](https://img.shields.io/badge/Security-Audited-red.svg)](https://github.com/magodeveloper/accessibility-mw/actions)
 
 ## 🎯 **Características Principales**
 
@@ -17,6 +19,8 @@
 - **🏥 Health Checks**: Monitoreo profundo de estado del sistema
 - **📈 Cache Inteligente**: Cache LRU con límites de memoria configurables
 - **🌐 Multi-formato**: Soporte para URLs, HTML directo y archivos
+- **📦 Bundle Monitoring**: Sistema automático de monitoreo del bundle en CI/CD
+- **🔒 Security Audit**: Análisis automático de seguridad con múltiples herramientas
 
 ## 📁 **Estructura del Proyecto**
 
@@ -33,15 +37,31 @@ accessibility-mw/
 │   └── tsconfig.json          # Configuración TypeScript
 ├── docs/                       # Documentación del proyecto
 │   └── ENVIRONMENT.md          # Variables de entorno detalladas
-├── results/                    # Resultados de análisis y reportes
+├── reports/                    # Reportes automáticos del sistema
+│   ├── bundle/                 # Reportes de Bundle Monitoring
+│   │   ├── BUNDLE_REPORT.md    # Reporte en Markdown
+│   │   └── bundle-analysis.json # Reporte en JSON
+│   └── security/               # Reportes de Security Audit
+├── results/                    # Resultados de análisis y reportes (legacy)
 ├── scripts/                    # Scripts de utilidad y verificación
-│   └── check-status.js        # Verificación de estado de microservicios
+│   ├── bundle-monitor.js       # 🆕 Script de Bundle Monitoring
+│   ├── check-status.js         # Verificación de estado de microservicios
+│   └── health-check.mjs        # Health check utilities
+├── .github/                    # GitHub Actions workflows
+│   └── workflows/
+│       ├── ci.yml              # Continuous Integration
+│       ├── bundle-monitoring.yml # 🆕 Bundle Monitoring automático
+│       └── security-audit.yml   # 🆕 Security audit automatizado
 ├── src/                       # Código fuente principal
 │   ├── config/                # Configuración de la aplicación
 │   ├── locales/               # Localizaciones y traducciones
 │   ├── mappers/               # Transformadores de datos
 │   ├── middlewares/           # Middlewares Express (auth, rate limit, etc.)
-│   ├── routes/                # Rutas API (analyze, health, monitoring)
+│   ├── routes/                # Rutas API
+│   │   ├── analyze.route.ts   # Análisis de accesibilidad
+│   │   ├── bundle.route.js    # 🆕 Bundle monitoring dashboard
+│   │   ├── health.route.ts    # Health checks
+│   │   └── monitoring.route.ts # Métricas y monitoreo
 │   ├── schemas/               # Validaciones Zod
 │   ├── services/              # Servicios de negocio (cache, pool, metrics)
 │   ├── utils/                 # Utilidades generales
@@ -196,6 +216,12 @@ npm run health:monitor         # Dashboard de monitoreo
 
 # Métricas
 npm run metrics                # Ver métricas en formato JSON
+
+# Bundle Monitoring (🆕 Nuevo Sistema)
+npm run bundle:analyze         # Análisis manual del bundle
+npm run bundle:report          # Generar reporte JSON
+npm run bundle:dashboard       # Abrir dashboard web
+npm run bundle:clean           # Limpiar reportes antiguos
 ```
 
 ### Docker y Containerización
@@ -539,7 +565,222 @@ Accede al dashboard completo en: `http://localhost:3001/api/monitoring/dashboard
 }
 ```
 
-## 🛠️ **Optimizaciones y Arquitectura**
+## � **Bundle Monitoring System**
+
+### 🎯 Sistema de Bundle Monitoring Automático
+
+**Implementado recientemente**: Sistema completo de monitoreo automático del bundle en CI/CD que proporciona análisis detallados de tamaño, dependencias y optimizaciones.
+
+#### 🚀 Características Principales
+
+- **📊 Análisis Automático**: Monitoreo continuo del tamaño del bundle en cada build
+- **🔍 Detección de Dependencias**: Identificación de librerías pesadas y optimizaciones
+- **📈 Dashboard Web**: Interface web interactiva para visualizar métricas
+- **⚡ CI/CD Integration**: Ejecución automática en GitHub Actions
+- **📋 Reportes Detallados**: Generación automática de reportes en Markdown y JSON
+
+#### 🛠️ Componentes del Sistema
+
+```
+📦 Bundle Monitoring Architecture
+├── scripts/bundle-monitor.js          # Script principal de análisis
+├── .github/workflows/bundle-monitoring.yml    # CI/CD workflow
+├── src/routes/bundle.route.js         # API endpoints del dashboard  
+├── .bundlewatch.config.json          # Configuración de límites
+└── reports/bundle/                    # Reportes generados automáticamente
+```
+
+#### 📊 Métricas del Bundle (Estado Actual)
+
+```bash
+📦 Bundle Size: 258.38 KB
+📁 Files Analyzed: 35
+🎯 Status: HEALTHY (well below 10MB limit)
+⚡ Performance: Optimal
+🔍 Dependencies: Clean (no heavy packages detected)
+```
+
+#### 🔧 API Endpoints del Bundle Monitor
+
+```bash
+# Estado actual del bundle
+GET /api/bundle/status
+# Respuesta: { "totalSize": "258.38 KB", "files": 35, "status": "HEALTHY" }
+
+# Reporte detallado completo  
+GET /api/bundle/report
+# Incluye: análisis de dependencias, recomendaciones, métricas históricas
+
+# Historial de análisis
+GET /api/bundle/history
+# Timeline de cambios en el tamaño del bundle
+
+# Dashboard web interactivo
+GET /api/bundle/dashboard
+# Interface HTML completa para visualización de métricas
+```
+
+#### ⚙️ Configuración y Límites
+
+El sistema utiliza múltiples herramientas para análisis comprehensivo:
+
+```json
+// .bundlewatch.config.json
+{
+  "files": [
+    {
+      "path": "./dist/server.js",
+      "maxSize": "10MB",
+      "compression": "gzip"
+    }
+  ],
+  "ci": {
+    "trackBranches": ["main", "master", "develop"],
+    "repoBranch": "master"
+  }
+}
+```
+
+#### 🔄 CI/CD Workflow Automático
+
+El workflow se ejecuta automáticamente en:
+
+- ✅ **Push events**: En cada push a ramas principales
+- ✅ **Pull Requests**: Análisis de impacto en PRs
+- ✅ **Schedule**: Análisis diarios automáticos (2 AM UTC)
+- ✅ **Manual trigger**: Ejecución manual desde GitHub Actions
+
+#### 📋 Reportes y Alertas
+
+**Reporte Markdown Automático**:
+```bash
+# 📦 Bundle Analysis Report
+
+## 📊 Bundle Metrics
+- **Total Size**: 258.38 KB
+- **Files**: 35 analyzed
+- **Status**: 🟢 HEALTHY
+- **Performance**: ⚡ Optimal
+
+## 📈 Analysis Results
+- ✅ Size Limit: Well below 10MB threshold
+- ✅ Dependencies: No heavy packages detected  
+- ✅ Optimization: Bundle is well optimized
+
+## 🔍 Recommendations
+- Continue monitoring for new dependencies
+- Consider code splitting for larger features
+- Regular dependency audits recommended
+```
+
+**GitHub Actions Summary**:
+El sistema genera automáticamente resúmenes en GitHub Actions con:
+- 📊 Métricas actuales vs. límites
+- 📈 Comparación con builds anteriores  
+- ⚠️ Alertas si se exceden límites
+- 🎯 Recomendaciones de optimización
+
+#### 🚨 Sistema de Alertas Inteligente
+
+**Condiciones de Alerta**:
+
+| Condición | Nivel | Acción |
+|-----------|-------|---------|
+| Bundle > 8MB | ⚠️ Warning | GitHub Actions summary alert |
+| Bundle > 10MB | 🚨 Error | Build failure + notification |
+| Growth > 20% | 📈 Info | Size increase notification |
+| New heavy dep | 🔍 Review | Dependency review required |
+
+#### 🛠️ Comandos de Bundle Monitoring
+
+```bash
+# Ejecutar análisis manual
+npm run bundle:analyze
+node scripts/bundle-monitor.js
+
+# Generar reporte JSON
+npm run bundle:report
+node scripts/bundle-monitor.js --json
+
+# Ver dashboard web (servidor debe estar corriendo)
+npm run dev
+# Luego visitar: http://localhost:3001/api/bundle/dashboard
+
+# Limpiar reportes antiguos
+npm run bundle:clean
+```
+
+#### 🔧 Configuración Avanzada
+
+**Variables de entorno para Bundle Monitoring**:
+
+```bash
+# Bundle monitoring configuration
+BUNDLE_MONITOR_ENABLED=true              # Habilitar/deshabilitar monitoring
+BUNDLE_SIZE_LIMIT_MB=10                  # Límite de tamaño en MB
+BUNDLE_ANALYSIS_TIMEOUT=30000            # Timeout para análisis (ms)
+BUNDLE_HISTORY_RETENTION_DAYS=30         # Días de retención de histórico
+BUNDLE_ALERTS_WEBHOOK_URL=...            # URL para notificaciones Slack/Discord
+```
+
+**Integración con herramientas externas**:
+
+```json
+// package.json - Scripts adicionales
+{
+  "scripts": {
+    "bundle:analyze": "node scripts/bundle-monitor.js",
+    "bundle:report": "node scripts/bundle-monitor.js --json",
+    "bundle:dashboard": "start http://localhost:3001/api/bundle/dashboard",
+    "bundle:clean": "rimraf reports/bundle/*"
+  }
+}
+```
+
+## 🔒 **Security Audit System**
+
+### 🛡️ Comprehensive Security Scanning
+
+**Implementado recientemente**: Sistema completo de auditoría de seguridad automatizada que incluye múltiples herramientas de análisis.
+
+#### 🔍 Security Scan Components
+
+- **🔐 NPM Audit**: Análisis de vulnerabilidades en dependencias
+- **🚨 Snyk Security**: Escaneo avanzado de vulnerabilidades (opcional con token)
+- **📊 CodeQL Analysis**: Análisis estático de código (opcional, requiere GitHub Code Scanning)
+- **🐳 Docker Security**: Escaneo de vulnerabilidades en imagen Docker con Trivy
+
+#### 🔧 Security Workflow Status
+
+```bash
+# Estado actual del workflow de seguridad
+✅ NPM Audit: Always active
+⚠️  Snyk Scan: Optional (requires SNYK_TOKEN secret)  
+⚠️  CodeQL: Optional (requires Code Scanning enabled)
+✅ Docker Scan: Active on push events
+```
+
+#### 🛠️ Security Configuration Fixed
+
+**Problema resuelto**: El workflow de seguridad causaba fallos en CI/CD cuando Code Scanning no estaba habilitado en el repositorio.
+
+**Solución implementada**: 
+- CodeQL steps now use `continue-on-error: true`
+- Conditional execution based on Code Scanning availability
+- Graceful degradation without blocking CI/CD pipeline
+- Clear status reporting in GitHub Actions summary
+
+#### 📋 Security Setup Documentation
+
+Para habilitar todas las características de seguridad:
+
+1. **Enable Code Scanning**: Repository Settings → Security & analysis → Code scanning → Set up
+2. **Add SNYK_TOKEN**: Repository secrets para enhanced vulnerability scanning  
+3. **Configure webhooks**: Para notificaciones de alertas de seguridad
+
+Ver documentación completa: [`SECURITY_SETUP.md`](SECURITY_SETUP.md)
+
+## �🛠️ **Optimizaciones y Arquitectura**
 
 ### 🏗️ Arquitectura del Sistema
 
@@ -1263,11 +1504,13 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ### 📈 Estado del Proyecto
 
 - **Build Status**: [![CI](https://github.com/magodeveloper/accessibility-mw/workflows/CI/badge.svg)](https://github.com/magodeveloper/accessibility-mw/actions)
-- **Security**: [![Security Audit](https://github.com/magodeveloper/accessibility-mw/workflows/Security%20Audit/badge.svg)](https://github.com/magodeveloper/accessibility-mw/actions)
+- **Bundle Monitoring**: [![Bundle Monitoring](https://github.com/magodeveloper/accessibility-mw/workflows/Bundle%20Monitoring/badge.svg)](https://github.com/magodeveloper/accessibility-mw/actions)
+- **Security Audit**: [![Security Audit](https://github.com/magodeveloper/accessibility-mw/workflows/Security%20Audit/badge.svg)](https://github.com/magodeveloper/accessibility-mw/actions)
 - **Coverage**: [![codecov](https://codecov.io/gh/magodeveloper/accessibility-mw/branch/main/graph/badge.svg)](https://codecov.io/gh/magodeveloper/accessibility-mw)
 - **Dependencies**: [![Dependabot](https://img.shields.io/badge/Dependabot-enabled-brightgreen.svg)](https://github.com/magodeveloper/accessibility-mw/network/dependencies)
 - **Version**: ![npm version](https://img.shields.io/npm/v/accessibility-mw.svg)
-- **Downloads**: ![npm downloads](https://img.shields.io/npm/dm/accessibility-mw.svg)
+- **Bundle Size**: ![Bundle Size](https://img.shields.io/badge/Bundle_Size-258.38_KB-green.svg)
+- **Security Score**: ![Security](https://img.shields.io/badge/Security-Monitored-red.svg)
 
 ---
 

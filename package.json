@@ -4,7 +4,7 @@
   "description": "accessibility-mw",
   "main": "server.js",
   "scripts": {
-    "build": "tsc && cp -f src/routes/*.yaml dist/routes/",
+    "build": "tsc && pwsh -Command \"Copy-Item src/routes/*.yaml dist/routes/ -Force\"",
     "build:check": "tsc --noEmit --incremental",
     "type-check": "tsc --noEmit",
     "dev": "tsx watch src/server.ts",
@@ -43,6 +43,10 @@
     "docker:clean": "pwsh docker-cleanup.ps1",
     "docker:size": "docker images | findstr accessibility-mw && docker system df",
     "analyze:bundle": "pwsh analyze-bundle.ps1",
+    "bundle:monitor": "node scripts/bundle-monitor.js",
+    "bundle:check": "node scripts/bundle-monitor.js",
+    "bundle:watch": "bundlewatch --config .bundlewatch.config.json",
+    "bundle:full": "npm run build && npm run bundle:monitor",
     "validate:project": "pwsh validate-project.ps1"
   },
   "repository": {
@@ -75,6 +79,7 @@
   },
   "devDependencies": {
     "@babel/preset-env": "^7.28.3",
+    "@size-limit/preset-small-lib": "^11.2.0",
     "@types/cors": "2.8.19",
     "@types/express": "5.0.3",
     "@types/jest": "30.0.0",
@@ -84,14 +89,58 @@
     "@typescript-eslint/eslint-plugin": "8.40.0",
     "@typescript-eslint/parser": "8.40.0",
     "babel-jest": "^30.0.5",
+    "bundlewatch": "^0.4.1",
     "cross-env": "^10.0.0",
     "eslint": "9.34.0",
     "jest": "30.0.5",
     "pino-pretty": "^13.1.1",
     "rimraf": "^6.0.1",
+    "size-limit": "^11.2.0",
     "supertest": "7.1.4",
     "ts-jest": "29.4.1",
     "tsx": "4.20.5",
     "typescript": "5.9.2"
+  },
+  "size-limit": [
+    {
+      "name": "Server Bundle",
+      "path": "dist/server.js",
+      "limit": "5 MB",
+      "ignore": [
+        "playwright"
+      ]
+    },
+    {
+      "name": "Main Route Bundle",
+      "path": "dist/routes/analyze.route.js",
+      "limit": "2 MB"
+    },
+    {
+      "name": "Utils Bundle",
+      "path": "dist/utils/*.js",
+      "limit": "1 MB"
+    }
+  ],
+  "bundlewatch": {
+    "files": [
+      {
+        "path": "./dist/**/*.js",
+        "maxSize": "10mb",
+        "compression": "gzip"
+      },
+      {
+        "path": "./dist/server.js",
+        "maxSize": "5mb",
+        "compression": "gzip"
+      }
+    ],
+    "ci": {
+      "trackBranches": [
+        "main",
+        "develop"
+      ],
+      "compareWith": "main",
+      "repoBranchBase": "origin/main"
+    }
   }
 }

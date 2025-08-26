@@ -54,7 +54,22 @@ jobs:
         run: npm run type-check
 
       - name: Build project
-        run: npm run build:check
+        run: npm run build
+
+      - name: Bundle monitoring
+        run: |
+          npm run bundle:monitor
+          npm run bundle:check
+        continue-on-error: true
+
+      - name: Upload bundle reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bundle-reports-node${{ matrix.node-version }}
+          path: |
+            reports/bundle/
+            !reports/bundle/*.json
 
       - name: Run unit tests
         run: npm run test:unit
@@ -96,10 +111,16 @@ jobs:
         run: npm audit --audit-level=moderate --production
         continue-on-error: true
 
-      - name: Check bundle size
+      - name: Bundle size trend analysis
         run: |
           if [ -d "dist" ]; then
-            echo "Bundle size analysis:"
+            echo "=== Bundle Size Analysis ==="
+            echo "Current bundle size:"
             du -sh dist/
-            find dist -name "*.js" -exec ls -lh {} \; | head -10
+            echo ""
+            echo "Largest bundle files:"
+            find dist -name "*.js" -exec ls -lh {} \; | sort -k5 -hr | head -10
+            echo ""
+            echo "Bundle composition:"
+            find dist -type f -exec basename {} \; | sort | uniq -c | sort -nr
           fi

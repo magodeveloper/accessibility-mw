@@ -71,14 +71,18 @@ jobs:
           path: snyk-report.json
           retention-days: 30
 
-      - name: CodeQL Analysis
+      - name: CodeQL Analysis - Initialize
         uses: github/codeql-action/init@v3
+        id: codeql-init
+        continue-on-error: true
         with:
           languages: javascript
           queries: security-and-quality
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
+        if: steps.codeql-init.outcome == 'success'
+        continue-on-error: true
 
       - name: Docker Security Scan
         if: github.event_name != 'schedule'
@@ -104,10 +108,14 @@ jobs:
         if: always()
         run: |
           echo "## Security Audit Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- **NPM Audit**: $(test -f npm-audit-report.json && echo 'Completed' || echo 'Failed')" >> $GITHUB_STEP_SUMMARY
-          echo "- **Snyk Scan**: $(test -f snyk-report.json && echo 'Completed' || echo 'Failed')" >> $GITHUB_STEP_SUMMARY
-          echo "- **CodeQL**: Completed" >> $GITHUB_STEP_SUMMARY
-          echo "- **Docker Scan**: $(test -f trivy-report.json && echo 'Completed' || echo 'Skipped')" >> $GITHUB_STEP_SUMMARY
+          echo "- **NPM Audit**: $(test -f npm-audit-report.json && echo '[PASS] Completed' || echo '[FAIL] Failed')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Snyk Scan**: $(test -f snyk-report.json && echo '[PASS] Completed' || echo '[SKIP] Failed/Skipped (requires SNYK_TOKEN)')" >> $GITHUB_STEP_SUMMARY
+          echo "- **CodeQL**: $([[ '${{ steps.codeql-init.outcome }}' == 'success' ]] && echo '[PASS] Completed' || echo '[SKIP] Skipped (Code Scanning not enabled)')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Docker Scan**: $(test -f trivy-report.json && echo '[PASS] Completed' || echo '[SKIP] Skipped')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "- **Enable Code Scanning**: Go to Settings -> Security & analysis -> Code scanning -> Set up -> Configure CodeQL" >> $GITHUB_STEP_SUMMARY
+          echo "- **Add SNYK_TOKEN**: Add Snyk token to repository secrets for enhanced vulnerability scanning" >> $GITHUB_STEP_SUMMARY
 
   dependency-review:
     name: Dependency Review

@@ -1,0 +1,45 @@
+{
+  "preset": "@size-limit/preset-small-lib",
+  "size-limit": [
+    {
+      "name": "📁 Total Distribution",
+      "path": "dist/**/*.js",
+      "limit": "10 MB",
+      "gzip": false,
+      "running": false,
+      "webpack": false
+    },
+    {
+      "name": "🚀 Main Server",
+      "path": "dist/server.js",
+      "limit": "5 MB",
+      "gzip": false,
+      "running": false,
+      "webpack": false
+    },
+    {
+      "name": "🛣️ Main Route",
+      "path": "dist/routes/analyze.route.js",
+      "limit": "2 MB",
+      "gzip": false,
+      "running": false,
+      "webpack": false
+    },
+    {
+      "name": "🔧 Utils Bundle",
+      "path": "dist/utils/security.js",
+      "limit": "1 MB",
+      "gzip": false,
+      "running": false,
+      "webpack": false
+    },
+    {
+      "name": "🎯 Services Bundle",
+      "path": "dist/services/**/*.js",
+      "limit": "2 MB",
+      "gzip": false,
+      "running": false,
+      "webpack": false
+    }
+  ]
+}
