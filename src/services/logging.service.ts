@@ -80,7 +80,9 @@ class AdvancedLogger {
           service: 'accessibility-mw',
         }),
       },
-      timestamp: pino.stdTimeFunctions.isoTime,
+      timestamp:
+        pino.stdTimeFunctions?.isoTime ||
+        (() => `,"timestamp":"${new Date().toISOString()}"`),
 
       // Redact sensitive information
       redact: {

@@ -15,7 +15,7 @@ jest.spyOn(console, 'log').mockImplementation(mockConsole.log);
 jest.spyOn(console, 'warn').mockImplementation(mockConsole.warn);
 jest.spyOn(console, 'error').mockImplementation(mockConsole.error);
 
-describe('HealthMonitor Service', () => {
+describe('Health Monitor Service', () => {
   let monitor: HealthMonitor;
 
   beforeEach(() => {

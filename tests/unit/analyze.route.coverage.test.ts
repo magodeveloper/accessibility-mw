@@ -14,10 +14,10 @@ describe('Route Coverage Test', () => {
     const helpers = await import('../../src/routes/analyze.helpers');
 
     expect(helpers).toBeDefined();
-    expect(helpers.runFullAnalysis).toBeDefined();
     expect(helpers.validateAndSanitizeInput).toBeDefined();
-    expect(typeof helpers.runFullAnalysis).toBe('function');
+    expect(helpers.runAnalysisTools).toBeDefined();
     expect(typeof helpers.validateAndSanitizeInput).toBe('function');
+    expect(typeof helpers.runAnalysisTools).toBe('function');
   });
 
   it('debe verificar que las funciones estén exportadas', () => {
