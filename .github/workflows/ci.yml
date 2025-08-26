@@ -77,23 +77,26 @@ jobs:
             !reports/bundle/*.json
 
       - name: Run unit tests
-        run: cross-env ANALYSIS_API_URL=http://localhost:8082 jest tests/unit --testTimeout=15000 --coverage=false
+        run: npx jest tests/unit --testTimeout=15000 --coverage=false
         env:
           CI: true
+          ANALYSIS_API_URL: http://localhost:8082
           PLAYWRIGHT_BROWSERS_PATH: /home/runner/.cache/playwright
           PLAYWRIGHT_HEADLESS: true
 
       - name: Run integration tests
-        run: cross-env ANALYSIS_API_URL=http://localhost:8082 jest tests/integration --testTimeout=15000 --coverage=false
+        run: npx jest tests/integration --testTimeout=15000 --coverage=false
         env:
           CI: true
+          ANALYSIS_API_URL: http://localhost:8082
           PLAYWRIGHT_BROWSERS_PATH: /home/runner/.cache/playwright
           PLAYWRIGHT_HEADLESS: true
 
       - name: Generate coverage report
-        run: cross-env ANALYSIS_API_URL=http://localhost:8082 jest --coverage --testTimeout=15000
+        run: npx jest --coverage --testTimeout=15000
         env:
           CI: true
+          ANALYSIS_API_URL: http://localhost:8082
           PLAYWRIGHT_BROWSERS_PATH: /home/runner/.cache/playwright
           PLAYWRIGHT_HEADLESS: true
 

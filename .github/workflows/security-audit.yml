@@ -58,7 +58,7 @@ jobs:
       # CodeQL Analysis deshabilitado temporalmente para evitar warnings
       # Habilitar cuando se configure Code Scanning en el repositorio:
       # Settings → Security & analysis → Code scanning → Set up → Configure CodeQL
-      
+
       # - name: Check CodeQL availability
       #   id: check-codeql
       #   run: |
@@ -110,7 +110,7 @@ jobs:
           echo "- **CodeQL**: ⚠️  Disabled (to avoid warnings - Code Scanning not enabled)" >> $GITHUB_STEP_SUMMARY
           echo "- **Docker Scan**: $(test -f trivy-report.json && echo '✅ Completed' || echo '⚠️  Skipped')" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           echo "### 🔧 Optional Enhancement" >> $GITHUB_STEP_SUMMARY
           echo "**Enable Code Scanning for enhanced security:**" >> $GITHUB_STEP_SUMMARY
           echo "1. Go to **Settings** → **Security & analysis**" >> $GITHUB_STEP_SUMMARY
@@ -118,7 +118,7 @@ jobs:
           echo "3. Choose **Configure CodeQL**" >> $GITHUB_STEP_SUMMARY
           echo "4. Uncomment CodeQL steps in security-audit.yml" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           echo "### 📊 Security Status" >> $GITHUB_STEP_SUMMARY
           echo "- Dependencies scanned for vulnerabilities" >> $GITHUB_STEP_SUMMARY
           echo "- Docker image security validated" >> $GITHUB_STEP_SUMMARY
