@@ -1,5 +1,5 @@
 # Etapa 1: Compilación completa
-FROM node:20.19-alpine3.20 AS builder
+FROM node:20.19.1-alpine3.20 AS builder
 WORKDIR /app
 
 # Instalar dependencias del sistema y actualizaciones de seguridad
@@ -24,7 +24,7 @@ RUN rm -rf node_modules && \
   npm cache clean --force
 
 # Etapa 2: Imagen de producción liviana (SIN reinstalar npm)
-FROM mcr.microsoft.com/playwright:v1.48.0-jammy AS accessibility-mw
+FROM mcr.microsoft.com/playwright:v1.55.0-jammy AS accessibility-mw
 WORKDIR /app
 
 # Variables de entorno
