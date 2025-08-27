@@ -90,14 +90,15 @@ describe('Render Service', () => {
       );
     });
 
-    it('debe mostrar warning de deprecación', async () => {
+    it('debe suprimir warning de deprecación en tests', async () => {
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
       const testHtml = '<html><body><h1>Test</h1></body></html>';
       const testFn = jest.fn().mockResolvedValue('test-result');
 
       await withPage('html', testHtml, testFn);
 
-      expect(consoleSpy).toHaveBeenCalledWith(
+      // En entorno de test, el warning está suprimido
+      expect(consoleSpy).not.toHaveBeenCalledWith(
         '[withPage] Using legacy non-pooled browser. Consider migrating to withPooledPage for better performance.'
       );
 

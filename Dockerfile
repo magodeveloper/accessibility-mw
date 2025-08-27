@@ -47,8 +47,9 @@ COPY .achecker.yml ./
 # ¡NO MÁS npm install! Todo viene del builder
 # Crear directorios, permisos, actualizaciones de seguridad y limpiar en un solo RUN
 RUN apt-get update && apt-get upgrade -y && \
-  mkdir -p /app/results /app/logs && \
+  mkdir -p /app/results /app/logs /app/.achecker_cache && \
   chown -R pwuser:pwuser /app && \
+  chmod -R 755 /app/results /app/logs /app/.achecker_cache && \
   rm -rf /tmp/* /var/cache/* /var/lib/apt/lists/* /var/cache/apt/*
 
 USER pwuser

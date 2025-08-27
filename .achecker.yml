@@ -2,17 +2,23 @@ ruleArchive: latest
 policies:
   - IBM_Accessibility
 
+# Solo reportar violaciones críticas para ser más rápido
 reportLevels:
   - violation
   - potentialviolation
-  - recommendation
-  - potentialrecommendation
-  - manual
+#  - recommendation
+#  - potentialrecommendation
+#  - manual
 #  - pass
 
-outputFolder: ./results
-cacheFolder: ./.achecker_cache
+outputFolder: /app/results
+cacheFolder: /app/.achecker_cache
 
 outputFormat:
   - json
 outputFilenameTimestamp: false
+
+# Configuraciones de rendimiento
+captureScreenshots: false
+silent: true
+timeout: 30000

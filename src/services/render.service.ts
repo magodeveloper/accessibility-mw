@@ -17,7 +17,16 @@ export async function withPage<T>(
   fn: (page: Page) => Promise<T>,
   opts?: WithPageOptions
 ): Promise<T> {
-  console.warn('[withPage] Using legacy non-pooled browser. Consider migrating to withPooledPage for better performance.');
+  // Evitamos spam de warnings en tests y mostramos solo una vez en otros entornos
+  const isTest = process.env.NODE_ENV === 'test';
+  // @ts-ignore - variable de módulo para recordar si ya avisamos
+  if (!global.__WITH_PAGE_LEGACY_WARNED__ && !isTest) {
+    // @ts-ignore
+    global.__WITH_PAGE_LEGACY_WARNED__ = true;
+    console.warn(
+      '[withPage] Using legacy non-pooled browser. Consider migrating to withPooledPage for better performance.'
+    );
+  }
   return withPooledPage(inputType, value, fn, opts);
 }
 

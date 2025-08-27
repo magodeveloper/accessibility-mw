@@ -1,6 +1,7 @@
 import * as express from 'express';
 import * as fs from 'fs';
 import { UnifiedResponse } from '../mappers/unifyResults';
+import { advancedLogger } from '../services/logging.service';
 import { error, success } from '../utils/response';
 import {
   getWcagCriterionId,
@@ -16,12 +17,9 @@ import {
   validateUrlIfNeeded,
 } from './analyze.helpers';
 
-// Interfaces para tipos de datos específicos
 interface LogData {
   [key: string]: unknown;
 }
-
-// Removed unused types
 
 interface HttpClientData {
   [key: string]: unknown;
@@ -108,7 +106,6 @@ interface ErrorPayload {
   [key: string]: unknown; // Para compatibilidad con HttpClientData
 }
 
-// Optimized logger utility
 interface Logger {
   info: (message: string, data?: LogData) => void;
   warn: (message: string, data?: LogData) => void;
@@ -116,7 +113,6 @@ interface Logger {
   debug: (message: string, data?: LogData) => void;
 }
 
-// Tipo extendido para el resultado de buildUnified
 type ExtendedUnifiedResponse = UnifiedResponse & {
   meta: UnifiedResponse['meta'] & {
     inputType?: string;
@@ -125,8 +121,6 @@ type ExtendedUnifiedResponse = UnifiedResponse & {
     duration?: number;
   };
 };
-
-// Functions
 
 const createOptimizedLogger = (
   requestId: string,
@@ -143,7 +137,6 @@ const createOptimizedLogger = (
       const logEntry = `[${timestamp}] [${level}] [${requestId}] ${message}${dataStr}\n`;
       fs.appendFileSync('debug_log.txt', logEntry);
     } catch (err) {
-      // Silently ignore file logging errors to prevent app crashes
       if (isDev)
         console.warn('Failed to write to debug log:', (err as Error).message);
     }
@@ -199,9 +192,22 @@ const createHttpClient = () => {
       const timeoutId = setTimeout(() => controller.abort(), timeout);
 
       try {
+        const requestHeaders = {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'User-Agent': 'accessibility-mw/1.0.0',
+          ...headers,
+        }; // Log detailed request info for debugging
+        advancedLogger.debug('HTTP Request Details', {
+          method: 'POST',
+          url: url,
+          headers: requestHeaders,
+          payloadSize: JSON.stringify(data).length,
+        });
+
         const response = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...headers },
+          headers: requestHeaders,
           body: JSON.stringify(data),
           signal: controller.signal,
         });
@@ -222,6 +228,8 @@ const httpClient = createHttpClient();
 const ANALYSIS_API_URL =
   process.env.ANALYSIS_API_URL || 'http://localhost:8082';
 const analyzeRouter = express.Router();
+export { analyzeRouter };
+export default analyzeRouter;
 
 interface AnalysisConfig {
   ANALYZE_TIMEOUT_MS: number;
@@ -247,6 +255,66 @@ const mapImpactToSeverity = (impact: string): string => {
   return severityMap[impact?.toLowerCase()] || 'medium';
 };
 
+// Determina el idioma a usar (solo es / en por ahora)
+const resolveAcceptLanguage = (req?: express.Request): string => {
+  const raw = (req?.headers['accept-language'] as string) || '';
+  if (!raw) return 'es';
+  const first = raw.split(',')[0].trim().slice(0, 2).toLowerCase();
+  return ['es', 'en'].includes(first) ? first : 'es';
+};
+
+// Helper para logs verbosos controlados por variable de entorno
+const debugVerbose = (message: string, data?: unknown) => {
+  if (process.env.DEBUG_VERBOSE === 'true') {
+     
+    console.log(`🐞 ${message}`, data || '');
+  }
+};
+
+// Mapeo de tipo de resultado para el microservicio
+const mapToResultLevel = (itemType?: string): string => {
+  // Mapear tipos conocidos (normalizamos a minúsculas)
+  const t = (itemType || '').toLowerCase();
+  switch (t) {
+    case 'violation':
+      return 'violation';
+    case 'recommendation':
+    case 'remediation':
+      return 'recommendation';
+    case 'potentialviolation':
+    case 'potential_violation':
+    case 'needsreview':
+    case 'needs_review':
+      return 'potentialViolation';
+    case 'manualcheck':
+    case 'manual_check':
+      return 'manualCheck';
+    case 'pass':
+    case 'passes':
+      return 'pass';
+    default:
+      return 'violation';
+  }
+};
+
+// Interfaz para respuesta detallada
+interface SaveResponseDetail {
+  success: number;
+  error: number;
+  message: string;
+}
+
+interface DetailedSaveResponse {
+  analysis: SaveResponseDetail;
+  results: SaveResponseDetail;
+  errors: SaveResponseDetail;
+  totalProcessed: {
+    violations: number;
+    results: number;
+    errors: number;
+  };
+}
+
 const createAnalysisPayload = (
   unified: ExtendedUnifiedResponse,
   stats: AnalysisStats,
@@ -257,7 +325,7 @@ const createAnalysisPayload = (
   const { axeStats = {}, eaStats = {} } = stats;
 
   return {
-    userId: userId ?? 1, // Usa el userId del request o default 1
+    userId: userId ?? 1,
     dateAnalysis: new Date().toISOString(),
     contentType: unified.meta?.inputType === 'html' ? 'html' : 'url',
     contentInput:
@@ -382,19 +450,17 @@ async function saveAnalysis(
 
 async function saveResult(
   result: Record<string, unknown>,
-  requestId = 'unknown'
+  requestId = 'unknown',
+  acceptLanguage = 'es'
 ): Promise<number | null> {
   const logger = createOptimizedLogger(requestId);
-
-  console.log('🚨 SAVE_RESULT_FUNCTION_START:', {
-    resultKeys: Object.keys(result || {}),
-    analysisApiUrl: ANALYSIS_API_URL,
-    requestId,
+  debugVerbose('SAVE_RESULT_START', {
+    keys: Object.keys(result || {}),
+    hasAnalysisId: !!result?.analysisId,
   });
 
   if (!ANALYSIS_API_URL) {
     logger.warn('saveResult: No ANALYSIS_API_URL configured');
-    console.log('🚨 SAVE_RESULT_NO_URL');
     return null;
   }
 
@@ -403,17 +469,16 @@ async function saveResult(
   });
 
   try {
-    console.log(
-      '🚨 SAVE_RESULT_MAKING_REQUEST to:',
-      `${ANALYSIS_API_URL}/api/result`
-    );
+    debugVerbose('SAVE_RESULT_REQUEST', {
+      url: `${ANALYSIS_API_URL}/api/result`,
+    });
 
     const resp = await httpClient.post(
       `${ANALYSIS_API_URL}/api/result`,
-      result
+      result,
+      { 'Accept-Language': acceptLanguage }
     );
-
-    console.log('🚨 SAVE_RESULT_RESPONSE:', {
+    debugVerbose('SAVE_RESULT_RESPONSE', {
       status: resp.status,
       ok: resp.ok,
     });
@@ -422,10 +487,6 @@ async function saveResult(
 
     if (!resp.ok) {
       const errorText = await resp.text();
-      console.log('🚨 SAVE_RESULT_ERROR_RESPONSE:', {
-        status: resp.status,
-        error: errorText,
-      });
       logger.error('saveResult error response', {
         status: resp.status,
         error: errorText,
@@ -434,21 +495,18 @@ async function saveResult(
     }
 
     const responseData = await resp.json();
-    console.log('🚨 SAVE_RESULT_SUCCESS_DATA:', { responseData });
     logger.info('saveResult success', { hasData: !!responseData });
 
     // Retornar el ID del resultado guardado
     const resultId = responseData?.data?.id || responseData?.id || null;
-    console.log('🚨 SAVE_RESULT_RETURNING:', {
-      resultId,
-      hasData: !!responseData?.data,
-      hasDirectId: !!responseData?.id,
-    });
     return resultId;
   } catch (err) {
     const error = err as Error;
-    console.log('🚨 SAVE_RESULT_CATCH_ERROR:', { error: error.message });
-    logger.error('Error al guardar resultado', { error: error.message });
+    logger.error('Error al guardar resultado', {
+      error: error.message,
+      errorName: error.name,
+      stack: error.stack?.substring(0, 200),
+    });
     // No re-throw para permitir que el análisis continúe
     return null;
   }
@@ -456,7 +514,8 @@ async function saveResult(
 
 async function saveError(
   errorPayload: ErrorPayload,
-  requestId = 'unknown'
+  requestId = 'unknown',
+  acceptLanguage = 'es'
 ): Promise<void> {
   const logger = createOptimizedLogger(requestId);
 
@@ -465,16 +524,15 @@ async function saveError(
     return;
   }
 
-  logger.info('🔥 saveError called', {
-    payload: errorPayload,
+  logger.debug('saveError called', {
     payloadSize: JSON.stringify(errorPayload).length,
-    payloadJson: JSON.stringify(errorPayload, null, 2),
   });
 
   try {
     const errorResp = await httpClient.post(
       `${ANALYSIS_API_URL}/api/error`,
-      errorPayload
+      errorPayload,
+      { 'Accept-Language': acceptLanguage }
     );
 
     logger.info('saveError response', {
@@ -521,7 +579,7 @@ async function saveResultsAndErrors(
     analysisId,
     requestId,
     firstItemType: itemsList[0]?.type,
-    firstItemId: (itemsList[0] as AnalysisItem)?.id,
+    firstItemId: itemsList[0]?.id,
   });
 
   logger.info('🔧 Starting to save results and errors', {
@@ -549,26 +607,23 @@ async function saveResultsAndErrors(
 
       console.log('🚨 ABOUT_TO_SAVE_RESULT:', {
         batchIndex,
-        itemId: (item as AnalysisItem)?.id,
+        itemId: item?.id,
         itemType: item.type,
         resultSize: JSON.stringify(result).length,
       });
 
       // Guardar resultado y capturar el ID
       try {
-        console.log(
-          '🚨 CALLING_SAVE_RESULT for item:',
-          (item as AnalysisItem)?.id
-        );
+        console.log('🚨 CALLING_SAVE_RESULT for item:', item?.id);
         resultId = await saveResult(result, requestId);
         console.log('🚨 SAVE_RESULT_RETURNED:', {
-          itemId: (item as AnalysisItem)?.id,
+          itemId: item?.id,
           resultId,
         });
         logger.info(`Result saved with ID: ${resultId}`, { requestId });
       } catch (err) {
         console.log('🚨 SAVE_RESULT_FAILED:', {
-          itemId: (item as AnalysisItem)?.id,
+          itemId: item?.id,
           error: String(err),
         });
         failedResults.push({ result, error: String(err) });
@@ -579,7 +634,7 @@ async function saveResultsAndErrors(
       const errorTypes = ['violation', 'needsreview', 'recommendation'];
 
       console.log('🚨 ERROR_PROCESSING_CHECK:', {
-        itemId: (item as AnalysisItem)?.id,
+        itemId: item.id,
         itemType: item.type,
         resultId,
         errorTypes,
@@ -589,7 +644,7 @@ async function saveResultsAndErrors(
 
       logger.info(
         `🔍 Checking error processing for item: ${
-          (item as AnalysisItem)?.id || 'unknown'
+          item.id || 'unknown'
         }, type: "${item.type}", resultId: ${resultId}`,
         { requestId }
       );
@@ -705,6 +760,126 @@ async function saveResultsAndErrors(
   });
 
   return { failedResults, failedErrors };
+}
+
+// Nueva función con conteo detallado de éxitos y errores
+async function saveResultsAndErrorsDetailed(
+  resultsPayload: Record<string, unknown>[],
+  itemsList: AnalysisItem[],
+  analysisId: string | number,
+  requestId = 'unknown',
+  acceptLanguage = 'es'
+): Promise<DetailedSaveResponse> {
+  const logger = createOptimizedLogger(requestId);
+
+  // Contadores detallados
+  let resultsSuccess = 0;
+  let resultsError = 0;
+  let errorsSuccess = 0;
+  let errorsError = 0;
+
+  logger.info('🔧 Starting detailed save process', {
+    resultCount: resultsPayload.length,
+    itemsCount: itemsList.length,
+    analysisId,
+  });
+
+  // Procesar resultados en lotes
+  const BATCH_SIZE = 5;
+  for (let i = 0; i < resultsPayload.length; i += BATCH_SIZE) {
+    const batch = resultsPayload.slice(i, i + BATCH_SIZE);
+    const batchItems = itemsList.slice(i, i + BATCH_SIZE);
+
+    const batchPromises = batch.map(async (result, batchIndex) => {
+      const item = batchItems[batchIndex];
+      let resultId: number | null = null;
+
+      // Guardar resultado
+      try {
+        resultId = await saveResult(result, requestId, acceptLanguage);
+        if (resultId) {
+          resultsSuccess++;
+          logger.info(`Result saved with ID: ${resultId}`);
+        }
+      } catch (err) {
+        resultsError++;
+        logger.error(`Failed to save result: ${err}`);
+      }
+
+      // Guardar error si es violation y se guardó el resultado
+      if (
+        resultId &&
+        item.type &&
+        ['violation', 'needsreview', 'recommendation'].includes(item.type)
+      ) {
+        const node = item.nodes?.[0];
+        const hasErrorMessage = node?.failureSummary || item.help;
+
+        if (hasErrorMessage && node) {
+          const errorMessage =
+            node.failureSummary || item.help || 'Error detected';
+          const errorPayload: ErrorPayload = createErrorPayload(
+            item,
+            node,
+            analysisId,
+            errorMessage,
+            resultId
+          );
+
+          try {
+            await saveError(errorPayload, requestId, acceptLanguage);
+            errorsSuccess++;
+            logger.info(`Error saved for resultId: ${resultId}`);
+          } catch (err) {
+            errorsError++;
+            logger.error(`Failed to save error: ${err}`);
+          }
+        }
+      }
+    });
+
+    await Promise.all(batchPromises);
+  }
+
+  const response: DetailedSaveResponse = {
+    analysis: {
+      success: 1, // El análisis ya se guardó previamente
+      error: 0,
+      message: 'Análisis guardado correctamente',
+    },
+    results: {
+      success: resultsSuccess,
+      error: resultsError,
+      message:
+        resultsError > 0
+          ? `${resultsSuccess} resultados guardados, ${resultsError} fallaron`
+          : `${resultsSuccess} resultados guardados exitosamente`,
+    },
+    errors: {
+      success: errorsSuccess,
+      error: errorsError,
+      message:
+        errorsError > 0
+          ? `${errorsSuccess} errores guardados, ${errorsError} fallaron`
+          : `${errorsSuccess} errores guardados exitosamente`,
+    },
+    totalProcessed: {
+      violations: itemsList.length,
+      results: resultsSuccess + resultsError,
+      errors: errorsSuccess + errorsError,
+    },
+  };
+
+  logger.info('Detailed save process completed', {
+    analysisSuccess: response.analysis.success,
+    analysisErrors: response.analysis.error,
+    resultsSuccess: response.results.success,
+    resultsErrors: response.results.error,
+    errorsSuccess: response.errors.success,
+    errorsErrors: response.errors.error,
+    totalProcessed: response.totalProcessed,
+  });
+  return response;
 }
 
 /**
@@ -1020,10 +1195,23 @@ analyzeRouter.post('/', async (req: express.Request, res: express.Response) => {
       userId,
     });
 
-    const { statusCode, message, analysisId, failedResults, failedErrors } =
-      saveResults || {};
+    const saveResponse = saveResults || {};
+    const analysisId = saveResponse.analysisId;
+    const statusCode = saveResponse.statusCode || 200;
+    const message = saveResponse.message || 'Analysis completed';
+    const persistenceData = saveResponse.persistence || {};
+    const resultErrors = persistenceData.results?.error || 0;
+    const errorErrors = persistenceData.errors?.error || 0;
+    const totalErrors = resultErrors + errorErrors;
 
-    logger.info('Analysis completed', { analysisId, statusCode });
+    logger.info('Analysis completed', {
+      analysisId,
+      statusCode,
+      resultErrors,
+      errorErrors,
+      totalErrors,
+      analysisSuccess: persistenceData.analysis?.success,
+    });
 
     return res.status(statusCode || 200).json(
       success(
@@ -1032,8 +1220,12 @@ analyzeRouter.post('/', async (req: express.Request, res: express.Response) => {
           analysisSaved: true,
           message,
           analysisId,
-          failedResults,
-          failedErrors,
+          persistence: persistenceData,
+          totalErrors: totalErrors,
+          errorsSummary: {
+            resultSaveErrors: resultErrors,
+            errorSaveErrors: errorErrors,
+          },
         },
         requestId
       )
@@ -1198,13 +1390,21 @@ async function saveAndFormatResults({
     saveData?.data?.id ||
     saveData?.Id ||
     saveData?.id ||
-    null;
+    // FALLBACK: Si no se pudo guardar en microservicio, usar timestamp como ID temporal
+    Date.now();
   logger.debug('Extracted analysisId', {
     analysisId,
     hasDataId: !!saveData?.data?.Id,
     hasDataid: !!saveData?.data?.id,
     hasId: !!saveData?.Id,
     hasid: !!saveData?.id,
+    saveDataKeys: saveData ? Object.keys(saveData) : null,
+    isFallbackId:
+      !saveData ||
+      (!saveData?.data?.Id &&
+        !saveData?.data?.id &&
+        !saveData?.Id &&
+        !saveData?.id),
   });
 
   // Escribir a archivo de depuración solo en desarrollo
@@ -1236,66 +1436,35 @@ async function saveAndFormatResults({
     requestId,
   });
 
-  const resultsPayload = unified.results.flatMap(toolResult =>
-    toolResult.items
-      .filter(item => {
-        const wcagInfo = getWcagMapping(item as AnalysisItem);
+  const acceptLang = resolveAcceptLanguage(req);
+  const resultsPayload: Record<string, unknown>[] = [];
+  unified.results.forEach(toolResult => {
+    toolResult.items.forEach(item => {
+      const mapping = getWcagMapping(item as any);
+      const criterion = mapping.criterion ?? 'unknown';
+      resultsPayload.push({
+        analysisId: analysisId,
+        wcagCriterionId: getWcagCriterionId(criterion),
+        wcagCriterion: criterion,
+        level: mapToResultLevel((item as any).type),
+        severity: mapImpactToSeverity((item as any).impact || ''),
+        description:
+          (item as any).help ||
+          (item as any)['message'] ||
+          'Accessibility issue detected',
+      });
+      // Mantener lista de items para posteriores errores
+      itemsList.push(item as AnalysisItem);
+    });
+  });
 
-        // DEBUG: Log cada item antes del filtro
-        logger.info('🔍 Checking item:', {
-          rule:
-            (item as AnalysisItem).id ||
-            (item as AnalysisItem).ruleId ||
-            'unknown',
-          wcagInfo,
-          requestId,
-        });
-
-        // Filtrar por versiones y niveles WCAG solicitados
-        // Si no hay información WCAG específica, usar valores por defecto inclusivos
-        const versionMatch =
-          wcagVersions.includes(wcagInfo.version) ||
-          (wcagInfo.version === '2.0' &&
-            wcagVersions.some((v: string) => ['2.1', '2.2'].includes(v)));
-        const levelMatch =
-          wcagLevels.includes(wcagInfo.level) ||
-          (wcagInfo.level === 'A' &&
-            wcagLevels.some((l: string) => ['AA', 'AAA'].includes(l)));
-
-        const passes = versionMatch && levelMatch;
-
-        // DEBUG: Log resultado del filtro
-        logger.info('🔍 Filter result:', {
-          rule:
-            (item as AnalysisItem).id ||
-            (item as AnalysisItem).ruleId ||
-            'unknown',
-          versionMatch,
-          levelMatch,
-          passes,
-          requestId,
-        });
-
-        return passes;
-      })
-      .map(item => {
-        itemsList.push(item as AnalysisItem);
-        const wcagInfo = getWcagMapping(item as AnalysisItem);
-        const criterionId = getWcagCriterionId(wcagInfo.criterion);
-
-        return {
-          analysisId,
-          wcagCriterionId: criterionId,
-          wcagCriterion: wcagInfo.criterion,
-          level: item.type || 'violation',
-          severity: mapImpactToSeverity(item.impact || 'minor'),
-          description:
-            item.help ||
-            (item as AnalysisItem).message ||
-            (item.nodes?.[0]?.failureSummary ?? 'Accessibility issue detected'),
-        };
-      })
-  );
+  // Debug logging del payload
+  if (resultsPayload.length > 0) {
+    logger.info('🚨 PAYLOAD_DEBUG: First result payload', {
+      payload: resultsPayload[0],
+      totalItems: resultsPayload.length,
+    });
+  }
 
   // Debug logging antes de saveResultsAndErrors
   logger.info('📊 About to call saveResultsAndErrors', {
@@ -1303,43 +1472,40 @@ async function saveAndFormatResults({
     itemsListLength: itemsList.length,
     analysisId,
     hasAnalysisId: !!analysisId,
+    isFallbackId:
+      !saveData ||
+      (!saveData?.data?.Id &&
+        !saveData?.data?.id &&
+        !saveData?.Id &&
+        !saveData?.id),
+    microserviceStatus: saveData ? 'SUCCESS' : 'FAILED_OR_DISABLED',
   });
 
-  const { failedResults, failedErrors } = await saveResultsAndErrors(
+  // Al guardar resultados y errores pasar Accept-Language dinámico
+  const detailedResponse = await saveResultsAndErrorsDetailed(
     resultsPayload,
     itemsList,
     analysisId,
-    requestId
+    requestId,
+    acceptLang
   );
 
-  // Formateo de respuesta optimizado
-  const hasFailures = failedResults.length > 0 || failedErrors.length > 0;
-
   return {
-    statusCode: hasFailures ? 207 : 200,
-    message: hasFailures
-      ? `Análisis guardado, pero algunos resultados (${failedResults.length}) o errores (${failedErrors.length}) no se pudieron guardar.`
-      : 'Análisis y resultados guardados exitosamente en la base de datos',
+    statusCode: detailedResponse.analysis.success === 1 ? 200 : 207,
+    message: 'Análisis completado con detalles de persistencia',
     analysisId,
-    failedResults: hasFailures
-      ? failedResults.map(f => ({
-          wcagCriterion: f.result.wcagCriterion,
-          level: f.result.level,
-          severity: f.result.severity,
-          description: f.result.description,
-          error: f.error,
-        }))
-      : undefined,
-    failedErrors: hasFailures
-      ? failedErrors.map(f => ({
-          criterion: f.errorPayload.criterion,
-          type: f.errorPayload.type,
-          impact: f.errorPayload.impact,
-          failureSummary: f.errorPayload.failureSummary,
-          error: f.error,
-        }))
-      : undefined,
+    persistence: {
+      analysis: detailedResponse.analysis,
+      results: detailedResponse.results,
+      errors: detailedResponse.errors,
+    },
+    summary: {
+      totalViolations: detailedResponse.totalProcessed.violations,
+      resultsProcessed: detailedResponse.totalProcessed.results,
+      errorsProcessed: detailedResponse.totalProcessed.errors,
+    },
   };
 }
 
-export default analyzeRouter;
+// Exponer helpers para pruebas
+export const __test = { mapToResultLevel, resolveAcceptLanguage };

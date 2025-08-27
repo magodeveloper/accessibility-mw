@@ -257,7 +257,7 @@ describe('Security Utils - URL Validation', () => {
         expect(typeof result).toBe('object');
         expect('ok' in result).toBe(true);
       }
-    });
+    }, 60000); // aumentar timeout a 60s por posibles DNS lentos en CI
 
     it('should handle mixed case protocols', async () => {
       const result1 = await validatePublicHttpUrl('HTTP://example.com');

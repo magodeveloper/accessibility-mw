@@ -43,7 +43,7 @@ paths:
                   tool: both
                   wcagVersion: '2.2'
                   wcagLevel: 'AA'
-                  userId: 123
+                  userId: 1
               axe-html-basic:
                 summary: axe-core · HTML básico
                 value:
@@ -61,6 +61,7 @@ paths:
                   tool: axe-core
                   wcagVersion: '2.2'
                   wcagLevel: 'AA'
+                  userId: 1
               axe-html-advanced:
                 summary: axe-core · HTML alta complejidad (landmarks/ARIA)
                 value:
@@ -69,6 +70,7 @@ paths:
                   tool: axe-core
                   wcagVersion: '2.2'
                   wcagLevel: 'AA'
+                  userId: 1
               axe-html-aspx:
                 summary: axe-core · HTML con ASPX
                 value:
@@ -77,6 +79,7 @@ paths:
                   tool: axe-core
                   wcagVersion: '2.2'
                   wcagLevel: 'AA'
+                  userId: 1
               axe-html-php:
                 summary: axe-core · HTML con PHP
                 value:
@@ -85,6 +88,7 @@ paths:
                   tool: axe-core
                   wcagVersion: '2.2'
                   wcagLevel: 'AA'
+                  userId: 1
               axe-html-react:
                 summary: axe-core · HTML con React
                 value:
@@ -93,6 +97,7 @@ paths:
                   tool: axe-core
                   wcagVersion: '2.2'
                   wcagLevel: 'AA'
+                  userId: 1
               axe-url:
                 summary: axe-core · URL pública
                 value:
@@ -101,6 +106,7 @@ paths:
                   tool: axe-core
                   wcagVersion: '2.2'
                   wcagLevel: 'AA'
+                  userId: 1
               equalaccess-html-basic:
                 summary: Equal Access · HTML básico
                 value:
@@ -109,6 +115,7 @@ paths:
                   tool: equal-access
                   wcagVersion: '2.2'
                   wcagLevel: 'AA'
+                  userId: 1
               equalaccess-html-medium:
                 summary: Equal Access · HTML complejidad media
                 value:
@@ -117,6 +124,7 @@ paths:
                   tool: equal-access
                   wcagVersion: '2.2'
                   wcagLevel: 'AA'
+                  userId: 1
               equalaccess-html-advanced:
                 summary: Equal Access · HTML alta complejidad
                 value:
@@ -125,6 +133,7 @@ paths:
                   tool: equal-access
                   wcagVersion: '2.2'
                   wcagLevel: 'AA'
+                  userId: 1
               equalaccess-html-aspx:
                 summary: Equal Access · HTML con ASPX
                 value:
@@ -133,6 +142,7 @@ paths:
                   tool: equal-access
                   wcagVersion: '2.2'
                   wcagLevel: 'AA'
+                  userId: 1
               equalaccess-html-php:
                 summary: Equal Access · HTML con PHP
                 value:
@@ -141,6 +151,7 @@ paths:
                   tool: equal-access
                   wcagVersion: '2.2'
                   wcagLevel: 'AA'
+                  userId: 1
               equalaccess-html-react:
                 summary: Equal Access · HTML con React
                 value:
@@ -149,6 +160,7 @@ paths:
                   tool: equal-access
                   wcagVersion: '2.2'
                   wcagLevel: 'AA'
+                  userId: 1
               equalaccess-url:
                 summary: Equal Access · URL pública
                 value:
@@ -157,6 +169,7 @@ paths:
                   tool: equal-access
                   wcagVersion: '2.2'
                   wcagLevel: 'AA'
+                  userId: 1
       responses:
         '200':
           description: |
