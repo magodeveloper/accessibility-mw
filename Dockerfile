@@ -45,12 +45,16 @@ COPY --from=builder /app/package*.json ./
 COPY .achecker.yml ./
 
 # ¡NO MÁS npm install! Todo viene del builder
-# Crear directorios, permisos, actualizaciones de seguridad y limpiar en un solo RUN
+# SOLUCIÓN DEFINITIVA PARA EQUAL-ACCESS:
+# 1. Actualizar sistema y limpiar cache
+# 2. Crear directorios necesarios
+# 3. Asignar ownership correcto DESPUÉS de crear directorios
+# 4. Establecer permisos
 RUN apt-get update && apt-get upgrade -y && \
-  mkdir -p /app/results /app/logs /app/.achecker_cache && \
+  rm -rf /tmp/* /var/cache/* /var/lib/apt/lists/* && \
+  mkdir -p /app/results /app/logs /app/.achecker_cache/engine && \
   chown -R pwuser:pwuser /app && \
-  chmod -R 755 /app/results /app/logs /app/.achecker_cache && \
-  rm -rf /tmp/* /var/cache/* /var/lib/apt/lists/* /var/cache/apt/*
+  chmod -R 755 /app
 
 USER pwuser
 EXPOSE 3001

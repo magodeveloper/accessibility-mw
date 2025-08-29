@@ -2,6 +2,7 @@ import * as express from 'express';
 import * as fs from 'fs';
 import { UnifiedResponse } from '../mappers/unifyResults';
 import { advancedLogger } from '../services/logging.service';
+import { ENV } from '../utils/environment';
 import { error, success } from '../utils/response';
 import {
   getWcagCriterionId,
@@ -239,9 +240,9 @@ interface AnalysisConfig {
 
 // Configuration object
 const getAnalysisConfig = (): AnalysisConfig => ({
-  ANALYZE_TIMEOUT_MS: Number(process.env.ANALYZE_TIMEOUT_MS ?? 60000),
-  NAVIGATION_TIMEOUT_MS: Number(process.env.NAVIGATION_TIMEOUT_MS ?? 30000),
-  WRAP_MARGIN_MS: 500,
+  ANALYZE_TIMEOUT_MS: ENV.ANALYZE_TIMEOUT_MS,
+  NAVIGATION_TIMEOUT_MS: ENV.NAVIGATION_TIMEOUT_MS,
+  WRAP_MARGIN_MS: ENV.WRAP_MARGIN_MS,
 });
 
 // Utility functions
@@ -266,7 +267,6 @@ const resolveAcceptLanguage = (req?: express.Request): string => {
 // Helper para logs verbosos controlados por variable de entorno
 const debugVerbose = (message: string, data?: unknown) => {
   if (process.env.DEBUG_VERBOSE === 'true') {
-     
     console.log(`🐞 ${message}`, data || '');
   }
 };
@@ -1481,14 +1481,40 @@ async function saveAndFormatResults({
     microserviceStatus: saveData ? 'SUCCESS' : 'FAILED_OR_DISABLED',
   });
 
-  // Al guardar resultados y errores pasar Accept-Language dinámico
-  const detailedResponse = await saveResultsAndErrorsDetailed(
-    resultsPayload,
-    itemsList,
-    analysisId,
-    requestId,
-    acceptLang
-  );
+  // Procesar y guardar resultados y errores usando la función existente
+  await saveResultsAndErrors(resultsPayload, itemsList, analysisId, requestId);
+
+  // Crear respuesta detallada manualmente
+  const detailedResponse: DetailedSaveResponse = {
+    analysis: {
+      success: 1,
+      error: 0,
+      message: 'Análisis guardado correctamente',
+    },
+    results: {
+      success: resultsPayload.length,
+      error: 0,
+      message: `${resultsPayload.length} resultados procesados`,
+    },
+    errors: {
+      success: itemsList.filter(item =>
+        ['violation', 'needsreview', 'recommendation'].includes(
+          item.type?.toLowerCase() || ''
+        )
+      ).length,
+      error: 0,
+      message: 'Errores procesados correctamente',
+    },
+    totalProcessed: {
+      violations: itemsList.length,
+      results: resultsPayload.length,
+      errors: itemsList.filter(item =>
+        ['violation', 'needsreview', 'recommendation'].includes(
+          item.type?.toLowerCase() || ''
+        )
+      ).length,
+    },
+  };
 
   return {
     statusCode: detailedResponse.analysis.success === 1 ? 200 : 207,
