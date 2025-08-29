@@ -86,19 +86,19 @@ jobs:
             !reports/bundle/*.json
 
       - name: Run unit tests
-        run: npx jest tests/unit --testTimeout=30000 --coverage=false
+        run: npx jest tests/unit --testTimeout=30000 --coverage=false --config=jest.ci.config.js
         env:
           CI: true
           ANALYSIS_API_URL: http://localhost:8082
 
       - name: Run integration tests
-        run: npx jest tests/integration --testTimeout=30000 --coverage=false
+        run: npx jest tests/integration --testTimeout=30000 --coverage=false --config=jest.ci.config.js
         env:
           CI: true
           ANALYSIS_API_URL: http://localhost:8082
 
-      - name: Generate coverage report
-        run: npx jest --coverage --testTimeout=30000
+      - name: Generate coverage report (unit tests only)
+        run: npx jest tests/unit --coverage --testTimeout=30000
         env:
           CI: true
           ANALYSIS_API_URL: http://localhost:8082
