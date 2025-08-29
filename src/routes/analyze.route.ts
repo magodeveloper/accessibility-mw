@@ -1340,25 +1340,25 @@ async function saveAndFormatResults({
     requestId,
   });
 
-  const acceptLang = resolveAcceptLanguage(req);
   const resultsPayload: Record<string, unknown>[] = [];
   unified.results.forEach(toolResult => {
     toolResult.items.forEach(item => {
-      const mapping = getWcagMapping(item as any);
+      const analysisItem = item as AnalysisItem;
+      const mapping = getWcagMapping(analysisItem);
       const criterion = mapping.criterion ?? 'unknown';
       resultsPayload.push({
         analysisId: analysisId,
         wcagCriterionId: getWcagCriterionId(criterion),
         wcagCriterion: criterion,
-        level: mapToResultLevel((item as any).type),
-        severity: mapImpactToSeverity((item as any).impact || ''),
+        level: mapToResultLevel(analysisItem.type),
+        severity: mapImpactToSeverity(analysisItem.impact || ''),
         description:
-          (item as any).help ||
-          (item as any)['message'] ||
+          analysisItem.help ||
+          analysisItem['message'] ||
           'Accessibility issue detected',
       });
       // Mantener lista de items para posteriores errores
-      itemsList.push(item as AnalysisItem);
+      itemsList.push(analysisItem);
     });
   });
 
