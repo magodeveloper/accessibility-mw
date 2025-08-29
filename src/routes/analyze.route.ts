@@ -324,6 +324,30 @@ const createAnalysisPayload = (
 ) => {
   const { axeStats = {}, eaStats = {} } = stats;
 
+  // Determine correct tool used - prioritize actual tool from meta, fallback to detecting from results
+  let toolUsed = unified.meta?.tool || 'axe-core';
+  if (toolUsed === 'both') {
+    // If both tools were used, determine primary tool based on which had more results
+    const hasAxeResults =
+      (axeStats.violations || 0) > 0 || (axeStats.passes || 0) > 0;
+    const hasEaResults =
+      (eaStats.violations || 0) > 0 || (eaStats.passes || 0) > 0;
+    if (hasEaResults && !hasAxeResults) {
+      toolUsed = 'equal-access';
+    } else if (hasAxeResults && !hasEaResults) {
+      toolUsed = 'axe-core';
+    } else {
+      // Both have results or neither, keep as 'both' or default to axe-core
+      toolUsed = 'axe-core';
+    }
+  }
+  // Normalize tool name - ensure it matches expected values
+  if (toolUsed === 'equal-access' || toolUsed === 'EqualAccess') {
+    toolUsed = 'equal-access';
+  } else if (toolUsed === 'axe' || toolUsed === 'axe-core') {
+    toolUsed = 'axe-core';
+  }
+
   return {
     userId: userId ?? 1,
     dateAnalysis: new Date().toISOString(),
@@ -331,10 +355,10 @@ const createAnalysisPayload = (
     contentInput:
       unified.meta?.inputType === 'html'
         ? unified.meta?.value?.substring(0, 1000) || 'html content'
-        : unified.meta?.value || 'no-url',
+        : 'N/A',
     sourceUrl: unified.meta?.inputType === 'url' ? unified.meta?.value : 'N/A',
-    toolUsed: unified.meta?.tool || 'axe',
-    status: unified.ok ? 'completed' : 'failed',
+    toolUsed: toolUsed,
+    status: unified.ok ? 'success' : 'failed',
     summaryResult: `Analysis completed with ${
       axeStats.violations || 0
     } violations, ${axeStats.needsReview || 0} needs review, ${
@@ -760,126 +784,6 @@ async function saveResultsAndErrors(
   });
 
   return { failedResults, failedErrors };
-}
-
-// Nueva función con conteo detallado de éxitos y errores
-async function saveResultsAndErrorsDetailed(
-  resultsPayload: Record<string, unknown>[],
-  itemsList: AnalysisItem[],
-  analysisId: string | number,
-  requestId = 'unknown',
-  acceptLanguage = 'es'
-): Promise<DetailedSaveResponse> {
-  const logger = createOptimizedLogger(requestId);
-
-  // Contadores detallados
-  let resultsSuccess = 0;
-  let resultsError = 0;
-  let errorsSuccess = 0;
-  let errorsError = 0;
-
-  logger.info('🔧 Starting detailed save process', {
-    resultCount: resultsPayload.length,
-    itemsCount: itemsList.length,
-    analysisId,
-  });
-
-  // Procesar resultados en lotes
-  const BATCH_SIZE = 5;
-  for (let i = 0; i < resultsPayload.length; i += BATCH_SIZE) {
-    const batch = resultsPayload.slice(i, i + BATCH_SIZE);
-    const batchItems = itemsList.slice(i, i + BATCH_SIZE);
-
-    const batchPromises = batch.map(async (result, batchIndex) => {
-      const item = batchItems[batchIndex];
-      let resultId: number | null = null;
-
-      // Guardar resultado
-      try {
-        resultId = await saveResult(result, requestId, acceptLanguage);
-        if (resultId) {
-          resultsSuccess++;
-          logger.info(`Result saved with ID: ${resultId}`);
-        }
-      } catch (err) {
-        resultsError++;
-        logger.error(`Failed to save result: ${err}`);
-      }
-
-      // Guardar error si es violation y se guardó el resultado
-      if (
-        resultId &&
-        item.type &&
-        ['violation', 'needsreview', 'recommendation'].includes(item.type)
-      ) {
-        const node = item.nodes?.[0];
-        const hasErrorMessage = node?.failureSummary || item.help;
-
-        if (hasErrorMessage && node) {
-          const errorMessage =
-            node.failureSummary || item.help || 'Error detected';
-          const errorPayload: ErrorPayload = createErrorPayload(
-            item,
-            node,
-            analysisId,
-            errorMessage,
-            resultId
-          );
-
-          try {
-            await saveError(errorPayload, requestId, acceptLanguage);
-            errorsSuccess++;
-            logger.info(`Error saved for resultId: ${resultId}`);
-          } catch (err) {
-            errorsError++;
-            logger.error(`Failed to save error: ${err}`);
-          }
-        }
-      }
-    });
-
-    await Promise.all(batchPromises);
-  }
-
-  const response: DetailedSaveResponse = {
-    analysis: {
-      success: 1, // El análisis ya se guardó previamente
-      error: 0,
-      message: 'Análisis guardado correctamente',
-    },
-    results: {
-      success: resultsSuccess,
-      error: resultsError,
-      message:
-        resultsError > 0
-          ? `${resultsSuccess} resultados guardados, ${resultsError} fallaron`
-          : `${resultsSuccess} resultados guardados exitosamente`,
-    },
-    errors: {
-      success: errorsSuccess,
-      error: errorsError,
-      message:
-        errorsError > 0
-          ? `${errorsSuccess} errores guardados, ${errorsError} fallaron`
-          : `${errorsSuccess} errores guardados exitosamente`,
-    },
-    totalProcessed: {
-      violations: itemsList.length,
-      results: resultsSuccess + resultsError,
-      errors: errorsSuccess + errorsError,
-    },
-  };
-
-  logger.info('Detailed save process completed', {
-    analysisSuccess: response.analysis.success,
-    analysisErrors: response.analysis.error,
-    resultsSuccess: response.results.success,
-    resultsErrors: response.results.error,
-    errorsSuccess: response.errors.success,
-    errorsErrors: response.errors.error,
-    totalProcessed: response.totalProcessed,
-  });
-  return response;
 }
 
 /**

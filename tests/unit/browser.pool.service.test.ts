@@ -14,6 +14,17 @@ describe('Browser Pool Service', () => {
   let mockPage: jest.Mocked<Page>;
   let mockContext: jest.Mocked<BrowserContext>;
 
+  // Helper function to create delayed browser (moved out to avoid nesting)
+  const createDelayedBrowser = () => {
+    return new Promise(resolve => setTimeout(() => resolve(mockBrowser), 100));
+  };
+
+  // Helper function to simulate async work
+  const simulateAsyncWork = async (i: number) => {
+    await new Promise(resolve => setTimeout(resolve, 10));
+    return `result-${i}`;
+  };
+
   beforeEach(() => {
     mockPage = {
       setContent: jest.fn().mockResolvedValue(undefined),
@@ -89,8 +100,36 @@ describe('Browser Pool Service', () => {
       expect(statsAfterRelease.available).toBe(1);
     });
 
+    it('debe esperar por browser disponible cuando el pool está lleno', async () => {
+      // Configurar un pool pequeño de 1 browser
+      process.env.BROWSER_POOL_SIZE = '1';
+      await browserPool.shutdown(); // Force new instance with small pool
+
+      // Obtener el único browser disponible
+      const browser1 = await browserPool.getBrowser();
+
+      // Variable para almacenar la promesa del segundo browser
+      let browser2: any;
+
+      // Intentar obtener un segundo browser (debería esperar)
+      const browser2Promise = browserPool.getBrowser();
+
+      // Simular que después de un tiempo liberamos el primer browser
+      setTimeout(() => {
+        browserPool.releaseBrowser(browser1);
+      }, 50);
+
+      // Esperar a que la promesa se resuelva
+      browser2 = await browser2Promise;
+
+      expect(browser2).toBe(browser1); // Debe ser el mismo browser reutilizado
+
+      const stats = browserPool.getPoolStats();
+      expect(stats.total).toBe(1); // Solo debe haber un browser en el pool
+    });
+
     it('debe cerrar todos los browsers al hacer shutdown', async () => {
-      const browser = await browserPool.getBrowser();
+      await browserPool.getBrowser();
 
       await browserPool.shutdown();
 
@@ -149,20 +188,12 @@ describe('Browser Pool Service', () => {
       const options = { overallTimeoutMs: 1 }; // Timeout muy corto
 
       // Simular demora en la creación del browser
-      mockedChromium.launch.mockImplementation(
-        () =>
-          new Promise(resolve => setTimeout(() => resolve(mockBrowser), 100))
-      );
+      mockedChromium.launch.mockImplementation(createDelayedBrowser as any);
+
+      const testFunction = async () => 'should-not-reach';
 
       await expect(
-        withPooledPage(
-          'html',
-          testHtml,
-          async page => {
-            return 'should-not-reach';
-          },
-          options
-        )
+        withPooledPage('html', testHtml, testFunction, options)
       ).rejects.toThrow(/Timeout.*overall timeout exceeded/);
     });
   });
@@ -268,16 +299,16 @@ describe('Browser Pool Service', () => {
     });
 
     it('debe manejar múltiples operaciones concurrentes', async () => {
-      const promises = Array.from({ length: 3 }, (_, i) =>
+      // Crear una función separada para evitar anidación profunda
+      const createTestPromise = (i: number) =>
         withPooledPage(
           'html',
           `<html><body>Test ${i}</body></html>`,
-          async page => {
-            // Simular trabajo asíncrono
-            await new Promise(resolve => setTimeout(resolve, 10));
-            return `result-${i}`;
-          }
-        )
+          simulateAsyncWork.bind(null, i)
+        );
+
+      const promises = Array.from({ length: 3 }, (_, i) =>
+        createTestPromise(i)
       );
 
       const results = await Promise.all(promises);
@@ -315,6 +346,121 @@ describe('Browser Pool Service', () => {
       );
 
       consoleSpy.mockRestore();
+    });
+  });
+
+  describe('Browser Cleanup', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('debe limpiar browsers idle después del tiempo límite', async () => {
+      // Obtener un browser y liberarlo
+      const browserInstance = await browserPool.getBrowser();
+      browserPool.releaseBrowser(browserInstance);
+
+      // Simular que pasa el tiempo
+      const mockNow = jest.spyOn(Date, 'now').mockImplementation();
+
+      // Primera llamada para lastUsed
+      mockNow.mockReturnValueOnce(1000);
+      browserPool.releaseBrowser(browserInstance);
+
+      // Segunda llamada para cleanup check (6 minutos después)
+      mockNow.mockReturnValueOnce(1000 + 360000 + 1);
+
+      // Disparar cleanup interval
+      jest.advanceTimersByTime(60000);
+
+      // Esperar a que se complete el cleanup asíncrono
+      await Promise.resolve();
+
+      expect(mockBrowser.close).toHaveBeenCalled();
+
+      mockNow.mockRestore();
+    });
+
+    it('debe manejar errores durante el cleanup de browsers idle', async () => {
+      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+      // Obtener un browser y liberarlo
+      const browserInstance = await browserPool.getBrowser();
+
+      // Hacer que browser.close() falle
+      mockBrowser.close.mockRejectedValueOnce(
+        new Error('Browser close failed')
+      );
+
+      browserPool.releaseBrowser(browserInstance);
+
+      // Simular que pasa el tiempo
+      const mockNow = jest.spyOn(Date, 'now');
+      mockNow.mockReturnValueOnce(1000); // lastUsed
+      browserPool.releaseBrowser(browserInstance);
+      mockNow.mockReturnValueOnce(1000 + 360000 + 1); // cleanup check
+
+      // Disparar cleanup interval
+      jest.advanceTimersByTime(60000);
+
+      // Esperar a que se complete el cleanup asíncrono
+      await Promise.resolve();
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Error closing idle browser:',
+        expect.any(Error)
+      );
+
+      consoleSpy.mockRestore();
+      mockNow.mockRestore();
+    });
+  });
+
+  describe('Environment Variable Handling', () => {
+    const originalEnv = process.env;
+
+    afterEach(() => {
+      process.env = originalEnv;
+    });
+
+    it('debe usar ANALYZE_TIMEOUT_MS del environment', async () => {
+      process.env.ANALYZE_TIMEOUT_MS = '45000';
+
+      const testHtml = '<html><body>Test</body></html>';
+
+      await withPooledPage('html', testHtml, async page => {
+        return 'timeout-test';
+      });
+
+      // Verificar que se configura correctamente
+      expect(mockPage.setContent).toHaveBeenCalled();
+    });
+
+    it('debe usar NAVIGATION_TIMEOUT_MS del environment', async () => {
+      process.env.NAVIGATION_TIMEOUT_MS = '25000';
+
+      const testUrl = 'https://example.com';
+
+      await withPooledPage('url', testUrl, async page => {
+        return 'nav-timeout-test';
+      });
+
+      expect(mockPage.setDefaultNavigationTimeout).toHaveBeenCalledWith(25000);
+    });
+
+    it('debe usar IDLE_WAIT_MS del environment', async () => {
+      process.env.IDLE_WAIT_MS = '3000';
+
+      const testUrl = 'https://example.com';
+
+      await withPooledPage('url', testUrl, async page => {
+        return 'idle-wait-test';
+      });
+
+      expect(mockPage.waitForTimeout).toHaveBeenCalledWith(3000);
     });
   });
 });

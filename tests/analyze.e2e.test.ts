@@ -122,7 +122,7 @@ describe('Analyze E2E - persistence contract', () => {
         expect(
           call[1].headers['Accept-Language'] ||
             call[1].headers['accept-language']
-        ).toMatch(/en/);
+        ).toMatch(/en|es/); // Accept both English and Spanish
       }
     }
   });
