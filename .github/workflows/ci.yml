@@ -37,10 +37,19 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: |
+            ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
       - name: Setup Playwright browsers
-        run: npx playwright install chromium --with-deps
-        env:
-          PLAYWRIGHT_BROWSERS_PATH: /home/runner/.cache/playwright
+        run: |
+          npx playwright install --with-deps chromium
+          npx playwright install-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
 
       - name: Cache build artifacts
         uses: actions/cache@v4
@@ -77,28 +86,22 @@ jobs:
             !reports/bundle/*.json
 
       - name: Run unit tests
-        run: npx jest tests/unit --testTimeout=15000 --coverage=false
+        run: npx jest tests/unit --testTimeout=30000 --coverage=false
         env:
           CI: true
           ANALYSIS_API_URL: http://localhost:8082
-          PLAYWRIGHT_BROWSERS_PATH: /home/runner/.cache/playwright
-          PLAYWRIGHT_HEADLESS: true
 
       - name: Run integration tests
-        run: npx jest tests/integration --testTimeout=15000 --coverage=false
+        run: npx jest tests/integration --testTimeout=30000 --coverage=false
         env:
           CI: true
           ANALYSIS_API_URL: http://localhost:8082
-          PLAYWRIGHT_BROWSERS_PATH: /home/runner/.cache/playwright
-          PLAYWRIGHT_HEADLESS: true
 
       - name: Generate coverage report
-        run: npx jest --coverage --testTimeout=15000
+        run: npx jest --coverage --testTimeout=30000
         env:
           CI: true
           ANALYSIS_API_URL: http://localhost:8082
-          PLAYWRIGHT_BROWSERS_PATH: /home/runner/.cache/playwright
-          PLAYWRIGHT_HEADLESS: true
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

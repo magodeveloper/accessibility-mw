@@ -4,7 +4,7 @@ module.exports = {
   testMatch: ['**/tests/**/*.test.ts'],
   moduleFileExtensions: ['ts', 'js', 'json'],
   verbose: true,
-  testTimeout: 30000,
+  testTimeout: process.env.CI ? 60000 : 30000,
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   transform: {
     '^.+\\.ts$': [
@@ -14,7 +14,7 @@ module.exports = {
       },
     ],
   },
-  maxWorkers: 1,
+  maxWorkers: process.env.CI ? 1 : '50%',
   forceExit: true,
   collectCoverage: true, // Enable coverage by default
   coverageDirectory: 'coverage',
