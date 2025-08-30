@@ -27,15 +27,16 @@ RUN rm -rf node_modules && \
 FROM mcr.microsoft.com/playwright:v1.55.0-jammy AS accessibility-mw
 WORKDIR /app
 
-# Variables de entorno
+# Variables de entorno optimizadas para producción
 ENV NODE_ENV=production \
   APP_ENV=PROD \
   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
   PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
   PLAYWRIGHT_HEADLESS=true \
-  NODE_OPTIONS="--max-old-space-size=1024" \
+  NODE_OPTIONS="--max-old-space-size=2048 --enable-source-maps" \
   PORT=3001 \
-  HOST=0.0.0.0
+  HOST=0.0.0.0 \
+  UV_THREADPOOL_SIZE=16
 
 # Copiar SOLO los archivos necesarios desde builder
 COPY --from=builder /app/dist ./dist
@@ -48,13 +49,15 @@ COPY .achecker.yml ./
 # SOLUCIÓN DEFINITIVA PARA EQUAL-ACCESS:
 # 1. Actualizar sistema y limpiar cache
 # 2. Crear directorios necesarios
-# 3. Asignar ownership correcto DESPUÉS de crear directorios
-# 4. Establecer permisos
+# Optimización del sistema y creación de directorios
+# Limpiar cache y crear estructura de directorios con permisos optimizados
 RUN apt-get update && apt-get upgrade -y && \
-  rm -rf /tmp/* /var/cache/* /var/lib/apt/lists/* && \
-  mkdir -p /app/results /app/logs /app/.achecker_cache/engine && \
+  apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/cache/* && \
+  mkdir -p /app/results /app/logs /app/.achecker_cache/engine /app/temp && \
   chown -R pwuser:pwuser /app && \
-  chmod -R 755 /app
+  chmod -R 755 /app && \
+  # Crear directorio para archivos temporales de Playwright
+  mkdir -p /tmp/playwright && chown pwuser:pwuser /tmp/playwright
 
 USER pwuser
 EXPOSE 3001

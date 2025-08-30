@@ -16,9 +16,11 @@ services:
     ports:
       - '3001:3001'
     restart: unless-stopped
-    shm_size: '512m'
+    shm_size: '2g'  # Memoria compartida aumentada para Playwright
+    mem_limit: 3g   # Límite de memoria del contenedor
+    memswap_limit: 3g  # Límite de swap igual a memoria
     ulimits:
-      nofile: 32768
+      nofile: 65536  # Aumentar límite de archivos abiertos
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', r => process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
       interval: 30s
@@ -31,8 +33,9 @@ services:
         max-size: '10m'
         max-file: '3'
     tmpfs:
-      - /app/logs
-      - /app/.achecker_cache
+      - /app/logs:size=100m,mode=1777
+      - /app/.achecker_cache:size=256m,mode=1777
+      - /tmp:size=512m,mode=1777  # Optimizar directorio temporal
     networks:
       - accessibility_network
 
@@ -41,3 +44,10 @@ networks:
     driver: bridge
     driver_opts:
       com.docker.network.driver.mtu: 1500
+      com.docker.network.bridge.enable_ip_masquerade: 'true'
+    # Optimización DNS para mejor rendimiento de red
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.18.0.0/16
+          gateway: 172.18.0.1

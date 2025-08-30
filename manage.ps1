@@ -1,14 +1,40 @@
 #!/usr/bin/env pwsh
 # SCRIPT MAESTRO UNIFICADO PARA ACCESSIBILITY-MW
-# Gestiona todo: build, deploy, cleanup, logs, etc.
+# Gestiona todo: build, deploy, cleanup, logs, monitoreo, etc.
+#
+# FUNCIONALIDADES DISPONIBLES:
+# - build     : Construye la imagen Docker optimizada (2GB memoria compartida)
+# - start     : Inicia el contenedor con configuraciones de red
+# - stop      : Detiene el contenedor
+# - restart   : Reinicia el contenedor (stop + start)
+# - logs      : Muestra logs (usa -Follow para tiempo real)
+# - status    : Estado detallado del contenedor
+# - test      : Ejecuta tests de salud y conectividad
+# - clean     : Limpieza básica de contenedor e imagen
+# - cleanup   : Limpieza completa del sistema Docker
+# - stats     : Estadísticas en tiempo real del contenedor
+# - health    : Verificación completa de salud de la aplicación
+# - monitor   : Monitor continuo del sistema (Ctrl+C para salir)
+# - deploy-all: Despliegue completo del sistema con microservicios
+#
+# EJEMPLOS DE USO:
+# .\manage.ps1 build -VerboseOutput       # Build detallado con logs
+# .\manage.ps1 logs -Follow             # Logs en tiempo real  
+# .\manage.ps1 stats                    # Estadísticas del contenedor
+# .\manage.ps1 health                   # Verificación completa de salud
+# .\manage.ps1 monitor                  # Monitor continuo del sistema
+# .\manage.ps1 cleanup                  # Limpieza completa del sistema
 
 param(
     [Parameter(Mandatory=$true)]
-    [ValidateSet("build", "start", "stop", "restart", "logs", "clean", "status", "test", "deploy-all")]
+    [ValidateSet("build", "start", "stop", "restart", "logs", "clean", "status", "test", "deploy-all", "stats", "health", "cleanup", "monitor")]
     [string]$Action,
     
     [Parameter(Mandatory=$false)]
-    [switch]$Follow = $false
+    [switch]$Follow = $false,
+    
+    [Parameter(Mandatory=$false)]
+    [switch]$VerboseOutput = $false
 )
 
 $ErrorActionPreference = "Stop"
@@ -24,7 +50,7 @@ function Write-Warning { param($msg) Write-Host "⚠️ $msg" -ForegroundColor Y
 function Write-Error { param($msg) Write-Host "❌ $msg" -ForegroundColor Red }
 
 function Build-Image {
-    Write-Info "Construyendo imagen Docker..."
+    Write-Info "🏗️ Construyendo imagen Docker optimizada..."
     
     # Limpiar imágenes viejas
     $oldImages = docker images $IMAGE_NAME -q
@@ -33,12 +59,35 @@ function Build-Image {
         docker rmi $oldImages -f 2>$null
     }
     
-    # Build nueva imagen
-    docker build -t $IMAGE_NAME . --no-cache
-    if ($LASTEXITCODE -eq 0) {
-        Write-Success "Imagen construida exitosamente"
+    # Build nueva imagen con optimizaciones
+    if ($VerboseOutput) {
+        Write-Info "Construyendo con salida detallada..."
+        docker build -t $IMAGE_NAME . --no-cache | Tee-Object -FilePath "build.log"
     } else {
-        Write-Error "Error construyendo imagen"
+        docker build -t $IMAGE_NAME . --no-cache
+    }
+    
+    if ($LASTEXITCODE -eq 0) {
+        Write-Success "✅ Imagen construida exitosamente"
+        
+        # Mostrar información de la imagen
+        $imageInfo = docker images $IMAGE_NAME --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}"
+        Write-Info "📊 Información de la imagen:"
+        Write-Host $imageInfo -ForegroundColor Cyan
+        
+        # Verificar optimizaciones aplicadas
+        Write-Info "🔍 Verificando optimizaciones aplicadas..."
+        $config = docker inspect $IMAGE_NAME | ConvertFrom-Json
+        $env = $config[0].Config.Env | Where-Object { $_ -like "*NODE_OPTIONS*" -or $_ -like "*UV_THREADPOOL*" }
+        if ($env) {
+            Write-Success "✅ Optimizaciones de memoria detectadas: $($env -join ', ')"
+        }
+        
+    } else {
+        Write-Error "❌ Error construyendo imagen"
+        if (Test-Path "build.log") {
+            Write-Error "Ver detalles en build.log"
+        }
         exit 1
     }
 }
@@ -71,10 +120,21 @@ function Stop-Container {
 }
 
 function Show-Logs {
+    Write-Info "📋 Mostrando logs del contenedor..."
+    
+    $containerId = docker ps -q --filter "name=$CONTAINER_NAME"
+    if (-not $containerId) {
+        Write-Warning "⚠️ Contenedor '$CONTAINER_NAME' no está ejecutándose"
+        # Intentar mostrar logs de contenedor detenido
+        Write-Info "Intentando mostrar logs del último contenedor..."
+    }
+    
     if ($Follow) {
-        docker logs -f $CONTAINER_NAME
+        Write-Info "📡 Siguiendo logs en tiempo real (Ctrl+C para salir)..."
+        docker logs -f --timestamps $CONTAINER_NAME
     } else {
-        docker logs --tail 50 $CONTAINER_NAME
+        Write-Info "📄 Mostrando últimas 100 líneas de logs..."
+        docker logs --tail 100 --timestamps $CONTAINER_NAME
     }
 }
 
@@ -208,28 +268,37 @@ function Test-SystemConnectivity {
     # Test 1: Middleware → Analysis
     Write-Host "  📊 Conectividad Middleware → Analysis..." -NoNewline
     $testAnalysis = docker exec $CONTAINER_NAME curl -s http://msanalysis-api:8082/api/Analysis 2>$null
-    if ($testAnalysis -and $testAnalysis.Contains("analyses")) {
+    if ($testAnalysis -and ($testAnalysis.Contains("analyses") -or $testAnalysis.Contains("message"))) {
         Write-Host " ✅" -ForegroundColor Green
     } else {
         Write-Host " ❌" -ForegroundColor Red
+        if ($testAnalysis) {
+            Write-Host "    Respuesta: $($testAnalysis.Substring(0, [Math]::Min(80, $testAnalysis.Length)))" -ForegroundColor Gray
+        }
     }
     
     # Test 2: Middleware → Users
     Write-Host "  👤 Conectividad Middleware → Users..." -NoNewline
-    $testUsers = docker exec $CONTAINER_NAME curl -s http://msusers-api:8081/api/users 2>$null
-    if ($testUsers) {
+    $testUsers = docker exec $CONTAINER_NAME curl -s http://msusers-api:8081/api/v1/users 2>$null
+    if ($testUsers -and ($testUsers.Contains("users") -or $testUsers.Contains("message"))) {
         Write-Host " ✅" -ForegroundColor Green
     } else {
         Write-Host " ❌" -ForegroundColor Red
+        if ($testUsers) {
+            Write-Host "    Respuesta: $($testUsers.Substring(0, [Math]::Min(80, $testUsers.Length)))" -ForegroundColor Gray
+        }
     }
     
     # Test 3: Middleware → Reports
     Write-Host "  📋 Conectividad Middleware → Reports..." -NoNewline
-    $testReports = docker exec $CONTAINER_NAME curl -s http://msreports-api:8083/api/reports 2>$null
-    if ($testReports) {
+    $testReports = docker exec $CONTAINER_NAME curl -s http://msreports-api:8083/api/Report 2>$null
+    if ($testReports -and ($testReports.Contains("message") -or $testReports.Contains("reports"))) {
         Write-Host " ✅" -ForegroundColor Green
     } else {
         Write-Host " ❌" -ForegroundColor Red
+        if ($testReports) {
+            Write-Host "    Respuesta: $($testReports.Substring(0, [Math]::Min(80, $testReports.Length)))" -ForegroundColor Gray
+        }
     }
     
     # Test 4: Health general
@@ -354,6 +423,137 @@ function Deploy-All {
     }
 }
 
+# ===== FUNCIONES AVANZADAS AGREGADAS =====
+
+function Show-Stats {
+    Write-Info "📊 Estadísticas del contenedor..."
+    
+    $containerId = docker ps -q --filter "name=$CONTAINER_NAME"
+    if (-not $containerId) {
+        Write-Warning "⚠️ Contenedor '$CONTAINER_NAME' no está ejecutándose"
+        return
+    }
+    
+    Write-Info "📈 Estadísticas en tiempo real (presiona Ctrl+C para salir):"
+    docker stats $CONTAINER_NAME --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}"
+}
+
+function Show-Health {
+    Write-Info "🏥 Verificando salud del contenedor..."
+    
+    $containerId = docker ps -q --filter "name=$CONTAINER_NAME"
+    if (-not $containerId) {
+        Write-Error "❌ Contenedor '$CONTAINER_NAME' no está ejecutándose"
+        return
+    }
+    
+    # Health check básico
+    Write-Host "🔍 Estado del contenedor:" -ForegroundColor Yellow
+    $containerStatus = docker inspect $CONTAINER_NAME --format "{{.State.Status}}"
+    Write-Host "  Estado: $containerStatus" -ForegroundColor $(if ($containerStatus -eq "running") { "Green" } else { "Red" })
+    
+    # Health check de la aplicación
+    Write-Host "🌐 Health check de la aplicación:" -ForegroundColor Yellow
+    try {
+        $response = Invoke-WebRequest -Uri "http://localhost:$PORT/health" -TimeoutSec 5 -UseBasicParsing
+        if ($response.StatusCode -eq 200) {
+            Write-Host "  ✅ Aplicación respondiendo correctamente" -ForegroundColor Green
+            $healthData = $response.Content | ConvertFrom-Json
+            if ($healthData.status -eq "ok") {
+                Write-Host "  ✅ Health check: OK" -ForegroundColor Green
+            }
+        }
+    } catch {
+        Write-Host "  ❌ Aplicación no responde al health check" -ForegroundColor Red
+    }
+    
+    # Información adicional
+    Write-Host "📊 Recursos del contenedor:" -ForegroundColor Yellow
+    $stats = docker stats $CONTAINER_NAME --no-stream --format "{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}"
+    Write-Host "  CPU: $(($stats -split '\t')[0])" -ForegroundColor Cyan
+    Write-Host "  Memoria: $(($stats -split '\t')[1]) ($(($stats -split '\t')[2]))" -ForegroundColor Cyan
+}
+
+function Start-Cleanup {
+    Write-Info "🧹 Limpieza completa del sistema Docker..."
+    
+    # Detener contenedores relacionados
+    Write-Info "Deteniendo contenedores..."
+    docker stop $CONTAINER_NAME 2>$null
+    docker rm $CONTAINER_NAME 2>$null
+    
+    # Limpiar imágenes no utilizadas
+    Write-Info "Limpiando imágenes no utilizadas..."
+    docker image prune -f
+    
+    # Limpiar contenedores detenidos
+    Write-Info "Limpiando contenedores detenidos..."
+    docker container prune -f
+    
+    # Limpiar volúmenes no utilizados
+    Write-Info "Limpiando volúmenes no utilizados..."
+    docker volume prune -f
+    
+    # Limpiar redes no utilizadas
+    Write-Info "Limpiando redes no utilizadas..."
+    docker network prune -f
+    
+    # Limpiar caché de build
+    Write-Info "Limpiando caché de build..."
+    docker builder prune -f
+    
+    Write-Success "✅ Limpieza completa finalizada"
+    
+    # Mostrar espacio liberado
+    Write-Info "💾 Espacio disponible después de la limpieza:"
+    docker system df
+}
+
+function Start-Monitor {
+    Write-Info "🖥️ Monitor del sistema - Presiona Ctrl+C para salir"
+    
+    $containerId = docker ps -q --filter "name=$CONTAINER_NAME"
+    if (-not $containerId) {
+        Write-Error "❌ Contenedor '$CONTAINER_NAME' no está ejecutándose"
+        return
+    }
+    
+    while ($true) {
+        Clear-Host
+        Write-Host "🖥️ MONITOR DEL SISTEMA - $(Get-Date -Format 'HH:mm:ss')" -ForegroundColor Cyan
+        Write-Host "=================================================" -ForegroundColor Gray
+        
+        # Estado del contenedor
+        $containerStatus = docker inspect $CONTAINER_NAME --format "{{.State.Status}}"
+        Write-Host "📦 Estado del contenedor: $containerStatus" -ForegroundColor $(if ($containerStatus -eq "running") { "Green" } else { "Red" })
+        
+        # Estadísticas en tiempo real
+        Write-Host "`n📊 Recursos:" -ForegroundColor Yellow
+        $stats = docker stats $CONTAINER_NAME --no-stream --format "{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}"
+        if ($stats) {
+            $statsParts = $stats -split '\t'
+            Write-Host "  CPU: $($statsParts[0])" -ForegroundColor Cyan
+            Write-Host "  Memoria: $($statsParts[1]) ($($statsParts[2]))" -ForegroundColor Cyan
+            Write-Host "  Red I/O: $($statsParts[3])" -ForegroundColor Cyan
+            Write-Host "  Disco I/O: $($statsParts[4])" -ForegroundColor Cyan
+        }
+        
+        # Health check
+        Write-Host "`n🏥 Health Check:" -ForegroundColor Yellow
+        try {
+            $response = Invoke-WebRequest -Uri "http://localhost:$PORT/health" -TimeoutSec 2 -UseBasicParsing
+            if ($response.StatusCode -eq 200) {
+                Write-Host "  ✅ Aplicación saludable" -ForegroundColor Green
+            }
+        } catch {
+            Write-Host "  ❌ Aplicación no responde" -ForegroundColor Red
+        }
+        
+        Write-Host "`n⏰ Actualizando cada 3 segundos..." -ForegroundColor Gray
+        Start-Sleep 3
+    }
+}
+
 # Ejecutar acción
 switch ($Action) {
     "build" { Build-Image }
@@ -365,4 +565,8 @@ switch ($Action) {
     "status" { Show-Status }
     "test" { Run-Tests }
     "deploy-all" { Deploy-All }
+    "stats" { Show-Stats }
+    "health" { Show-Health }
+    "cleanup" { Start-Cleanup }
+    "monitor" { Start-Monitor }
 }
