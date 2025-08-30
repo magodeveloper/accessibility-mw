@@ -228,6 +228,7 @@ const httpClient = createHttpClient();
 // Configuration constants
 const ANALYSIS_API_URL =
   process.env.ANALYSIS_API_URL || 'http://localhost:8082';
+const REPORTS_API_URL = process.env.REPORTS_API_URL || 'http://localhost:8083';
 const analyzeRouter = express.Router();
 export { analyzeRouter };
 export default analyzeRouter;
@@ -308,6 +309,7 @@ interface DetailedSaveResponse {
   analysis: SaveResponseDetail;
   results: SaveResponseDetail;
   errors: SaveResponseDetail;
+  history?: SaveResponseDetail;
   totalProcessed: {
     violations: number;
     results: number;
@@ -327,7 +329,8 @@ const createAnalysisPayload = (
   // Determine correct tool used - prioritize actual tool from meta, fallback to detecting from results
   let toolUsed = unified.meta?.tool || 'axe-core';
   if (toolUsed === 'both') {
-    // If both tools were used, determine primary tool based on which had more results
+    // Si el usuario especificó "both", mantener ese valor
+    // Solo determinar la herramienta si no hay resultados de ninguna
     const hasAxeResults =
       (axeStats.violations || 0) > 0 || (axeStats.passes || 0) > 0;
     const hasEaResults =
@@ -337,8 +340,8 @@ const createAnalysisPayload = (
     } else if (hasAxeResults && !hasEaResults) {
       toolUsed = 'axe-core';
     } else {
-      // Both have results or neither, keep as 'both' or default to axe-core
-      toolUsed = 'axe-core';
+      // Both have results or neither, mantener "both" como fue solicitado
+      toolUsed = 'both';
     }
   }
   // Normalize tool name - ensure it matches expected values
@@ -469,6 +472,69 @@ async function saveAnalysis(
     const error = err as Error;
     logger.error('Network error to ms-analysis', { error: error.message });
     throw error;
+  }
+}
+
+async function saveHistory(
+  userId: number,
+  analysisId: number,
+  requestId = 'unknown',
+  acceptLanguage = 'es'
+): Promise<number | null> {
+  const logger = createOptimizedLogger(requestId);
+  logger.info('saveHistory called', { userId, analysisId, REPORTS_API_URL });
+
+  // Si no hay URL configurada, no intentar guardar
+  if (!REPORTS_API_URL) {
+    logger.warn('saveHistory: No REPORTS_API_URL configured');
+    return null;
+  }
+
+  const historyPayload = {
+    userId: userId,
+    analysisId: analysisId,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  logger.debug('saveHistory payload prepared', {
+    payload: historyPayload,
+  });
+
+  try {
+    logger.debug('Sending history to Reports API', {
+      url: `${REPORTS_API_URL}/api/History`,
+    });
+
+    const saveResp = await httpClient.post(
+      `${REPORTS_API_URL}/api/History`,
+      historyPayload,
+      { 'Accept-Language': acceptLanguage || 'es' }
+    );
+
+    logger.info('Response from Reports API', {
+      status: saveResp.status,
+      ok: saveResp.ok,
+    });
+
+    if (!saveResp.ok) {
+      const errorText = await saveResp.text();
+      logger.error('Reports API returned error', {
+        status: saveResp.status,
+        error: errorText,
+      });
+      throw new Error(`Reports API error (${saveResp.status}): ${errorText}`);
+    }
+
+    const result = await saveResp.json();
+    const historyId =
+      result?.data?.Id || result?.data?.id || result?.Id || result?.id || null;
+    logger.info('History saved successfully', { historyId });
+    return historyId;
+  } catch (err) {
+    const error = err as Error;
+    logger.error('Network error to ms-reports', { error: error.message });
+    return null; // Continuar incluso si hay error en guardar el historial
   }
 }
 
@@ -786,250 +852,6 @@ async function saveResultsAndErrors(
   return { failedResults, failedErrors };
 }
 
-/**
- * @openapi
- * /api/analyze:
- *   post:
- *     summary: Analiza accesibilidad web (HTML o URL)
- *     description: |
- *       **Análisis de Accesibilidad Web Completo**
- *
- *       Este endpoint ejecuta análisis de accesibilidad usando axe-core y/o IBM Equal Access,
- *       y automáticamente guarda los resultados en el microservicio de análisis.
- *
- *       ## 🔄 **Integración con Microservicio**
- *       - **Auto-Save** → Guarda análisis en `http://localhost:8082/api/analysis`
- *       - **Auto-Save** → Guarda resultados en `http://localhost:8082/api/result`
- *       - **Auto-Save** → Guarda errores en `http://localhost:8082/api/error`
- *       - **Response** → Devuelve `analysisId` para consultas futuras
- *
- *       ## 🎯 **URLs de Consulta Post-Análisis**
- *       Después del análisis, consulta los datos guardados:
- *       - **Por ID**: `http://localhost:8082/api/analysis/{analysisId}`
- *       - **Por fecha**: `http://localhost:8082/api/analysis/by-date?userId=1&date=2025-08-22`
- *       - **Swagger DB**: `http://localhost:8082/swagger/index.html`
- *     tags: [Analysis]
- *     parameters:
- *       - in: header
- *         name: Accept-Language
- *         schema:
- *           type: string
- *           example: es
- *         required: false
- *         description: Idioma preferido para mensajes (es, en)
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/AnalyzeRequest'
- *           examples:
- *             axe-core-Equal Access-html-advanced:
- *               summary: "axe-core y Equal Access · HTML alta complejidad"
- *               value:
- *                 inputType: "html"
- *                 value: "<!doctype html>\n<html lang=\"es\">\n  <head>\n    <meta charset=\"utf-8\">\n    <title>Avanzado</title>\n    <script>\n      document.addEventListener('DOMContentLoaded', () => {\n        const b = document.getElementById('abrir');\n        if (b) b.addEventListener('click', () => {\n          const d = document.getElementById('dlg');\n          if (d) d.removeAttribute('hidden');\n        });\n      });\n    </script>\n  </head>\n  <body>\n    <nav><a href=\"#main\">Ir al contenido</a></nav>\n    <main id=\"main\">\n      <h1>Catálogo</h1>\n      <div role=\"tablist\">\n        <button role=\"tab\" aria-selected=\"true\">Tab 1</button>\n        <button role=\"tab\">Tab 2</button>\n      </div>\n      <button id=\"abrir\">Abrir modal</button>\n      <div id=\"dlg\" role=\"dialog\" aria-modal=\"true\" hidden>\n        <h2>Título</h2>\n        <button>Cerrar</button>\n      </div>\n    </main>\n  </body>\n</html>\n"
- *                 tool: "both"
- *                 wcagVersion: "2.2"
- *                 wcagLevel: "AA"
- *             axe-html-basic:
- *               summary: "axe-core · HTML básico"
- *               value:
- *                 inputType: "html"
- *                 value: "<!doctype html>\n<html lang=\"es\">\n  <head><meta charset=\"utf-8\"><title>Hola</title></head>\n  <body>\n    <h1>Hola mundo</h1>\n    <p>Contenido de ejemplo.</p>\n  </body>\n</html>\n"
- *                 tool: "axe-core"
- *                 wcagVersion: "2.2"
- *                 wcagLevel: "AA"
- *             axe-html-medium:
- *               summary: "axe-core · HTML complejidad media (algunos problemas comunes)"
- *               value:
- *                 inputType: "html"
- *                 value: "<!doctype html>\n<html>\n  <head>\n    <meta charset=\"utf-8\">\n    <title>Ejemplo medio</title>\n    <style>.low-contrast{color:#999;background:#9a9a9a;}</style>\n  </head>\n  <body>\n    <img src=\"foto.jpg\">\n    <button></button>\n    <a href=\"#\">Leer más</a>\n    <p class=\"low-contrast\">Texto con bajo contraste.</p>\n    <form>\n      <label for=\"email\">Correo</label>\n      <input id=\"correo\" type=\"email\" placeholder=\"tu@correo.com\">\n      <button type=\"submit\">Enviar</button>\n    </form>\n  </body>\n</html>\n"
- *                 tool: "axe-core"
- *                 wcagVersion: "2.2"
- *                 wcagLevel: "AA"
- *             axe-html-advanced:
- *               summary: "axe-core · HTML alta complejidad (landmarks/ARIA)"
- *               value:
- *                 inputType: "html"
- *                 value: "<!doctype html>\n<html lang=\"es\">\n  <head>\n    <meta charset=\"utf-8\">\n    <title>Avanzado</title>\n    <style>#menu{display:none;}</style>\n  </head>\n  <body>\n    <header role=\"banner\"><h1>Portal</h1></header>\n    <nav aria-label=\"principal\"><ul><li><a href=\"#m\">Menú</a></li></ul></nav>\n    <main id=\"m\" role=\"main\">\n      <section aria-labelledby=\"s1\"><h2 id=\"s1\">Productos</h2></section>\n      <button aria-haspopup=\"dialog\" aria-controls=\"dlg\">Abrir modal</button>\n      <div id=\"dlg\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"t\" hidden>\n        <h2 id=\"t\">Título modal</h2>\n        <button id=\"cerrar\">X</button>\n      </div>\n      <div role=\"button\">Acción</div>\n    </main>\n    <footer role=\"contentinfo\">© 2025</footer>\n  </body>\n</html>\n"
- *                 tool: "axe-core"
- *                 wcagVersion: "2.2"
- *                 wcagLevel: "AA"
- *             axe-html-aspx:
- *               summary: "axe-core · HTML con ASPX"
- *               value:
- *                 inputType: "html"
- *                 value: "<!doctype html>\n<%@ Page Language=\"C#\" AutoEventWireup=\"true\" %>\n<html lang=\"es\">\n  <head>\n    <meta charset=\"utf-8\">\n    <title>ASPX Sample</title>\n  </head>\n  <body>\n    <form id=\"form1\" runat=\"server\">\n      <h1><%= \"Hola desde ASPX\" %></h1>\n      <img src=\"/img/logo.png\">\n      <asp:TextBox ID=\"txtEmail\" runat=\"server\" />\n      <asp:Button ID=\"btnSend\" runat=\"server\" Text=\"\" />\n      <a href=\"#\">Más info</a>\n    </form>\n  </body>\n</html>\n"
- *                 tool: "axe-core"
- *                 wcagVersion: "2.2"
- *                 wcagLevel: "AA"
- *             axe-html-php:
- *               summary: "axe-core · HTML con PHP"
- *               value:
- *                 inputType: "html"
- *                 value: "<!doctype html>\n<html lang=\"es\">\n  <head>\n    <meta charset=\"utf-8\">\n    <title><?php echo \"PHP Sample\"; ?></title>\n  </head>\n  <body>\n    <h1><?php echo \"Hola desde PHP\"; ?></h1>\n    <img src=\"/img/banner.jpg\">\n    <button></button>\n    <label for=\"email\">Correo</label>\n    <input id=\"correo\" type=\"email\">\n  </body>\n</html>\n"
- *                 tool: "axe-core"
- *                 wcagVersion: "2.2"
- *                 wcagLevel: "AA"
- *             axe-html-react:
- *               summary: "axe-core · HTML con React"
- *               value:
- *                 inputType: "html"
- *                 value: "<!doctype html>\n<html lang=\"es\">\n  <head>\n    <meta charset=\"utf-8\" />\n    <title>React Sample</title>\n    <script crossorigin src=\"https://unpkg.com/react@18/umd/react.development.js\"></script>\n    <script crossorigin src=\"https://unpkg.com/react-dom@18/umd/react-dom.development.js\"></script>\n  </head>\n  <body>\n    <div id=\"root\"></div>\n    <script>\n      const e = React.createElement;\n      function App() {\n        return e('div', null,\n          e('h1', null, 'Hola React'),\n          e('button', null),\n          e('img', { src: '/img/x.png' })\n        );\n      }\n      ReactDOM.createRoot(document.getElementById('root')).render(e(App));\n    </script>\n  </body>\n</html>\n"
- *                 tool: "axe-core"
- *                 wcagVersion: "2.2"
- *                 wcagLevel: "AA"
- *             axe-url:
- *               summary: "axe-core · URL pública"
- *               value:
- *                 inputType: "url"
- *                 value: "https://www.elcomercio.com/"
- *                 tool: "axe-core"
- *                 wcagVersion: "2.2"
- *                 wcagLevel: "AA"
- *             equalaccess-html-basic:
- *               summary: "Equal Access · HTML básico"
- *               value:
- *                 inputType: "html"
- *                 value: "<!doctype html>\n<html lang=\"es\">\n  <head><meta charset=\"utf-8\"><title>Hola</title></head>\n  <body>\n    <h1>Hola mundo</h1>\n    <p>Contenido de ejemplo.</p>\n  </body>\n</html>\n"
- *                 tool: "equal-access"
- *                 wcagVersion: "2.2"
- *                 wcagLevel: "AA"
- *             equalaccess-html-medium:
- *               summary: "Equal Access · HTML complejidad media"
- *               value:
- *                 inputType: "html"
- *                 value: "<!doctype html>\n<html>\n  <head>\n    <meta charset=\"utf-8\">\n    <title>Ejemplo medio</title>\n  </head>\n  <body>\n    <img src=\"foto.jpg\">\n    <button aria-label=\"\"></button>\n    <label>Nombre<input type=\"text\"></label>\n    <a href=\"#\" role=\"button\">Más</a>\n    <ul><li tabindex=\"0\">Item sin rol</li></ul>\n  </body>\n</html>\n"
- *                 tool: "equal-access"
- *                 wcagVersion: "2.2"
- *                 wcagLevel: "AA"
- *             equalaccess-html-advanced:
- *               summary: "Equal Access · HTML alta complejidad"
- *               value:
- *                 inputType: "html"
- *                 value: "<!doctype html>\n<html lang=\"es\">\n  <head>\n    <meta charset=\"utf-8\">\n    <title>Avanzado</title>\n    <script>\n      document.addEventListener('DOMContentLoaded', () => {\n        const b = document.getElementById('abrir');\n        if (b) b.addEventListener('click', () => {\n          const d = document.getElementById('dlg');\n          if (d) d.removeAttribute('hidden');\n        });\n      });\n    </script>\n  </head>\n  <body>\n    <nav><a href=\"#main\">Ir al contenido</a></nav>\n    <main id=\"main\">\n      <h1>Catálogo</h1>\n      <div role=\"tablist\">\n        <button role=\"tab\" aria-selected=\"true\">Tab 1</button>\n        <button role=\"tab\">Tab 2</button>\n      </div>\n      <button id=\"abrir\">Abrir modal</button>\n      <div id=\"dlg\" role=\"dialog\" aria-modal=\"true\" hidden>\n        <h2>Título</h2>\n        <button>Cerrar</button>\n      </div>\n    </main>\n  </body>\n</html>\n"
- *                 tool: "equal-access"
- *                 wcagVersion: "2.2"
- *                 wcagLevel: "AA"
- *             equalaccess-html-aspx:
- *               summary: "Equal Access · HTML con ASPX"
- *               value:
- *                 inputType: "html"
- *                 value: "<!doctype html>\n<%@ Page Language=\"C#\" AutoEventWireup=\"true\" %>\n<html>\n  <head>\n    <meta charset=\"utf-8\">\n    <title>ASPX Sample</title>\n    <style>.low-contrast{color:#9a9a9a;background:#9b9b9b;}</style>\n  </head>\n  <body>\n    <form id=\"form1\" runat=\"server\">\n      <h1>Portal</h1>\n      <p class=\"low-contrast\">Texto con bajo contraste</p>\n      <asp:CheckBox ID=\"chk\" runat=\"server\" />\n      <asp:LinkButton ID=\"lnk\" runat=\"server\">Click</asp:LinkButton>\n      <a role=\"button\">Acción</a>\n    </form>\n  </body>\n</html>\n"
- *                 tool: "equal-access"
- *                 wcagVersion: "2.2"
- *                 wcagLevel: "AA"
- *             equalaccess-html-php:
- *               summary: "Equal Access · HTML con PHP"
- *               value:
- *                 inputType: "html"
- *                 value: "<!doctype html>\n<html>\n  <head>\n    <meta charset=\"utf-8\">\n    <title><?= \"PHP Sample\" ?></title>\n  </head>\n  <body>\n    <nav><a href=\"#contenido\">Ir</a></nav>\n    <main id=\"contenido\">\n      <h1>Categorías</h1>\n      <ul>\n        <li tabindex=\"0\">Item</li>\n        <li><a href=\"#\">Leer más</a></li>\n      </ul>\n      <?php if (true): ?>\n      <div role=\"dialog\" aria-modal=\"true\">\n        <h2>Modal</h2>\n        <button>Cerrar</button>\n      </div>\n      <?php endif; ?>\n    </main>\n  </body>\n</html>\n"
- *                 tool: "equal-access"
- *                 wcagVersion: "2.2"
- *                 wcagLevel: "AA"
- *             equalaccess-html-react:
- *               summary: "Equal Access · HTML con React"
- *               value:
- *                 inputType: "html"
- *                 value: "<!doctype html>\n<html>\n  <head>\n    <meta charset=\"utf-8\" />\n    <title>React Sample</title>\n    <script crossorigin src=\"https://unpkg.com/react@18/umd/react.development.js\"></script>\n    <script crossorigin src=\"https://unpkg.com/react-dom@18/umd/react-dom.development.js\"></script>\n    <style>.bad{color:#aaa;background:#aaa;}</style>\n  </head>\n  <body>\n    <div id=\"app\"></div>\n    <script>\n      const e = React.createElement;\n      const App = () => e('main', { id:'main' },\n        e('h1', { className:'bad' }, 'Catálogo'),\n        e('a', { href:'#', role:'button' }, 'Abrir'),\n        e('input', { type:'text', placeholder:'Nombre' })\n      );\n      ReactDOM.createRoot(document.getElementById('app')).render(e(App));\n    </script>\n  </body>\n</html>\n"
- *                 tool: "equal-access"
- *                 wcagVersion: "2.2"
- *                 wcagLevel: "AA"
- *             equalaccess-url:
- *               summary: "Equal Access · URL pública"
- *               value:
- *                 inputType: "url"
- *                 value: "https://www.elcomercio.com/"
- *                 tool: "equal-access"
- *                 wcagVersion: "2.2"
- *                 wcagLevel: "AA"
- *     responses:
- *       200:
- *         description: |
- *           **✅ Análisis Completado y Guardado Exitosamente**
- *
- *           El análisis se ejecutó correctamente y se guardó en el microservicio de análisis.
- *           El resultado incluye el `analysisId` para consultas futuras.
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/UnifiedResponse'
- *             examples:
- *               successful_analysis:
- *                 summary: "Análisis exitoso con guardado automático"
- *                 value:
- *                   ok: true
- *                   data:
- *                     ok: true
- *                     meta:
- *                       inputType: "html"
- *                       tool: "axe-core"
- *                       wcagVersion: "2.2"
- *                       wcagLevel: "AA"
- *                       duration: 1500
- *                     results:
- *                       - tool: "axe-core"
- *                         stats:
- *                           violations: 2
- *                           needsReview: 1
- *                           passes: 15
- *                         items: []
- *                     analysisSaved: true
- *                     analysisId: 42
- *                     message: "Análisis y resultados guardados exitosamente en la base de datos"
- *                   requestId: "abc123"
- *       207:
- *         description: |
- *           **⚠️ Análisis Completado con Problemas de Guardado Parcial**
- *
- *           El análisis se ejecutó correctamente, pero algunos resultados no se pudieron guardar.
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/UnifiedResponse'
- *       400:
- *         description: "❌ Error de validación en los parámetros de entrada"
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *             examples:
- *               validation_error:
- *                 summary: "Error de validación típico"
- *                 value:
- *                   ok: false
- *                   error: "inputType must be 'html' or 'url'"
- *                   code: "VALIDATION_ERROR"
- *                   requestId: "abc123"
- *       429:
- *         description: "🚫 Límite de velocidad excedido"
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       500:
- *         description: "💥 Error interno del servidor"
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       503:
- *         description: |
- *           **🔌 Microservicio de Análisis No Disponible**
- *
- *           El análisis se ejecutó correctamente, pero no se pudo conectar con el microservicio.
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       504:
- *         description: "⏱️ Timeout en el análisis"
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- */
 analyzeRouter.post('/', async (req: express.Request, res: express.Response) => {
   const requestId = (req as express.Request & { id?: string }).id;
   const logger = createOptimizedLogger(requestId, req);
@@ -1388,6 +1210,34 @@ async function saveAndFormatResults({
   // Procesar y guardar resultados y errores usando la función existente
   await saveResultsAndErrors(resultsPayload, itemsList, analysisId, requestId);
 
+  // Guardar historial si tenemos ID de usuario y analysisId
+  let historyId = null;
+  if (userId && analysisId) {
+    try {
+      logger.info('Attempting to save history record', { userId, analysisId });
+      const acceptLanguage = resolveAcceptLanguage(req);
+      historyId = await saveHistory(
+        userId,
+        Number(analysisId),
+        requestId,
+        acceptLanguage
+      );
+      logger.info('History record saved', { historyId });
+    } catch (histErr) {
+      logger.error('Error saving history record', {
+        error: (histErr as Error).message,
+        userId,
+        analysisId,
+      });
+      // Continuamos aunque falle el guardado del historial
+    }
+  } else {
+    logger.warn('Cannot save history record - missing required data', {
+      hasUserId: !!userId,
+      hasAnalysisId: !!analysisId,
+    });
+  }
+
   // Crear respuesta detallada manualmente
   const detailedResponse: DetailedSaveResponse = {
     analysis: {
@@ -1424,15 +1274,24 @@ async function saveAndFormatResults({
     statusCode: detailedResponse.analysis.success === 1 ? 200 : 207,
     message: 'Análisis completado con detalles de persistencia',
     analysisId,
+    historyId,
     persistence: {
       analysis: detailedResponse.analysis,
       results: detailedResponse.results,
       errors: detailedResponse.errors,
+      history: {
+        success: historyId ? 1 : 0,
+        error: historyId ? 0 : 1,
+        message: historyId
+          ? 'Historial guardado correctamente'
+          : 'No se pudo guardar el historial',
+      },
     },
     summary: {
       totalViolations: detailedResponse.totalProcessed.violations,
       resultsProcessed: detailedResponse.totalProcessed.results,
       errorsProcessed: detailedResponse.totalProcessed.errors,
+      historyRecorded: !!historyId,
     },
   };
 }

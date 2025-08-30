@@ -43,6 +43,7 @@ describe('Environment Utility', () => {
         delete process.env.TRUST_PROXY;
         delete process.env.CORS_ORIGINS;
         delete process.env.ANALYSIS_API_URL;
+        delete process.env.REPORTS_API_URL;
         delete process.env.HEALTHCHECK_TIMEOUT_MS;
         delete process.env.ENABLE_FILE_LOGGING;
 
@@ -65,6 +66,7 @@ describe('Environment Utility', () => {
           TRUST_PROXY: false,
           CORS_ORIGINS: [],
           ANALYSIS_API_URL: 'http://localhost:8082',
+          REPORTS_API_URL: 'http://localhost:8083',
           HEALTHCHECK_TIMEOUT_MS: 15000,
           ENABLE_FILE_LOGGING: false, // Not development, so false
         });
@@ -156,6 +158,17 @@ describe('Environment Utility', () => {
 
     describe('Production Environment Configuration', () => {
       it('should use production defaults when NODE_ENV is production', () => {
+        // Limpiar variables relevantes para asegurar estado limpio
+        delete process.env.BROWSER_POOL_SIZE;
+        delete process.env.PORT;
+        delete process.env.HOST;
+        delete process.env.ANALYZE_TIMEOUT_MS;
+        delete process.env.CACHE_MAX_ENTRIES;
+        delete process.env.CACHE_MAX_MEMORY_MB;
+        delete process.env.RATE_LIMIT_MAX_REQUESTS;
+        delete process.env.ANALYZE_RATE_LIMIT_MAX;
+        delete process.env.ENABLE_FILE_LOGGING;
+
         process.env.NODE_ENV = 'production';
 
         const config = getEnvironmentConfig();
@@ -197,6 +210,17 @@ describe('Environment Utility', () => {
 
     describe('Development Environment Configuration', () => {
       it('should use development defaults when NODE_ENV is development', () => {
+        // Limpiar variables relevantes para asegurar estado limpio
+        delete process.env.BROWSER_POOL_SIZE;
+        delete process.env.PORT;
+        delete process.env.HOST;
+        delete process.env.ANALYZE_TIMEOUT_MS;
+        delete process.env.CACHE_MAX_ENTRIES;
+        delete process.env.CACHE_MAX_MEMORY_MB;
+        delete process.env.RATE_LIMIT_MAX_REQUESTS;
+        delete process.env.ANALYZE_RATE_LIMIT_MAX;
+        delete process.env.ENABLE_FILE_LOGGING;
+
         process.env.NODE_ENV = 'development';
 
         const config = getEnvironmentConfig();
@@ -215,6 +239,17 @@ describe('Environment Utility', () => {
 
     describe('Custom Environment Configuration', () => {
       it('should handle custom NODE_ENV values', () => {
+        // Limpiar variables relevantes para asegurar estado limpio
+        delete process.env.BROWSER_POOL_SIZE;
+        delete process.env.PORT;
+        delete process.env.HOST;
+        delete process.env.ANALYZE_TIMEOUT_MS;
+        delete process.env.CACHE_MAX_ENTRIES;
+        delete process.env.CACHE_MAX_MEMORY_MB;
+        delete process.env.RATE_LIMIT_MAX_REQUESTS;
+        delete process.env.ANALYZE_RATE_LIMIT_MAX;
+        delete process.env.ENABLE_FILE_LOGGING;
+
         process.env.NODE_ENV = 'staging';
 
         const config = getEnvironmentConfig();
@@ -226,6 +261,13 @@ describe('Environment Utility', () => {
       });
 
       it('should handle all custom environment variables', () => {
+        // Limpiar directamente algunas variables de entorno clave
+        delete process.env.REPORTS_API_URL;
+        delete process.env.ANALYSIS_API_URL;
+        delete process.env.PORT;
+        delete process.env.HOST;
+        delete process.env.NODE_ENV;
+
         process.env.PORT = '9000';
         process.env.HOST = 'api.example.com';
         process.env.NODE_ENV = 'testing';
@@ -243,34 +285,41 @@ describe('Environment Utility', () => {
         process.env.CORS_ORIGINS =
           'https://staging.example.com,https://test.example.com';
         process.env.ANALYSIS_API_URL = 'http://analysis.internal:8080';
+        process.env.REPORTS_API_URL = 'http://reports.internal:8080';
         process.env.HEALTHCHECK_TIMEOUT_MS = '10000';
         process.env.ENABLE_FILE_LOGGING = 'true';
 
         const config = getEnvironmentConfig();
 
-        expect(config).toEqual({
-          PORT: 9000,
-          HOST: 'api.example.com',
-          NODE_ENV: 'testing',
-          ANALYZE_TIMEOUT_MS: 45000,
-          NAVIGATION_TIMEOUT_MS: 8000,
-          WRAP_MARGIN_MS: 5000,
-          CACHE_MAX_ENTRIES: 500,
-          CACHE_MAX_MEMORY_MB: 200,
-          CACHE_TTL_MS: 900000,
-          BROWSER_POOL_SIZE: 10,
-          RATE_LIMIT_WINDOW_MS: 180000,
-          RATE_LIMIT_MAX_REQUESTS: 200,
-          ANALYZE_RATE_LIMIT_MAX: 30,
-          TRUST_PROXY: true,
-          CORS_ORIGINS: [
-            'https://staging.example.com',
-            'https://test.example.com',
-          ],
-          ANALYSIS_API_URL: 'http://analysis.internal:8080',
-          HEALTHCHECK_TIMEOUT_MS: 10000,
-          ENABLE_FILE_LOGGING: true,
-        });
+        // Verificación individual de cada propiedad para facilitar la depuración
+        expect(config.PORT).toBe(9000);
+        expect(config.HOST).toBe('api.example.com');
+        expect(config.NODE_ENV).toBe('testing');
+        expect(config.ANALYZE_TIMEOUT_MS).toBe(45000);
+        expect(config.NAVIGATION_TIMEOUT_MS).toBe(8000);
+        expect(config.WRAP_MARGIN_MS).toBe(5000);
+        expect(config.CACHE_MAX_ENTRIES).toBe(500);
+        expect(config.CACHE_MAX_MEMORY_MB).toBe(200);
+        expect(config.CACHE_TTL_MS).toBe(900000);
+        expect(config.BROWSER_POOL_SIZE).toBe(10);
+        expect(config.RATE_LIMIT_WINDOW_MS).toBe(180000);
+        expect(config.RATE_LIMIT_MAX_REQUESTS).toBe(200);
+        expect(config.ANALYZE_RATE_LIMIT_MAX).toBe(30);
+        expect(config.TRUST_PROXY).toBe(true);
+        expect(config.CORS_ORIGINS).toEqual([
+          'https://staging.example.com',
+          'https://test.example.com',
+        ]);
+        expect(config.ANALYSIS_API_URL).toBe('http://analysis.internal:8080');
+        expect(config.REPORTS_API_URL).toBe('http://reports.internal:8080');
+        expect(config.HEALTHCHECK_TIMEOUT_MS).toBe(10000);
+        expect(config.ENABLE_FILE_LOGGING).toBe(true);
+
+        // Imprimir el valor para depuración
+        console.log(
+          `REPORTS_API_URL en environment: ${process.env.REPORTS_API_URL}`
+        );
+        console.log(`REPORTS_API_URL en config: ${config.REPORTS_API_URL}`);
       });
     });
 
