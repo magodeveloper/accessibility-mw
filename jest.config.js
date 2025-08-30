@@ -12,7 +12,14 @@ module.exports = {
       {
         useESM: false,
         // Disable coverage instrumentation for files that will be evaluated in browser context
-        coveragePathIgnorePatterns: process.env.CI ? ['/node_modules/', '/tests/', 'browser.pool.service.ts', 'render.service.ts'] : ['/node_modules/', '/tests/']
+        coveragePathIgnorePatterns: process.env.CI
+          ? [
+              '/node_modules/',
+              '/tests/',
+              'browser.pool.service.ts',
+              'render.service.ts',
+            ]
+          : ['/node_modules/', '/tests/'],
       },
     ],
   },
@@ -26,7 +33,12 @@ module.exports = {
     '!src/**/*.test.ts',
     '!src/**/*.spec.ts',
     // Exclude browser-related services from coverage when running in CI to avoid conflicts
-    ...(process.env.CI ? ['!src/services/browser.pool.service.ts', '!src/services/render.service.ts'] : [])
+    ...(process.env.CI
+      ? [
+          '!src/services/browser.pool.service.ts',
+          '!src/services/render.service.ts',
+        ]
+      : []),
   ],
   coverageReporters: ['text', 'lcov', 'html', 'json'],
   coverageThreshold: {

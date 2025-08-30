@@ -34,7 +34,7 @@ if (process.env.CI) {
   process.env.PUPPETEER_ARGS =
     '--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage';
   process.env.BYPASS_SSRF_VALIDATION_IN_DEV = 'false'; // Stricter validation in CI
-  
+
   // Disable coverage instrumentation for browser evaluation context to avoid conflicts
   process.env.DISABLE_BROWSER_COVERAGE = 'true';
 } else {
