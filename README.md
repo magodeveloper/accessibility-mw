@@ -127,7 +127,7 @@
 ├── 🐳 docker-compose.yml                   # Docker producción
 ├── 🐳 docker-compose.dev.yml               # Docker desarrollo
 ├── 🐳 Dockerfile                           # Multi-stage optimizada
-├── 🛠️  manage.ps1                          # Script gestión unificada
+├── 🛠️  manage.ps1                          # Script gestión unificada (18+ acciones)
 ├── ⚙️  .env.template                       # Plantilla variables entorno
 ├── 📦 package.json                         # Dependencias y scripts npm
 └── 📄 README.md                            # Documentación principal
@@ -140,6 +140,8 @@
 │ 🎯 72.25% code coverage                    │
 │ 🔒 Security audit automático               │
 │ 📊 Bundle monitoring CI/CD                 │
+│ 🛠️  Script manage.ps1 (18+ acciones)       │
+│ 🚪 Coordinación Gateway integrada          │
 └─────────────────────────────────────────────┘
 ```
 
@@ -3998,9 +4000,11 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
    - 16 UV threads para paralelismo optimizado
 
 6. **✅ Sistema de Gestión Inteligente**
-   - Script `manage.ps1` unificado con 10+ funciones avanzadas
-   - Monitoreo en tiempo real (stats, health, monitor)
-   - Limpieza automática de recursos Docker
+   - Script `manage.ps1` unificado con **18+ acciones avanzadas** (PowerShell compliant)
+   - **Nuevas funciones**: `prerequisites`, `test-gateway`, `test-all`, `validate`
+   - Monitoreo en tiempo real (stats, health, monitor) con dashboard interactivo
+   - Limpieza automática de recursos Docker con validación de prerrequisitos
+   - Integración completa con Gateway (.NET) para desarrollo coordinado
 
 ### 🔗 **Arquitectura en Producción**
 
@@ -4041,37 +4045,74 @@ Internet/Intranet
 | **Memory Management** | 3GB limit + 2GB shm | ✅ Optimizado | Sin errores OOM |
 | **Health Score** | 98+ de 100 | ✅ Excelente | Monitoreo mejorado |
 | **Deployment Time** | <3 minutos | ✅ Automatizado | Más rápido |
-| **Manage Commands** | 10+ funciones | ✅ Completo | Sistema unificado |
+| **Manage Commands** | **18+ funciones** | ✅ Completo | **Sistema unificado mejorado** |
 
 ### 🚀 **Para Usuarios Nuevos - Comandos Esenciales**
 
 ```powershell
 # ⚡ INICIO RÁPIDO COMPLETO
-# Paso 1: Clonar y desplegar (¡Es todo lo que necesitas!)
+# Paso 1: Verificar prerrequisitos del sistema
+.\manage.ps1 -Action prerequisites    # ✨ NUEVO: Validación automática de Docker, npm, Node.js, git
+
+# Paso 2: Clonar y desplegar (¡Es todo lo que necesitas!)
 git clone https://github.com/magodeveloper/accessibility-mw.git
 cd accessibility-mw
-.\manage.ps1 deploy-all
+.\manage.ps1 -Action deploy-all
 
 # ⚙️ GESTIÓN DIARIA DEL SISTEMA  
-.\manage.ps1 start           # Iniciar el middleware
-.\manage.ps1 stop            # Detener el middleware
-.\manage.ps1 restart         # Reiniciar el middleware
-.\manage.ps1 logs -Follow    # Ver logs en tiempo real
+.\manage.ps1 -Action start           # Iniciar el middleware
+.\manage.ps1 -Action stop            # Detener el middleware
+.\manage.ps1 -Action restart         # Reiniciar el middleware
+.\manage.ps1 -Action logs -Follow    # Ver logs en tiempo real
 
 # 📊 MONITOREO AVANZADO
-.\manage.ps1 stats           # Estadísticas de recursos (CPU, memoria, red)
-.\manage.ps1 health          # Health check completo del sistema
-.\manage.ps1 monitor         # Dashboard continuo (actualiza cada 3s)
+.\manage.ps1 -Action stats           # Estadísticas de recursos (CPU, memoria, red)
+.\manage.ps1 -Action health          # Health check completo del sistema
+.\manage.ps1 -Action monitor         # Dashboard continuo (actualiza cada 3s)
+
+# 🧪 TESTING Y CALIDAD MEJORADO
+.\manage.ps1 -Action test            # Tests del middleware
+.\manage.ps1 -Action test-gateway -Coverage    # ✨ Tests del Gateway con cobertura
+.\manage.ps1 -Action test-all                  # ✨ Suite completa de tests del sistema
+.\manage.ps1 -Action validate                  # ✨ Validación completa del proyecto
 
 # 🧹 MANTENIMIENTO
-.\manage.ps1 cleanup         # Limpieza completa del sistema Docker
-.\manage.ps1 build -VerboseOutput  # Rebuild con logs detallados
+.\manage.ps1 -Action cleanup         # ✨ Limpieza completa del sistema Docker (PowerShell compliant)
+.\manage.ps1 -Action build -VerboseOutput  # Rebuild con logs detallados
 
-# 🔍 VERIFICACIÓN DEL SISTEMA
+# ❓ AYUDA INTERACTIVA
+.\manage.ps1 -Action help           # ✨ Ayuda completa con todos los comandos disponibles
+```
+
+### 🔗 **Coordinación con Gateway (.NET)**
+
+El sistema incluye coordinación inteligente entre el middleware y el Gateway:
+
+```powershell
+# 🎯 DESARROLLO COORDINADO
+# Sistema completo (recomendado para producción)
+.\manage.ps1 -Action deploy-all              # Despliega todo el ecosistema incluyendo Gateway
+
+# Gateway específico (desarrollo .NET aislado)
+cd ..\accessibility-gw
+.\manage-gateway.ps1 run -Port 8100          # Desarrollo local del Gateway únicamente
+.\manage-gateway.ps1 test -TestType Unit     # Tests unitarios del Gateway
+```
+
+#### 🤝 **Integración Automática:**
+- El `manage.ps1` **delega automáticamente** al `manage-gateway.ps1` para funciones específicas
+- Testing coordinado: `test-gateway` ejecuta los tests .NET usando el script especializado  
+- Despliegue orquestado: `deploy-all` gestiona tanto middleware como Gateway
+- Monitoreo unificado: Health checks cubren ambos componentes
+
+### 🔍 **Verificación del Sistema Completo**
+
+```powershell
 # Verificar que todos los microservicios responden correctamente:
 curl http://localhost:8082/api/Analysis     # Analysis API ✅
 curl http://localhost:8081/api/v1/users     # Users API ✅  
 curl http://localhost:8083/api/Report       # Reports API ✅
+curl http://localhost:8100/health           # Gateway Health ✅ (nuevo endpoint)
 curl http://localhost:3001/health           # Middleware Health ✅
 ```
 
