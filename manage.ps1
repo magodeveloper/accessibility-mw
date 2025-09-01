@@ -870,7 +870,8 @@ function Test-Gateway {
     Write-Info "Ejecutando: .\manage-gateway.ps1 test"
     if ($Coverage) {
       & ".\manage-gateway.ps1" "test" "-GenerateCoverage"
-    } else {
+    }
+    else {
       & ".\manage-gateway.ps1" "test"
     }
 
