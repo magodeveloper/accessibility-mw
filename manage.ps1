@@ -478,8 +478,8 @@ function Test-SystemConnectivity {
     
   # Test 2: Middleware → Users
   Write-Host "  👤 Conectividad Middleware → Users..." -NoNewline
-  $testUsers = docker exec $CONTAINER_NAME curl -s -w "%{http_code}" http://msusers-api:8081/health 2>$null
-  if ($testUsers -and ($testUsers.Contains("200") -or $testUsers.Contains("Healthy"))) {
+  $testUsers = docker exec $CONTAINER_NAME curl -s -w "%{http_code}" http://msusers-api:8081/api/users 2>$null
+  if ($testUsers -and ($testUsers.Contains("200") -or $testUsers.Contains("users"))) {
     Write-Host " ✅" -ForegroundColor Green
   }
   else {
