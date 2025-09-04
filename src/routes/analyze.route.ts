@@ -352,7 +352,7 @@ const createAnalysisPayload = (
   }
 
   return {
-    userId: userId ?? 1,
+    userId: userId!, // Ya validamos que userId existe antes de llegar aquí
     dateAnalysis: new Date().toISOString(),
     contentType: unified.meta?.inputType === 'html' ? 'html' : 'url',
     contentInput:
@@ -896,6 +896,7 @@ analyzeRouter.post('/', async (req: express.Request, res: express.Response) => {
       tool,
       wcagVersion,
       wcagLevel,
+      isAnonymous: !userId,
     });
 
     const { unified, wcagVersions, wcagLevels } = await runFullAnalysis({
@@ -937,13 +938,14 @@ analyzeRouter.post('/', async (req: express.Request, res: express.Response) => {
       errorErrors,
       totalErrors,
       analysisSuccess: persistenceData.analysis?.success,
+      isAnonymous: !userId,
     });
 
     return res.status(statusCode || 200).json(
       success(
         {
           ...unified,
-          analysisSaved: true,
+          analysisSaved: !!analysisId, // false para usuarios anónimos
           message,
           analysisId,
           persistence: persistenceData,
@@ -952,6 +954,7 @@ analyzeRouter.post('/', async (req: express.Request, res: express.Response) => {
             resultSaveErrors: resultErrors,
             errorSaveErrors: errorErrors,
           },
+          isAnonymous: !userId, // 🚨 NUEVO: Indicar si es análisis anónimo
         },
         requestId
       )
@@ -979,6 +982,106 @@ analyzeRouter.post('/', async (req: express.Request, res: express.Response) => {
     );
   }
 });
+
+// 🚨 NUEVO: Endpoint específico para análisis anónimo (sin guardar en BD)
+analyzeRouter.post(
+  '/anonymous',
+  async (req: express.Request, res: express.Response) => {
+    const requestId = (req as express.Request & { id?: string }).id;
+    const logger = createOptimizedLogger(requestId, req);
+    const config = getAnalysisConfig();
+
+    // Forzar userId a undefined para análisis anónimo
+    const bodyWithoutUserId = { ...req.body, userId: undefined };
+
+    // Validación y sanitización
+    const validated = await validateAndSanitizeInput(
+      bodyWithoutUserId,
+      requestId,
+      (
+        req as express.Request & {
+          log?: { info: (data: LogData, message: string) => void };
+        }
+      )?.log
+    );
+    if ('error' in validated) {
+      return res
+        .status(400)
+        .json(
+          error(
+            validated.error ?? 'Datos inválidos',
+            'VALIDATION_ERROR',
+            validated.details,
+            requestId
+          )
+        );
+    }
+
+    const { inputType, value, tool, wcagVersion, wcagLevel, cumulativeWcag } =
+      validated;
+
+    try {
+      logger.info('Starting anonymous analysis', {
+        inputType,
+        tool,
+        wcagVersion,
+        wcagLevel,
+      });
+
+      const { unified } = await runFullAnalysis({
+        inputType,
+        value,
+        tool,
+        wcagVersion,
+        wcagLevel,
+        cumulativeWcag,
+        ...config,
+        requestId,
+        req,
+      });
+
+      logger.info('Anonymous analysis completed');
+
+      // Retornar solo el análisis, sin persistencia
+      return res.status(200).json(
+        success(
+          {
+            ...unified,
+            analysisSaved: false,
+            message: 'Anonymous analysis completed successfully',
+            analysisId: null,
+            persistence: null,
+            isAnonymous: true,
+          },
+          requestId
+        )
+      );
+    } catch (err: unknown) {
+      const errorObj = err as Error;
+      const msg = errorObj.message ?? '';
+      const isTimeout = /timeout/i.test(msg);
+      const status = isTimeout ? 504 : 500;
+
+      logger.error('Anonymous analyze error', { error: msg, isTimeout });
+
+      return res.status(status).json(
+        error(
+          isTimeout ? 'Analysis timed out' : msg,
+          isTimeout ? 'TIMEOUT' : 'INTERNAL_ERROR',
+          {
+            details: (err as Record<string, unknown>)?.details,
+            code: (err as Record<string, unknown>)?.code,
+            stack:
+              process.env.NODE_ENV !== 'production'
+                ? errorObj.stack
+                : undefined,
+          },
+          requestId
+        )
+      );
+    }
+  }
+);
 
 function getCumulativeWcag(
   wcagVersion: WcagVersion,
@@ -1079,6 +1182,42 @@ async function saveAndFormatResults({
   userId?: number;
 }) {
   const logger = createOptimizedLogger(requestId, req);
+
+  // 🚨 NUEVO: Soporte para usuarios anónimos
+  if (!userId) {
+    logger.info('Anonymous user analysis - skipping database persistence');
+    return {
+      statusCode: 200,
+      message: 'Anonymous analysis completed successfully',
+      analysisId: null,
+      historyId: null,
+      persistence: {
+        analysis: {
+          success: 0,
+          error: 0,
+          message: 'Skipped for anonymous user',
+        },
+        results: {
+          success: 0,
+          error: 0,
+          message: 'Skipped for anonymous user',
+        },
+        errors: { success: 0, error: 0, message: 'Skipped for anonymous user' },
+        history: {
+          success: 0,
+          error: 0,
+          message: 'Skipped for anonymous user',
+        },
+      },
+      summary: {
+        totalViolations: 0,
+        resultsProcessed: 0,
+        errorsProcessed: 0,
+        historyRecorded: false,
+      },
+    };
+  }
+
   const stats = extractStats(unified) || { axeStats: {}, eaStats: {} };
   const analysisPayload = createAnalysisPayload(
     unified,
