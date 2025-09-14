@@ -106,8 +106,13 @@ describe('Analyze E2E - persistence contract', () => {
       c[0].endsWith('/api/result')
     );
     if (resultCalls.length === 0) {
-      // Si no hay persistencia (falló antes de postear), al menos confirmamos que la respuesta no fue ok
-      expect(res.body.ok).toBeFalsy();
+      // Para análisis anónimos, no hay persistencia pero pueden ser exitosos
+      if (res.body.data && res.body.data.isAnonymous) {
+        console.log('ℹ️ Anonymous analysis - no persistence expected');
+      } else {
+        // Si no es anónimo y no hay persistencia, entonces falló
+        expect(res.body.ok).toBeFalsy();
+      }
     } else {
       // Validar level y header Accept-Language
       for (const call of resultCalls) {

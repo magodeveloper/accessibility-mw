@@ -167,6 +167,11 @@ describe('Server Configuration', () => {
     app = require('../../src/server').default;
   });
 
+  afterAll(async () => {
+    // Allow Jest to cleanup
+    await new Promise(resolve => setTimeout(resolve, 100));
+  });
+
   describe('Basic Server Setup', () => {
     it('should be an Express application', () => {
       expect(app).toBeDefined();

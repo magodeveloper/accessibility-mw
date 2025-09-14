@@ -12,8 +12,7 @@ module.exports = {
       'ts-jest',
       {
         useESM: false,
-        // Disable all coverage instrumentation to avoid browser context conflicts
-        isolatedModules: true,
+        // Configuration moved to tsconfig.json
       },
     ],
   },

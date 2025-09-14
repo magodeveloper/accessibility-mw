@@ -10,28 +10,32 @@
 # - restart   : Reinicia el contenedor (stop + start)
 # - logs      : Muestra logs (usa -Follow para tiempo real)
 # - status    : Estado detallado del contenedor
-# - test      : Ejecuta tests de salud y conectividad
+# - test      : Ejecuta tests básicos del middleware
+# - test-coverage : Ejecuta tests con análisis de cobertura
+# - test-watch    : Ejecuta tests en modo watch (continuo)
+# - test-e2e      : Ejecuta tests end-to-end
+# - test-dashboard : Genera dashboard completo de tests con métricas
+# - test-all      : Ejecuta todos los tests del sistema completo
 # - clean     : Limpieza básica de contenedor e imagen
 # - cleanup   : Limpieza completa del sistema Docker
 # - stats     : Estadísticas en tiempo real del contenedor
 # - health    : Verificación completa de salud de la aplicación
 # - monitor   : Monitor continuo del sistema (Ctrl+C para salir)
-# - test-gateway : Ejecuta tests del Gateway (unitarios e integración)
-# - test-all     : Ejecuta todos los tests del sistema completo
-# - validate     : Validación completa del proyecto (TypeScript, ESLint, build, tests, seguridad)
+# - validate  : Validación completa del proyecto (TypeScript, ESLint, build, tests, seguridad)
 #
 # EJEMPLOS DE USO:
 # .\manage.ps1 build -VerboseOutput       # Build detallado con logs
-# .\manage.ps1 logs -Follow             # Logs en tiempo real  
-# .\manage.ps1 stats                    # Estadísticas del contenedor
-# .\manage.ps1 health                   # Verificación completa de salud
-# .\manage.ps1 monitor                  # Monitor continuo del sistema
-# .\manage.ps1 test-gateway -Coverage     # Tests del Gateway con cobertura
-# .\manage.ps1 test-all                  # Todos los tests del sistema
+# .\manage.ps1 logs -Follow               # Logs en tiempo real  
+# .\manage.ps1 test-coverage              # Tests con cobertura
+# .\manage.ps1 test-dashboard             # Dashboard completo de tests
+# .\manage.ps1 test-watch                 # Tests en modo continuo
+# .\manage.ps1 health                     # Verificación completa de salud
+# .\manage.ps1 monitor                    # Monitor continuo del sistema
+# .\manage.ps1 test-all                   # Todos los tests del sistema
 
 param(
   [Parameter(Mandatory = $true)]
-  [ValidateSet("build", "start", "stop", "restart", "logs", "clean", "status", "test", "deploy-all", "stats", "health", "cleanup", "monitor", "test-gateway", "test-all", "validate", "prerequisites", "help")]
+  [ValidateSet("build", "start", "stop", "restart", "logs", "clean", "status", "test", "deploy-all", "stats", "health", "cleanup", "monitor", "test-all", "test-dashboard", "test-coverage", "test-watch", "test-e2e", "validate", "prerequisites", "help")]
   [string]$Action,
     
   [Parameter(Mandatory = $false)]
@@ -344,6 +348,11 @@ function Show-Status {
 }
 
 function Invoke-Tests {
+  param(
+    [Parameter(Mandatory = $false)]
+    [switch]$WithCoverage = $false
+  )
+  
   # Verificar prerrequisitos
   $prereqCheck = Test-Prerequisites -RequiredTools @("npm", "node") -Silent
   if (-not $prereqCheck.AllMet) {
@@ -351,13 +360,103 @@ function Invoke-Tests {
     exit 1
   }
 
-  Write-Info "Ejecutando tests..."
-  npm test
+  if ($WithCoverage) {
+    Write-Info "Ejecutando tests con cobertura..."
+    npm run test:coverage
+  }
+  else {
+    Write-Info "Ejecutando tests (sin coverage para evitar conflictos con Playwright)..."
+    npm run test:ci
+  }
+  
   if ($LASTEXITCODE -eq 0) {
     Write-Success "Tests completados"
   }
   else {
     Write-Error "Tests fallaron"
+    exit 1
+  }
+}
+
+function Invoke-TestCoverage {
+  # Verificar prerrequisitos
+  $prereqCheck = Test-Prerequisites -RequiredTools @("npm", "node") -Silent
+  if (-not $prereqCheck.AllMet) {
+    Write-Error "No se pueden ejecutar los tests. npm/node no están disponibles."
+    exit 1
+  }
+
+  Write-Info "🧪 Ejecutando tests con análisis de cobertura..."
+  npm run test:coverage
+  
+  if ($LASTEXITCODE -eq 0) {
+    Write-Success "Tests con cobertura completados"
+    if (Test-Path "coverage/lcov-report/index.html") {
+      Write-Info "📊 Reporte de cobertura disponible en: coverage/lcov-report/index.html"
+    }
+  }
+  else {
+    Write-Error "Tests de cobertura fallaron"
+    exit 1
+  }
+}
+
+function Invoke-TestWatch {
+  # Verificar prerrequisitos
+  $prereqCheck = Test-Prerequisites -RequiredTools @("npm", "node") -Silent
+  if (-not $prereqCheck.AllMet) {
+    Write-Error "No se pueden ejecutar los tests. npm/node no están disponibles."
+    exit 1
+  }
+
+  Write-Info "👀 Iniciando tests en modo watch (Ctrl+C para salir)..."
+  npm run test:watch
+}
+
+function Invoke-TestE2E {
+  # Verificar prerrequisitos
+  $prereqCheck = Test-Prerequisites -RequiredTools @("npm", "node") -Silent
+  if (-not $prereqCheck.AllMet) {
+    Write-Error "No se pueden ejecutar los tests. npm/node no están disponibles."
+    exit 1
+  }
+
+  Write-Info "🎯 Ejecutando tests end-to-end..."
+  npm run test:e2e
+  
+  if ($LASTEXITCODE -eq 0) {
+    Write-Success "Tests E2E completados"
+  }
+  else {
+    Write-Error "Tests E2E fallaron"
+    exit 1
+  }
+}
+
+function Invoke-TestDashboard {
+  Write-Info "📊 Generando dashboard completo de tests..."
+  
+  # Verificar que el script manage-tests.ps1 existe
+  if (-not (Test-Path ".\manage-tests.ps1")) {
+    Write-Error "No se encontró el archivo manage-tests.ps1 en el directorio actual"
+    exit 1
+  }
+  
+  # Ejecutar el script de dashboard con tests y abrir automáticamente
+  try {
+    Write-Info "Ejecutando análisis completo de tests..."
+    & .\manage-tests.ps1 -RunTests -OpenDashboard
+    
+    if ($LASTEXITCODE -eq 0) {
+      Write-Success "Dashboard de tests generado exitosamente"
+      Write-Info "🌐 El dashboard se abrirá automáticamente en tu navegador"
+    }
+    else {
+      Write-Warning "El dashboard se generó pero con algunos warnings"
+    }
+  }
+  catch {
+    Write-Error "Error al generar dashboard: $($_.Exception.Message)"
     exit 1
   }
 }
@@ -423,42 +522,7 @@ function Start-Container-WithNetworking {
   }
 }
 
-function Test-GatewayConnectivity {
-  Write-Info "🌐 Probando conectividad del Gateway..."
-    
-  try {
-    $gatewayHealth = Invoke-RestMethod -Uri "http://localhost:8100/health" -Method Get -TimeoutSec 10 -ErrorAction Stop
-    Write-Host "  📊 Gateway Health Check..." -NoNewline
-    Write-Host " ✅" -ForegroundColor Green
-    Write-Info "  Status: $($gatewayHealth.status)"
-    if ($gatewayHealth.services) {
-      Write-Info "  Servicios disponibles: $($gatewayHealth.services.Count)"
-    }
-        
-    # Probar endpoint de información
-    $gatewayInfo = Invoke-RestMethod -Uri "http://localhost:8100/info" -Method Get -TimeoutSec 5 -ErrorAction SilentlyContinue
-    if ($gatewayInfo) {
-      Write-Host "  🔍 Gateway Info..." -NoNewline
-      Write-Host " ✅" -ForegroundColor Green
-    }
-        
-    # Probar métricas
-    $gatewayMetrics = Invoke-RestMethod -Uri "http://localhost:8100/metrics" -Method Get -TimeoutSec 5 -ErrorAction SilentlyContinue
-    if ($gatewayMetrics) {
-      Write-Host "  📈 Gateway Metrics..." -NoNewline
-      Write-Host " ✅" -ForegroundColor Green
-    }
-        
-    return $true
-        
-  }
-  catch {
-    Write-Host "  📊 Gateway Health Check..." -NoNewline
-    Write-Host " ❌" -ForegroundColor Red
-    Write-Warning "Gateway no está respondiendo en http://localhost:8100/health"
-    return $false
-  }
-}
+
 
 function Test-SystemConnectivity {
   Write-Info "🔍 Probando conectividad del sistema..."
@@ -514,9 +578,6 @@ function Test-SystemConnectivity {
   else {
     Write-Host " ❌" -ForegroundColor Red
   }
-    
-  # Test 5: Gateway Connectivity (nuevo)
-  Test-GatewayConnectivity
     
   Write-Info "✅ Verificación de conectividad completada"
 }
@@ -577,76 +638,7 @@ function Initialize-Environment {
   Write-Info "✅ Verificación de entorno completada"
 }
 
-function Deploy-Gateway {
-  Write-Info "🚀 Desplegando API Gateway..."
-    
-  $originalLocation = Get-Location
-  try {
-    Set-Location "../accessibility-gw"
-        
-    # Verificar si existe el directorio del gateway
-    if (-not (Test-Path ".")) {
-      Write-Warning "⚠️ Directorio del Gateway no encontrado en ../accessibility-gw"
-      return $false
-    }
-        
-    # Ejecutar tests del Gateway primero
-    Write-Info "Ejecutando tests del Gateway..."
-    $testResult = & ".\manage-gateway.ps1" test -TestType All
-    if ($LASTEXITCODE -ne 0) {
-      Write-Warning "⚠️ Tests del Gateway fallaron (Exit Code: $LASTEXITCODE), continuando con despliegue..."
-    }
-    else {
-      Write-Success "✅ Tests del Gateway exitosos"
-      Write-Info "  Test result summary: $($testResult | Out-String)"
-    }
-        
-    # Build y deploy del gateway usando el script unificado
-    Write-Info "Construyendo Gateway..."
-    & ".\manage-gateway.ps1" build -Configuration Release -BuildType docker
-    if ($LASTEXITCODE -ne 0) {
-      Write-Error "❌ Error construyendo Gateway"
-      return $false
-    }
-        
-    Write-Info "Desplegando Gateway con Docker..."
-    & ".\manage-gateway.ps1" docker up -Environment prod
-    if ($LASTEXITCODE -ne 0) {
-      Write-Error "❌ Error desplegando Gateway"
-      return $false
-    }
-        
-    Start-Sleep 8
-        
-    # El nombre correcto del contenedor es accessibility-gateway (según docker-compose.yml)
-    Write-Info "Conectando Gateway a red compartida..."
-    docker network connect accessibility-shared accessibility-gateway 2>$null
-        
-    # Verificar que el gateway esté corriendo
-    $gatewayStatus = docker ps --filter "name=accessibility-gateway" --format "{{.Status}}"
-    if ($gatewayStatus -match "Up") {
-      Write-Success "✅ Gateway desplegado correctamente"
-            
-      # Verificar health del Gateway
-      Write-Info "Verificando salud del Gateway..."
-      & ".\manage-gateway.ps1" verify -Full
-            
-      return $true
-    }
-    else {
-      Write-Warning "⚠️ Gateway no se pudo iniciar correctamente"
-      return $false
-    }
-        
-  }
-  catch {
-    Write-Error "❌ Error desplegando Gateway: $($_.Exception.Message)"
-    return $false
-  }
-  finally {
-    Set-Location $originalLocation
-  }
-}
+
 
 function Deploy-All {
   Write-Info "🚀 DESPLEGANDO SISTEMA COMPLETO CON CONFIGURACIÓN AUTOMÁTICA..."
@@ -682,14 +674,10 @@ function Deploy-All {
       docker network connect accessibility-shared $($service.container) 2>$null
     }
         
-    # 4. Deploy Gateway (nuevo)
-    Set-Location $originalLocation
-    $gatewayDeployed = Deploy-Gateway
-        
-    # 5. Iniciar middleware con configuración automática
+    # 4. Iniciar middleware con configuración automática
     Start-Container-WithNetworking
         
-    # 6. Verificar conectividad
+    # 5. Verificar conectividad
     Write-Info "Verificando conectividad del sistema..."
     Test-SystemConnectivity
         
@@ -700,19 +688,9 @@ function Deploy-All {
     Write-Host "  👤 Users:         http://localhost:8081/swagger" -ForegroundColor Green
     Write-Host "  📊 Analysis:      http://localhost:8082/swagger" -ForegroundColor Green
     Write-Host "  📋 Reports:       http://localhost:8083/swagger" -ForegroundColor Green
-    if ($gatewayDeployed) {
-      Write-Host "  🌐 Gateway:       http://localhost:8100/swagger" -ForegroundColor Green
-      Write-Host "  🌐 Gateway API:   http://localhost:8100/api/v1/users" -ForegroundColor Green
-      Write-Host "  🏥 Gateway Health: http://localhost:8100/health" -ForegroundColor Green
-    }
     Write-Host ""
     Write-Host "🧪 PRUEBA RÁPIDA:" -ForegroundColor Yellow
     Write-Host "  curl -X POST http://localhost:3001/api/analyze -H 'Content-Type: application/json' -d '{""userId"":1,""inputType"":""html"",""value"":""<html><body><h1>Test</h1></body></html>"",""tool"":""both""}'" -ForegroundColor Gray
-    if ($gatewayDeployed) {
-      Write-Host ""
-      Write-Host "🌐 PRUEBA A TRAVÉS DEL GATEWAY:" -ForegroundColor Yellow
-      Write-Host "  curl -X POST http://localhost:8100/api/v1/translate -H 'Content-Type: application/json' -d '{""service"":""middleware"",""method"":""POST"",""path"":""/api/analyze"",""body"":{""userId"":1,""inputType"":""html"",""value"":""<html><body><h1>Test Gateway</h1></body></html>"",""tool"":""both""}}'" -ForegroundColor Gray
-    }
         
   }
   finally {
@@ -853,56 +831,17 @@ function Start-Monitor {
   }
 }
 
-function Test-Gateway {
-  Write-Info "🧪 Ejecutando tests del Gateway..."
-  Write-Info "📍 Delegando al script especializado del Gateway..."
-    
-  $originalLocation = Get-Location
-    
-  try {
-    Set-Location "../accessibility-gw"
-        
-    if (-not (Test-Path "manage-gateway.ps1")) {
-      Write-Error "❌ Script de gestión del Gateway no encontrado"
-      return
-    }
 
-    Write-Info "Ejecutando: .\manage-gateway.ps1 test"
-    if ($Coverage) {
-      & ".\manage-gateway.ps1" "test" "-GenerateCoverage"
-    }
-    else {
-      & ".\manage-gateway.ps1" "test"
-    }
-
-    if ($LASTEXITCODE -eq 0) {
-      Write-Success "✅ Tests del Gateway completados exitosamente"
-    }
-    else {
-      Write-Error "❌ Tests del Gateway fallaron (Exit Code: $LASTEXITCODE)"
-    }
-  }
-  catch {
-    Write-Error "❌ Error ejecutando tests del Gateway: $($_.Exception.Message)"
-  }
-  finally {
-    Set-Location $originalLocation
-  }
-}
 
 function Test-AllSystem {
   Write-Info "🧪 Ejecutando tests completos del sistema..."
     
-  # 1. Tests del Gateway
-  Write-Info "📍 1/3: Tests del Gateway..."
-  Test-Gateway
-    
-  # 2. Tests del Middleware
-  Write-Info "📍 2/3: Tests del Middleware..."
+  # 1. Tests del Middleware
+  Write-Info "📍 1/2: Tests del Middleware..."
   Invoke-Tests
     
-  # 3. Tests de integración del sistema completo
-  Write-Info "📍 3/3: Tests de integración del sistema..."
+  # 2. Tests de integración del sistema completo
+  Write-Info "📍 2/2: Tests de integración del sistema..."
   Test-SystemIntegration
     
   Write-Success "🎉 Tests completos del sistema finalizados"
@@ -923,34 +862,11 @@ function Test-SystemIntegration {
     
   Write-Info "Verificando conectividad entre servicios..."
     
-  # Test 1: Gateway puede alcanzar todos los servicios
-  $gatewayRunning = docker ps --filter "name=accessibility-gw" --format "{{.Names}}"
-  if ($gatewayRunning) {
-    Write-Info "Testing Gateway -> Microservices connectivity..."
-        
-    $endpoints = @(
-      @{Service = "Users"; Url = "http://localhost:8100/api/v1/users" },
-      @{Service = "Analysis"; Url = "http://localhost:8100/api/Analysis" }, 
-      @{Service = "Reports"; Url = "http://localhost:8100/api/Report" },
-      @{Service = "Middleware"; Url = "http://localhost:8100/api/middleware" }
-    )
-        
-    foreach ($endpoint in $endpoints) {
-      try {
-        $response = Invoke-WebRequest -Uri $endpoint.Url -Method HEAD -TimeoutSec 5 -UseBasicParsing
-        Write-Success "  ✅ $($endpoint.Service): Gateway proxy working (Status: $($response.StatusCode))"
-      }
-      catch {
-        Write-Warning "  ⚠️ $($endpoint.Service): Gateway proxy may have issues - $($_.Exception.Message)"
-      }
-    }
-  }
-    
-  # Test 2: Direct connectivity between services
+  # Test 1: Direct connectivity between services
   Write-Info "Testing direct service connectivity..."
   Test-SystemConnectivity
     
-  # Test 3: End-to-end workflow
+  # Test 2: End-to-end workflow
   Write-Info "Testing end-to-end workflow..."
   Test-EndToEndWorkflow
 }
@@ -964,9 +880,11 @@ function Test-EndToEndWorkflow {
     $middlewareEndpoint = "http://localhost:3001/api/analyze"
         
     $body = @{
-      url               = $testUrl
-      includeScreenshot = $false
-      waitTime          = 1
+      inputType   = "url"
+      value       = $testUrl
+      tool        = "axe-core"
+      wcagVersion = "2.2"
+      wcagLevel   = "AA"
     } | ConvertTo-Json
 
     $response = Invoke-WebRequest -Uri $middlewareEndpoint -Method POST -Body $body -ContentType "application/json" -TimeoutSec 30 -UseBasicParsing
@@ -1182,9 +1100,19 @@ switch ($Action) {
   "logs" { Show-Logs }
   "clean" { Clear-AllResources }
   "status" { Show-Status }
-  "test" { Invoke-Tests }
-  "test-gateway" { Test-Gateway }
+  "test" { 
+    if ($Coverage) {
+      Invoke-Tests -WithCoverage
+    }
+    else {
+      Invoke-Tests
+    }
+  }
   "test-all" { Test-AllSystem }
+  "test-coverage" { Invoke-TestCoverage }
+  "test-watch" { Invoke-TestWatch }
+  "test-e2e" { Invoke-TestE2E }
+  "test-dashboard" { Invoke-TestDashboard }
   "validate" { Test-ProjectValidation }
   "deploy-all" { Deploy-All }
   "stats" { Show-Stats }
@@ -1220,9 +1148,12 @@ switch ($Action) {
     Write-Host "  build-all      - Construir todas las imágenes" -ForegroundColor White
     Write-Host ""
     Write-Host "TESTING Y CALIDAD:" -ForegroundColor Green
-    Write-Host "  test           - Ejecutar tests del middleware (-Coverage para reportes)" -ForegroundColor White
-    Write-Host "  test-gateway   - Ejecutar tests del Gateway (-Coverage para reportes)" -ForegroundColor White
+    Write-Host "  test           - Ejecutar tests básicos del middleware (-Coverage para reportes)" -ForegroundColor White
     Write-Host "  test-all       - Ejecutar tests completos del sistema" -ForegroundColor White
+    Write-Host "  test-coverage  - Ejecutar tests con análisis de cobertura" -ForegroundColor White
+    Write-Host "  test-watch     - Ejecutar tests en modo watch (continuo)" -ForegroundColor White
+    Write-Host "  test-e2e       - Ejecutar tests end-to-end" -ForegroundColor White
+    Write-Host "  test-dashboard - Generar dashboard completo de tests con métricas" -ForegroundColor White
     Write-Host "  validate       - Validación completa del proyecto (TypeScript, ESLint, build, tests, etc.)" -ForegroundColor White
     Write-Host ""
     Write-Host "OPCIONES:" -ForegroundColor Green
@@ -1233,7 +1164,10 @@ switch ($Action) {
     Write-Host "EJEMPLOS:" -ForegroundColor Yellow
     Write-Host "  .\manage.ps1 -Action deploy-all" -ForegroundColor Gray
     Write-Host "  .\manage.ps1 -Action test -Coverage" -ForegroundColor Gray
-    Write-Host "  .\manage.ps1 -Action test-gateway -Coverage" -ForegroundColor Gray
+    Write-Host "  .\manage.ps1 -Action test-coverage" -ForegroundColor Gray
+    Write-Host "  .\manage.ps1 -Action test-dashboard" -ForegroundColor Gray
+    Write-Host "  .\manage.ps1 -Action test-watch" -ForegroundColor Gray
+    Write-Host "  .\manage.ps1 -Action test-e2e" -ForegroundColor Gray
     Write-Host "  .\manage.ps1 -Action test-all" -ForegroundColor Gray
     Write-Host "  .\manage.ps1 -Action logs-all -Follow" -ForegroundColor Gray
     Write-Host ""

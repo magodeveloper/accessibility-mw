@@ -25,6 +25,12 @@ import { performanceMonitor } from './services/performance.service';
 import { swaggerSpec } from './swagger';
 import { ENV, FeatureFlags } from './utils/environment';
 
+// Aumentar el límite de listeners para evitar warnings en tests
+// Esto es necesario porque pino-http y otros middlewares pueden registrar listeners automáticamente
+if (process.env.NODE_ENV === 'test') {
+  process.setMaxListeners(20);
+}
+
 // Interfaces y tipos para el servidor
 type RequestWithId = Request & {
   id?: string | number;
@@ -200,43 +206,46 @@ const forceHost =
   process.env.HOST ??
   (ENV.NODE_ENV === 'development' ? '127.0.0.1' : '0.0.0.0');
 
-server.listen(ENV.PORT, forceHost, () => {
-  const addr = server.address();
-  const addrStr =
-    typeof addr === 'string'
-      ? addr
-      : `${(addr as AddressInfo)?.address}:${(addr as AddressInfo)?.port}`;
-  advancedLogger.info(
-    `API escuchando en http://${forceHost}:${ENV.PORT} - Swagger: /api/docs`,
-    {
-      port: ENV.PORT,
-      host: forceHost,
-      nodeEnv: ENV.NODE_ENV,
-      cacheConfig: {
-        maxEntries: ENV.CACHE_MAX_ENTRIES,
-        maxMemoryMB: ENV.CACHE_MAX_MEMORY_MB,
-      },
-      timeouts: {
-        analyze: ENV.ANALYZE_TIMEOUT_MS,
-        navigation: ENV.NAVIGATION_TIMEOUT_MS,
-      },
-      browserPoolSize: ENV.BROWSER_POOL_SIZE,
-      rateLimits: {
-        general: ENV.RATE_LIMIT_MAX_REQUESTS,
-        analyze: ENV.ANALYZE_RATE_LIMIT_MAX,
-      },
-    }
-  );
+// Only start server if not in test environment
+if (ENV.NODE_ENV !== 'test') {
+  server.listen(ENV.PORT, forceHost, () => {
+    const addr = server.address();
+    const addrStr =
+      typeof addr === 'string'
+        ? addr
+        : `${(addr as AddressInfo)?.address}:${(addr as AddressInfo)?.port}`;
+    advancedLogger.info(
+      `API escuchando en http://${forceHost}:${ENV.PORT} - Swagger: /api/docs`,
+      {
+        port: ENV.PORT,
+        host: forceHost,
+        nodeEnv: ENV.NODE_ENV,
+        cacheConfig: {
+          maxEntries: ENV.CACHE_MAX_ENTRIES,
+          maxMemoryMB: ENV.CACHE_MAX_MEMORY_MB,
+        },
+        timeouts: {
+          analyze: ENV.ANALYZE_TIMEOUT_MS,
+          navigation: ENV.NAVIGATION_TIMEOUT_MS,
+        },
+        browserPoolSize: ENV.BROWSER_POOL_SIZE,
+        rateLimits: {
+          general: ENV.RATE_LIMIT_MAX_REQUESTS,
+          analyze: ENV.ANALYZE_RATE_LIMIT_MAX,
+        },
+      }
+    );
 
-  // Mostrar dirección real del servidor para depuración de binding
-  console.log(`🚀 Server bound to: ${addrStr}`);
-  advancedLogger.info('Server address info', { address: addr });
+    // Mostrar dirección real del servidor para depuración de binding
+    console.log(`🚀 Server bound to: ${addrStr}`);
+    advancedLogger.info('Server address info', { address: addr });
 
-  // Configurar health checks automáticos después del startup
-  console.log('🏥 Configurando health monitoring...');
-  setupHealthChecks();
-  advancedLogger.info('Health monitoring configurado correctamente');
-});
+    // Configurar health checks automáticos después del startup
+    console.log('🏥 Configurando health monitoring...');
+    setupHealthChecks();
+    advancedLogger.info('Health monitoring configurado correctamente');
+  });
+}
 
 // Graceful shutdown mejorado
 const gracefulShutdown = async (signal: string) => {
@@ -272,29 +281,34 @@ const gracefulShutdown = async (signal: string) => {
 };
 
 // Errores de proceso con logging mejorado
-process.on('unhandledRejection', (reason: unknown) => {
-  const error = reason as Error;
-  advancedLogger.fatal(
-    'UNHANDLED_REJECTION',
-    {
-      reason: error?.message || String(reason),
-      stack: error?.stack,
-    },
-    reason instanceof Error ? reason : new Error(String(reason))
-  );
-  // En producción, considerar graceful shutdown
-  if (FeatureFlags.isProduction()) {
-    gracefulShutdown('UNHANDLED_REJECTION');
-  }
-});
+if (ENV.NODE_ENV !== 'test') {
+  process.on('unhandledRejection', (reason: unknown) => {
+    const error = reason as Error;
+    advancedLogger.fatal(
+      'UNHANDLED_REJECTION',
+      {
+        reason: error?.message || String(reason),
+        stack: error?.stack,
+      },
+      reason instanceof Error ? reason : new Error(String(reason))
+    );
+    // En producción, considerar graceful shutdown
+    if (FeatureFlags.isProduction()) {
+      gracefulShutdown('UNHANDLED_REJECTION');
+    }
+  });
 
-process.on('uncaughtException', err => {
-  advancedLogger.fatal('UNCAUGHT_EXCEPTION', {}, err);
-  // Salida inmediata para excepciones no capturadas
-  process.exit(1);
-});
+  process.on('uncaughtException', err => {
+    advancedLogger.fatal('UNCAUGHT_EXCEPTION', {}, err);
+    // Salida inmediata para excepciones no capturadas
+    process.exit(1);
+  });
+}
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+// Only register signal handlers if not in test environment
+if (ENV.NODE_ENV !== 'test') {
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+}
 
 export default app;

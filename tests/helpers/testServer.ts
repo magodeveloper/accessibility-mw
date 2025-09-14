@@ -1,6 +1,6 @@
+import express, { Express } from 'express';
 import { Server, createServer } from 'http';
 import { AddressInfo } from 'net';
-import express, { Express } from 'express';
 
 /**
  * Helper para crear servidores de test con puertos dinámicos
@@ -9,6 +9,7 @@ export class TestServer {
   private server: Server | null = null;
   private port: number = 0;
   private app: Express;
+  private forceCloseTimeout: NodeJS.Timeout | null = null;
 
   constructor(app?: Express) {
     this.app = app || express();
@@ -18,7 +19,7 @@ export class TestServer {
     return new Promise((resolve, reject) => {
       // Crear servidor con puerto 0 (puerto dinámico)
       this.server = createServer(this.app);
-      
+
       this.server.listen(0, '127.0.0.1', () => {
         const address = this.server!.address() as AddressInfo;
         this.port = address.port;
@@ -26,30 +27,58 @@ export class TestServer {
         resolve(this.port);
       });
 
-      this.server.on('error', (error) => {
+      this.server.on('error', error => {
         reject(error);
       });
     });
   }
 
   async stop(): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
+      // Limpiar timeout existente si lo hay
+      if (this.forceCloseTimeout) {
+        clearTimeout(this.forceCloseTimeout);
+        this.forceCloseTimeout = null;
+      }
+
       if (this.server && this.server.listening) {
+        let resolved = false;
+
         this.server.close(() => {
-          console.log(`Test server stopped (port ${this.port})`);
-          resolve();
+          if (!resolved) {
+            resolved = true;
+            console.log(`Test server stopped (port ${this.port})`);
+            resolve();
+          }
         });
-        // Force close after timeout
-        setTimeout(() => {
-          if (this.server && this.server.listening) {
+
+        // Force close after timeout con referencia almacenada
+        this.forceCloseTimeout = setTimeout(() => {
+          if (this.server && this.server.listening && !resolved) {
+            resolved = true;
             this.server.closeAllConnections?.();
             resolve();
           }
+          // Limpiar la referencia del timeout
+          this.forceCloseTimeout = null;
         }, 5000);
+
+        // Usar .unref() para evitar que Jest detecte el timeout como open handle
+        this.forceCloseTimeout.unref();
       } else {
         resolve();
       }
     });
+  }
+
+  /**
+   * Limpia explícitamente todos los timers y conexiones
+   */
+  cleanup(): void {
+    if (this.forceCloseTimeout) {
+      clearTimeout(this.forceCloseTimeout);
+      this.forceCloseTimeout = null;
+    }
   }
 
   getPort(): number {
@@ -69,13 +98,13 @@ export class TestServer {
  * Helper para detectar si un puerto está en uso
  */
 export async function isPortInUse(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const server = require('net').createServer();
-    
+
     server.listen(port, '127.0.0.1', () => {
       server.close(() => resolve(false));
     });
-    
+
     server.on('error', () => resolve(true));
   });
 }

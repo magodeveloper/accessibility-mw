@@ -484,6 +484,8 @@ async function saveHistory(
   const logger = createOptimizedLogger(requestId);
   logger.info('saveHistory called', { userId, analysisId, REPORTS_API_URL });
 
+
+
   // Si no hay URL configurada, no intentar guardar
   if (!REPORTS_API_URL) {
     logger.warn('saveHistory: No REPORTS_API_URL configured');
@@ -549,6 +551,8 @@ async function saveResult(
     hasAnalysisId: !!result?.analysisId,
   });
 
+
+
   if (!ANALYSIS_API_URL) {
     logger.warn('saveResult: No ANALYSIS_API_URL configured');
     return null;
@@ -608,6 +612,8 @@ async function saveError(
   acceptLanguage = 'es'
 ): Promise<void> {
   const logger = createOptimizedLogger(requestId);
+
+
 
   if (!ANALYSIS_API_URL) {
     logger.warn('saveError: No ANALYSIS_API_URL configured');

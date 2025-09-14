@@ -1,5 +1,5 @@
-import rulesEs from './rules.es.json';
 import rulesEn from './rules.en.json';
+import rulesEs from './rules.es.json';
 
 type Rule = {
   code: string;
@@ -17,7 +17,8 @@ function getRules(lang: string): Rule[] {
     if (lang === 'en') {
       rulesCache['en'] = rulesEn as Rule[];
     } else {
-      rulesCache['es'] = rulesEs as Rule[];
+      // Para cualquier idioma no soportado, usar español como fallback
+      rulesCache[lang] = rulesEs as Rule[];
     }
   }
   return rulesCache[lang];
@@ -30,7 +31,11 @@ function getRules(lang: string): Rule[] {
  * @param field campo a buscar ('code', 'guideline', 'level', 'version'), por defecto 'code'
  * @returns descripción localizada o undefined
  */
-export function getRuleDescription(query: string, lang: string = 'es', field: 'code' | 'guideline' | 'level' | 'version' = 'code'): string | undefined {
+export function getRuleDescription(
+  query: string,
+  lang: string = 'es',
+  field: 'code' | 'guideline' | 'level' | 'version' = 'code'
+): string | undefined {
   const arr = getRules(lang) || getRules('es');
   return arr.find(r => r[field] === query)?.description;
 }

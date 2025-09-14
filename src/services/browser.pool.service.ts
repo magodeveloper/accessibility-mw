@@ -31,7 +31,7 @@ class BrowserPool {
     ).toLowerCase();
     const headless = headlessEnv !== 'false';
 
-    return await chromium.launch({
+    const launchOptions = {
       headless: headless || !process.env.DISPLAY,
       args: [
         '--no-sandbox',
@@ -44,7 +44,103 @@ class BrowserPool {
         '--disable-renderer-backgrounding',
         '--memory-pressure-off',
       ],
-    });
+    };
+
+    try {
+      // Intentar lanzar con navegadores de Playwright
+      return await chromium.launch(launchOptions);
+    } catch (error) {
+      // Si falla, intentar con Chrome del sistema
+      if (process.platform === 'win32') {
+        // Usar variables de entorno para encontrar Chrome dinámicamente
+        const programFiles = process.env['PROGRAMFILES'] || 'C:\\Program Files';
+        const programFilesX86 = process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)';
+        
+        const chromePaths = [
+          `${programFiles}\\Google\\Chrome\\Application\\chrome.exe`,
+          `${programFilesX86}\\Google\\Chrome\\Application\\chrome.exe`,
+          // También buscar en AppData local para Chrome user-installed
+          `${process.env.LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe`,
+        ];
+
+        for (const chromePath of chromePaths) {
+          try {
+            const fs = require('fs');
+            if (fs.existsSync(chromePath)) {
+              return await chromium.launch({
+                ...launchOptions,
+                executablePath: chromePath,
+              });
+            }
+          } catch {
+            continue;
+          }
+        }
+      } else if (process.platform === 'darwin') {
+        // macOS paths
+        const macChromePaths = [
+          '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+          '/Applications/Chromium.app/Contents/MacOS/Chromium',
+        ];
+        
+        for (const chromePath of macChromePaths) {
+          try {
+            const fs = require('fs');
+            if (fs.existsSync(chromePath)) {
+              return await chromium.launch({
+                ...launchOptions,
+                executablePath: chromePath,
+              });
+            }
+          } catch {
+            continue;
+          }
+        }
+      } else if (process.platform === 'linux') {
+        // Linux paths - intentar comando which primero
+        try {
+          const { execSync } = require('child_process');
+          const chromePath = execSync('which google-chrome || which chromium-browser || which chromium', 
+            { encoding: 'utf8' }).trim();
+          
+          if (chromePath) {
+            return await chromium.launch({
+              ...launchOptions,
+              executablePath: chromePath,
+            });
+          }
+        } catch {
+          // Si which falla, intentar rutas comunes
+          const linuxChromePaths = [
+            '/usr/bin/google-chrome',
+            '/usr/bin/chromium-browser',
+            '/usr/bin/chromium',
+            '/snap/bin/chromium',
+          ];
+          
+          for (const chromePath of linuxChromePaths) {
+            try {
+              const fs = require('fs');
+              if (fs.existsSync(chromePath)) {
+                return await chromium.launch({
+                  ...launchOptions,
+                  executablePath: chromePath,
+                });
+              }
+            } catch {
+              continue;
+            }
+          }
+        }
+      }
+
+      // Si falla completamente, relanzar el error original con información útil
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(
+        `Failed to launch browser. Please install Playwright browsers: npx playwright install\nOriginal error: ${errorMessage}`
+      );
+    }
   }
 
   async getBrowser(): Promise<Browser> {

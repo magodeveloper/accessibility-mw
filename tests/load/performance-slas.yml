@@ -1,0 +1,253 @@
+# Performance SLAs and Thresholds Configuration
+# Definición de Service Level Agreements y umbrales de rendimiento
+# para la aplicación Accessibility-MW
+
+## Service Level Objectives (SLOs)
+
+### Availability
+target_availability: 99.5%
+downtime_budget_monthly: 3.6 hours
+downtime_budget_daily: 7.2 minutes
+
+### Response Time SLOs
+health_check:
+  p95_threshold: 1000ms
+  p99_threshold: 2000ms
+  timeout: 5000ms
+
+analysis_simple:
+  p95_threshold: 5000ms
+  p99_threshold: 15000ms
+  timeout: 30000ms
+
+analysis_complex:
+  p95_threshold: 15000ms
+  p99_threshold: 45000ms
+  timeout: 60000ms
+
+monitoring:
+  p95_threshold: 3000ms
+  p99_threshold: 5000ms
+  timeout: 10000ms
+
+### Error Rate SLOs
+acceptable_error_rate: 1%
+warning_error_rate: 5%
+critical_error_rate: 10%
+
+## Load Test Thresholds
+
+### Normal Load Test
+normal_load:
+  max_users: 25
+  duration: 300s
+  success_criteria:
+    - http_req_duration_p95 < 5000
+    - http_req_failed < 0.05
+    - analysis_duration_p95 < 10000
+    - health_duration_p95 < 1000
+
+### Stress Test
+stress_test:
+  max_users: 200
+  duration: 360s
+  success_criteria:
+    - http_req_duration_p95 < 30000
+    - http_req_failed < 0.30
+    - system_recovers_post_test: true
+    - no_memory_leaks: true
+
+### Spike Test
+spike_test:
+  spike_users: 500
+  baseline_users: 10
+  spike_duration: 30s
+  success_criteria:
+    - system_survives_spike: true
+    - recovery_time < 120s
+    - error_rate_during_spike < 0.70
+    - baseline_performance_restored: true
+
+## Resource Thresholds
+
+### System Resources
+cpu_usage:
+  normal: '< 70%'
+  warning: '70-85%'
+  critical: '> 85%'
+
+memory_usage:
+  normal: '< 80%'
+  warning: '80-90%'
+  critical: '> 90%'
+
+disk_usage:
+  normal: '< 80%'
+  warning: '80-90%'
+  critical: '> 90%'
+
+### Application Metrics
+browser_pool:
+  max_instances: 10
+  idle_timeout: 30000ms
+  launch_timeout: 10000ms
+
+cache_hit_rate:
+  target: '> 80%'
+  warning: '60-80%'
+  critical: '< 60%'
+
+analysis_queue:
+  max_pending: 100
+  max_wait_time: 120s
+  processing_timeout: 300s
+
+## Alerting Rules
+
+### Critical Alerts (Immediate Response)
+critical_alerts:
+  - name: 'Service Down'
+    condition: 'availability < 99%'
+    duration: '1m'
+
+  - name: 'High Error Rate'
+    condition: 'error_rate > 10%'
+    duration: '2m'
+
+  - name: 'Analysis Timeout'
+    condition: 'analysis_duration_p95 > 60s'
+    duration: '5m'
+
+  - name: 'Memory Leak'
+    condition: 'memory_usage increasing AND > 90%'
+    duration: '10m'
+
+### Warning Alerts (Monitor Closely)
+warning_alerts:
+  - name: 'Degraded Performance'
+    condition: 'response_time_p95 > 10s'
+    duration: '5m'
+
+  - name: 'Increased Error Rate'
+    condition: 'error_rate > 5%'
+    duration: '3m'
+
+  - name: 'High Resource Usage'
+    condition: 'cpu_usage > 80% OR memory_usage > 85%'
+    duration: '10m'
+
+  - name: 'Cache Miss Rate High'
+    condition: 'cache_hit_rate < 70%'
+    duration: '15m'
+
+## Load Test Execution Schedule
+
+### Continuous Testing
+daily_smoke_test:
+  schedule: '0 6 * * *' # 6 AM daily
+  type: 'load'
+  duration: '5m'
+  users: 10
+
+weekly_load_test:
+  schedule: '0 2 * * 1' # 2 AM Mondays
+  type: 'load'
+  duration: '30m'
+  users: 50
+
+monthly_stress_test:
+  schedule: '0 3 1 * *' # 3 AM first of month
+  type: 'stress'
+  duration: '60m'
+  users: 200
+
+### Pre-Release Testing
+pre_release:
+  tests_required:
+    - load_test: '30 min at 100 users'
+    - stress_test: '60 min at 300 users'
+    - spike_test: 'spikes up to 500 users'
+    - endurance_test: '8 hours at 25 users'
+
+  success_criteria:
+    - all_thresholds_met: true
+    - no_memory_leaks: true
+    - performance_regression: < 10%
+    - error_rate: < 2%
+
+## Performance Benchmarks
+
+### Baseline Performance (Empty Load)
+baseline:
+  health_check: 50ms
+  analysis_axe: 2000ms
+  analysis_equal_access: 3000ms
+  analysis_both: 4000ms
+  monitoring_status: 100ms
+
+### Target Performance (Production Load)
+production_targets:
+  concurrent_users: 50
+  requests_per_second: 20
+  analysis_throughput: 100/hour
+  p95_response_time: 5000ms
+  availability: 99.5%
+
+### Growth Planning
+capacity_planning:
+  current_max_users: 100
+  target_max_users_6m: 200
+  target_max_users_1y: 500
+  scaling_threshold: 80%
+  auto_scaling_enabled: false
+
+## Test Data Management
+
+### Test Scenarios
+test_html_samples:
+  simple: '<!DOCTYPE html><html><head><title>Test</title></head><body><h1>Hello</h1></body></html>'
+  complex: 'large_form_with_multiple_accessibility_features.html'
+  problematic: 'html_with_known_accessibility_issues.html'
+
+### Test Environment Requirements
+test_environment:
+  isolated_network: true
+  production_like_data: false
+  monitoring_enabled: true
+  logging_level: 'DEBUG'
+
+database_requirements:
+  test_data_size: '1GB'
+  user_accounts: 100
+  historical_analyses: 1000
+  cache_prewarmed: true
+
+## Reporting and Documentation
+
+### Test Report Requirements
+test_reports_must_include:
+  - performance_metrics_summary
+  - threshold_compliance_status
+  - resource_utilization_graphs
+  - error_analysis
+  - recommendations
+  - trending_comparison
+
+### Success Criteria Documentation
+pass_criteria:
+  - all_slos_met: true
+  - no_critical_alerts: true
+  - performance_within_thresholds: true
+  - system_stability_confirmed: true
+
+fail_criteria:
+  - any_critical_threshold_breached: true
+  - system_crashes_or_hangs: true
+  - data_corruption: true
+  - security_vulnerabilities_exposed: true
+
+## Version History
+version: '1.0.0'
+last_updated: '2025-09-13'
+reviewed_by: 'Performance Team'
+next_review: '2025-12-13'

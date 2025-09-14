@@ -33,9 +33,10 @@ interface Metrics {
 }
 
 class MetricsCollector {
-  private metrics: Metrics;
+  private readonly metrics: Metrics;
   private responseTimes: number[] = [];
-  private maxResponseTimeEntries = 1000; // Mantener últimas 1000 mediciones
+  private readonly maxResponseTimeEntries = 1000; // Mantener últimas 1000 mediciones
+  private readonly systemMetricsTimer?: NodeJS.Timeout;
 
   constructor() {
     this.metrics = {
@@ -58,9 +59,10 @@ class MetricsCollector {
     };
 
     // Actualizar métricas del sistema cada minuto
-    setInterval(() => {
+    this.systemMetricsTimer = setInterval(() => {
       this.updateSystemMetrics();
     }, 60000);
+    this.systemMetricsTimer.unref();
   }
 
   recordRequest(success: boolean, isTimeout = false): void {
@@ -223,6 +225,15 @@ nodejs_memory_usage_bytes{type="heapTotal"} ${m.system.memoryUsage.heapTotal}
 nodejs_memory_usage_bytes{type="heapUsed"} ${m.system.memoryUsage.heapUsed}
 nodejs_memory_usage_bytes{type="external"} ${m.system.memoryUsage.external}
 `.trim();
+  }
+
+  /**
+   * Destruye el recolector de métricas y limpia los timers
+   */
+  destroy(): void {
+    if (this.systemMetricsTimer) {
+      clearInterval(this.systemMetricsTimer);
+    }
   }
 }
 

@@ -16,10 +16,11 @@ interface CacheStats {
 }
 
 export class LRUCache<T> {
-  private cache = new Map<string, CacheEntry<T>>();
-  private maxSize: number;
-  private maxMemoryMB: number;
+  private readonly cache = new Map<string, CacheEntry<T>>();
+  private readonly maxSize: number;
+  private readonly maxMemoryMB: number;
   private currentMemoryBytes = 0;
+  private readonly cleanupTimer?: NodeJS.Timeout;
   private stats: CacheStats = {
     hits: 0,
     misses: 0,
@@ -33,7 +34,9 @@ export class LRUCache<T> {
     this.maxMemoryMB = maxMemoryMB;
 
     // Limpieza periódica cada 5 minutos
-    setInterval(() => this.cleanup(), 5 * 60 * 1000);
+    this.cleanupTimer = setInterval(() => this.cleanup(), 5 * 60 * 1000);
+    // Usar unref() para que no mantenga el proceso activo
+    this.cleanupTimer.unref();
   }
 
   private calculateSize(value: T): number {
@@ -197,6 +200,16 @@ export class LRUCache<T> {
     options: Record<string, unknown> = {}
   ): boolean {
     return this.get(inputType, value, options) !== null;
+  }
+
+  /**
+   * Destruye el cache y limpia el timer de limpieza automática
+   */
+  destroy(): void {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+    }
+    this.clear();
   }
 }
 

@@ -62,6 +62,10 @@ describe('Monitoring Route Tests', () => {
     });
 
     it('debe manejar errores en dashboard', async () => {
+      // Suprimir console.error durante esta prueba de manejo de errores
+      const originalConsoleError = console.error;
+      console.error = jest.fn();
+
       const error = new Error('Dashboard error');
       mockGetHealthDashboard.mockImplementation(() => {
         throw error;
@@ -78,6 +82,9 @@ describe('Monitoring Route Tests', () => {
         code: 'INTERNAL_ERROR',
         requestId: 'test-request-123',
       });
+
+      // Restaurar console.error
+      console.error = originalConsoleError;
     });
   });
 
@@ -126,6 +133,10 @@ describe('Monitoring Route Tests', () => {
     });
 
     it('debe manejar errores en servicios', async () => {
+      // Suprimir console.error durante esta prueba de manejo de errores
+      const originalConsoleError = console.error;
+      console.error = jest.fn();
+
       const error = new Error('Services error');
       mockGetServicesStatus.mockImplementation(() => {
         throw error;
@@ -142,6 +153,9 @@ describe('Monitoring Route Tests', () => {
         code: 'INTERNAL_ERROR',
         requestId: 'test-request-123',
       });
+
+      // Restaurar console.error
+      console.error = originalConsoleError;
     });
   });
 
@@ -226,6 +240,77 @@ describe('Monitoring Route Tests', () => {
         .expect(res => {
           expect(res.body.requestId).toBeUndefined();
         });
+    });
+
+    describe('Additional Edge Cases for Coverage', () => {
+      it('debe manejar dashboard con datos nulos', async () => {
+        mockGetHealthDashboard.mockReturnValue(null);
+
+        const response = await request(app)
+          .get('/monitoring/dashboard')
+          .expect(200);
+
+        expect(response.body.requestId).toBe('test-request-123');
+        // When dashboard returns null, the response is an object with requestId and null data
+        expect(response.body).toEqual({ requestId: 'test-request-123' });
+      });
+
+      it('debe manejar servicios vacíos', async () => {
+        mockGetServicesStatus.mockReturnValue([]);
+
+        const response = await request(app)
+          .get('/monitoring/services')
+          .expect(200);
+
+        expect(response.body).toMatchObject({
+          services: [],
+          total: 0,
+          healthy: 0,
+          timestamp: expect.any(String),
+          requestId: 'test-request-123',
+        });
+      });
+
+      it('debe contar correctamente servicios healthy vs unhealthy', async () => {
+        const mixedServices = [
+          { status: 'healthy', name: 'service1' },
+          { status: 'unhealthy', name: 'service2' },
+          { status: 'degraded', name: 'service3' },
+          { status: 'healthy', name: 'service4' },
+        ];
+
+        mockGetServicesStatus.mockReturnValue(mixedServices);
+
+        const response = await request(app)
+          .get('/monitoring/services')
+          .expect(200);
+
+        expect(response.body.total).toBe(4);
+        expect(response.body.healthy).toBe(2); // Solo service1 y service4 son healthy
+      });
+
+      it('debe incluir todas las propiedades de memoria en /status', async () => {
+        const response = await request(app)
+          .get('/monitoring/status')
+          .expect(200);
+
+        expect(response.body.memory).toHaveProperty('rss');
+        expect(response.body.memory).toHaveProperty('heapUsed');
+        expect(response.body.memory).toHaveProperty('heapTotal');
+        expect(response.body.memory).toHaveProperty('external');
+        expect(response.body.memory).toHaveProperty('arrayBuffers');
+      });
+
+      it('debe incluir información de CPU en /metrics', async () => {
+        const response = await request(app)
+          .get('/monitoring/metrics')
+          .expect(200);
+
+        expect(response.body.cpu).toHaveProperty('user');
+        expect(response.body.cpu).toHaveProperty('system');
+        expect(typeof response.body.cpu.user).toBe('number');
+        expect(typeof response.body.cpu.system).toBe('number');
+      });
     });
   });
 });

@@ -15,7 +15,8 @@
     "removeComments": false,
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
-    "importHelpers": true
+    "importHelpers": true,
+    "isolatedModules": true
   },
   "include": [
     "src/**/*"

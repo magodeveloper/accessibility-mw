@@ -393,7 +393,7 @@ function formatBytes(bytes: number): string {
  * Extrae el mensaje de error de forma segura
  */
 function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? getErrorMessage(error) : 'Unknown error';
+  return error instanceof Error ? error.message : 'Unknown error';
 }
 
 export default router;

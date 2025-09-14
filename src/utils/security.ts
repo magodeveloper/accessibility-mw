@@ -339,8 +339,10 @@ export async function validatePublicHttpUrl(
         const { address } = await dns.lookup(hostname);
         ips.push(address);
       } catch (e: unknown) {
-        // Log the error for debugging purposes
-        console.error(`DNS lookup failed for ${hostname}:`, e);
+        // Log the error for debugging purposes, but not in test environment
+        if (process.env.NODE_ENV !== 'test') {
+          console.error(`DNS lookup failed for ${hostname}:`, e);
+        }
       }
     }
     if (ips.length === 0) {
