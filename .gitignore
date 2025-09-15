@@ -164,6 +164,11 @@ accessibility-reports/*.json
 accessibility-reports/*.html
 !accessibility-reports/README.md
 
+# Bundle monitoring reports
+reports/bundle/*.json
+reports/bundle/*.md
+!reports/bundle/.gitkeep
+
 # Screenshots de pruebas
 screenshots/
 test-screenshots/
