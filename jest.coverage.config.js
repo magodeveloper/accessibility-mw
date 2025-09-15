@@ -29,7 +29,7 @@ module.exports = {
     '!src/services/render.service.ts',
     '!src/services/axe.service.ts', // Also exclude axe service as it uses Playwright
   ],
-  coverageReporters: ['text', 'lcov', 'html', 'json'],
+  coverageReporters: ['text', 'lcov', 'html', 'json', 'json-summary'],
   coverageThreshold: {
     global: {
       branches: 40,

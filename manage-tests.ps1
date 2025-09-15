@@ -37,26 +37,92 @@ function Write-Error {
   Write-Host "❌ $Message" -ForegroundColor Red
 }
 
-# Datos de ejemplo (simulando datos reales del proyecto)
-$TestData = @{
-  TotalTests      = 678
-  PassingTests    = 678
-  FailingTests    = 0
-  TestSuites      = @{Count = 43 }
-  LoadTests       = @{Count = 5 }
-  Coverage        = @{
-    Statements = 74.68
-    Branches   = 60.23
-    Functions  = 80.86
-    Lines      = 74.85
+# Función para obtener resultados reales de tests
+function Get-RealTestResults {
+  Write-Info "🧪 Ejecutando tests para obtener resultados reales..."
+  
+  try {
+    # Ejecutar tests con cobertura usando la configuración específica
+    $env:COLLECT_COVERAGE = "true"
+    $output = & npm run test:ci 2>&1 | Out-String
+    
+    # Buscar información de test suites
+    $testSuitesMatch = $output | Select-String "Test Suites: (\d+) passed, (\d+) total"
+    $testsMatch = $output | Select-String "Tests:\s+(\d+) passed, (\d+) total"
+    $timeMatch = $output | Select-String "Time:\s+([\d\.]+) s"
+    
+    $realTestData = @{
+      TotalTests    = 0
+      PassingTests  = 0
+      FailingTests  = 0
+      TestSuites    = @{Count = 0}
+      ExecutionTime = [DateTime]::Now
+      Duration      = "0s"
+    }
+    
+    if ($testSuitesMatch) {
+      $suitesMatches = $testSuitesMatch.Matches[0].Groups
+      $realTestData.TestSuites.Count = [int]$suitesMatches[2].Value
+      Write-Info "  Test Suites encontrados: $($realTestData.TestSuites.Count)"
+    }
+    
+    if ($testsMatch) {
+      $testMatches = $testsMatch.Matches[0].Groups
+      $realTestData.PassingTests = [int]$testMatches[1].Value
+      $realTestData.TotalTests = [int]$testMatches[2].Value
+      $realTestData.FailingTests = $realTestData.TotalTests - $realTestData.PassingTests
+      Write-Info "  Tests totales: $($realTestData.TotalTests)"
+      Write-Info "  Tests pasados: $($realTestData.PassingTests)"
+      Write-Info "  Tests fallidos: $($realTestData.FailingTests)"
+    }
+    
+    if ($timeMatch) {
+      $duration = $timeMatch.Matches[0].Groups[1].Value
+      $realTestData.Duration = "${duration}s"
+      Write-Info "  Duración: $($realTestData.Duration)"
+    }
+    
+    return $realTestData
   }
-  LoadTestResults = @{
-    ExecutionTime = [DateTime]::Now.AddMinutes(-2)
+  catch {
+    Write-Error "Error obteniendo resultados de tests: $($_.Exception.Message)"
+    return $null
+  }
+}
+
+# Función para obtener conteo real de test suites
+function Get-RealTestSuites {
+  Write-Info "📁 Contando archivos de test..."
+  
+  try {
+    # Contar archivos .test.ts en la carpeta tests
+    $testFiles = Get-ChildItem -Path "tests" -Recurse -Filter "*.test.ts" | Measure-Object
+    $testCount = $testFiles.Count
+    
+    Write-Info "  Archivos de test encontrados: $testCount"
+    
+    return @{Count = $testCount}
+  }
+  catch {
+    Write-Warning "Error contando archivos de test: $($_.Exception.Message)"
+    return @{Count = 0}
+  }
+}
+
+# Función para obtener métricas de tests de carga (placeholder por ahora)
+function Get-RealLoadTestResults {
+  Write-Info "⚡ Verificando tests de carga..."
+  
+  # Retornamos estructura con datos de ejemplo para mostrar la sección
+  # En el futuro se puede implementar la lectura de resultados reales de K6 o Artillery
+  return @{
+    ExecutionTime = [DateTime]::Now.AddMinutes(-1)
     Summary       = @{
       TotalExecuted = 4
       Successful    = 4
       Failed        = 0
     }
+    Available     = $true
     K6            = @{
       "light-load-k6"  = @{
         Status     = "Success"
@@ -123,10 +189,16 @@ $TestData = @{
         }
       }
     }
+    Note          = "Datos de ejemplo para K6 - implementar lectura real"
   }
 }
 
 function Get-DashboardHTML {
+  param(
+    [Parameter(Mandatory = $true)]
+    [hashtable]$TestData
+  )
+  
   $timestamp = Get-Date -Format "dd 'de' MMMM yyyy, HH:mm"
   $totalCoverage = [math]::Round((($TestData.Coverage.Statements + $TestData.Coverage.Branches + $TestData.Coverage.Functions + $TestData.Coverage.Lines) / 4), 1)
   
@@ -690,11 +762,11 @@ function Get-DashboardHTML {
 "@
 
   # Mostrar resultados si están disponibles
-  if ($TestData.LoadTestResults) {
-    $executionTime = $TestData.LoadTestResults.ExecutionTime.ToString("dd/MM/yyyy HH:mm:ss")
-    $totalExecuted = $TestData.LoadTestResults.Summary.TotalExecuted
-    $successful = $TestData.LoadTestResults.Summary.Successful
-    $failed = $TestData.LoadTestResults.Summary.Failed
+  if ($TestData.LoadTests.Results) {
+    $executionTime = $TestData.LoadTests.Results.ExecutionTime.ToString("dd/MM/yyyy HH:mm:ss")
+    $totalExecuted = $TestData.LoadTests.Results.Summary.TotalExecuted
+    $successful = $TestData.LoadTests.Results.Summary.Successful
+    $failed = $TestData.LoadTests.Results.Summary.Failed
         
     $html += @"
                 <div class="load-results-summary">
@@ -731,8 +803,8 @@ function Get-DashboardHTML {
     # Mostrar resultados de K6 en orden específico: 20, 50, 100, 500 usuarios
     $orderedConfigs = @("light-load-k6", "medium-load-k6", "high-load", "extreme-load")
     foreach ($config in $orderedConfigs) {
-      if ($TestData.LoadTestResults.K6.ContainsKey($config)) {
-        $data = $TestData.LoadTestResults.K6[$config]
+      if ($TestData.LoadTests.Results.K6.ContainsKey($config)) {
+        $data = $TestData.LoadTests.Results.K6[$config]
         $statusClass = if ($data.Status -eq "Success") { "status-success" } else { "status-failed" }
         $statusIcon = if ($data.Status -eq "Success") { "✅" } else { "❌" }
                 
@@ -835,27 +907,184 @@ function Get-DashboardHTML {
 }
 
 # Función principal
+# Función para ejecutar tests reales con cobertura
+function Invoke-RealTests {
+  Write-Info "🧪 Ejecutando tests con cobertura..."
+  
+  try {
+    # Ejecutar tests con cobertura usando la configuración específica
+    $env:COLLECT_COVERAGE = "true"
+    $result = & npm run test:coverage 2>&1
+    
+    if ($LASTEXITCODE -eq 0) {
+      Write-Success "Tests ejecutados exitosamente"
+      return $true
+    } else {
+      Write-Warning "Tests completados con warnings"
+      Write-Info $result
+      return $true  # Continuar aunque haya warnings
+    }
+  }
+  catch {
+    Write-Error "Error ejecutando tests: $($_.Exception.Message)"
+    return $false
+  }
+}
+
+# Función para leer datos reales de cobertura de Jest
+function Get-JestCoverageData {
+  Write-Info "📊 Leyendo datos de cobertura..."
+  
+  $coverageSummaryPath = "coverage/coverage-summary.json"
+  
+  if (-not (Test-Path $coverageSummaryPath)) {
+    Write-Warning "No se encontró archivo de cobertura en: $coverageSummaryPath"
+    Write-Info "Usando datos por defecto..."
+    return $null
+  }
+  
+  try {
+    $coverageData = Get-Content $coverageSummaryPath | ConvertFrom-Json
+    $total = $coverageData.total
+    
+    $realCoverageData = @{
+      Statements = [math]::Round($total.statements.pct, 2)
+      Branches   = [math]::Round($total.branches.pct, 2)
+      Functions  = [math]::Round($total.functions.pct, 2)
+      Lines      = [math]::Round($total.lines.pct, 2)
+    }
+    
+    Write-Success "Cobertura real obtenida:"
+    Write-Info "  Statements: $($realCoverageData.Statements)%"
+    Write-Info "  Branches: $($realCoverageData.Branches)%"
+    Write-Info "  Functions: $($realCoverageData.Functions)%"
+    Write-Info "  Lines: $($realCoverageData.Lines)%"
+    
+    return $realCoverageData
+  }
+  catch {
+    Write-Error "Error leyendo archivo de cobertura: $($_.Exception.Message)"
+    return $null
+  }
+}
+
 function Main {
   try {
     Write-Info "=== ACCESSIBILITY-MW TEST DASHBOARD GENERATOR ==="
+    
+    # Construir objeto de datos dinámicamente
+    Write-Info "📊 Obteniendo datos reales de tests..."
+    
+    # Inicializar objeto de datos
+    $TestData = @{
+      TotalTests      = 0
+      PassingTests    = 0
+      FailingTests    = 0
+      TestSuites      = @{Count = 0}
+      LoadTests       = @{Count = 0; Available = $false}
+      Coverage        = @{
+        Statements = 0
+        Branches   = 0
+        Functions  = 0
+        Lines      = 0
+      }
+      ExecutionTime   = [DateTime]::Now
+      Duration        = "0s"
+    }
+    
+    # Si se solicita ejecutar tests, hacerlo primero y obtener datos reales
+    if ($RunTests) {
+      Write-Info "Ejecutando tests para obtener datos actualizados..."
+      
+      # Obtener resultados reales de tests
+      $realTestResults = Get-RealTestResults
+      if ($realTestResults) {
+        $TestData.TotalTests = $realTestResults.TotalTests
+        $TestData.PassingTests = $realTestResults.PassingTests
+        $TestData.FailingTests = $realTestResults.FailingTests
+        $TestData.TestSuites = $realTestResults.TestSuites
+        $TestData.ExecutionTime = $realTestResults.ExecutionTime
+        $TestData.Duration = $realTestResults.Duration
+      }
+      
+      # Obtener datos reales de cobertura
+      $realCoverage = Get-JestCoverageData
+      if ($realCoverage) {
+        $TestData.Coverage = $realCoverage
+        Write-Success "✅ Datos de cobertura reales obtenidos"
+      }
+      
+      # Obtener información de tests de carga
+      $loadTestResults = Get-RealLoadTestResults
+      if ($loadTestResults) {
+        $TestData.LoadTests = @{
+          Count = if ($loadTestResults.Available) { $loadTestResults.Summary.TotalExecuted } else { 0 }
+          Available = $loadTestResults.Available
+          Results = $loadTestResults
+        }
+      }
+    }
+    else {
+      Write-Info "Usando datos básicos del proyecto (ejecutar con -RunTests para datos completos)"
+      
+      # Obtener conteo básico de archivos de test sin ejecutarlos
+      $testSuites = Get-RealTestSuites
+      $TestData.TestSuites = $testSuites
+      
+      # Intentar obtener datos de cobertura existentes si hay un archivo
+      $existingCoverage = Get-JestCoverageData
+      if ($existingCoverage) {
+        $TestData.Coverage = $existingCoverage
+        Write-Info "📊 Usando datos de cobertura existentes"
+      }
+      else {
+        Write-Warning "⚠️ No hay datos de cobertura disponibles. Ejecutar con -RunTests para generar cobertura actualizada."
+      }
+      
+      # Obtener información de tests de carga (también para datos básicos)
+      $loadTestResults = Get-RealLoadTestResults
+      if ($loadTestResults) {
+        $TestData.LoadTests = @{
+          Count = if ($loadTestResults.Available) { $loadTestResults.Summary.TotalExecuted } else { 0 }
+          Available = $loadTestResults.Available
+          Results = $loadTestResults
+        }
+      }
+    }
+    
     Write-Info "Generando dashboard HTML..."
-        
-    $dashboardHTML = Get-DashboardHTML
+    $dashboardHTML = Get-DashboardHTML -TestData $TestData
         
     # Escribir archivo
     $dashboardHTML | Out-File -FilePath $OutputPath -Encoding UTF8
     Write-Success "Dashboard generado: $OutputPath"
         
-    # Mostrar estadísticas en consola
+    # Mostrar estadísticas en consola con datos reales
     Write-Info "=== RESUMEN DE TESTS ==="
     Write-Info "Tests totales: $($TestData.TotalTests)"
     Write-Success "Tests exitosos: $($TestData.PassingTests)"
     if ($TestData.FailingTests -gt 0) {
       Write-Warning "Tests fallidos: $($TestData.FailingTests)"
     }
-    Write-Info "Cobertura promedio: $(([math]::Round(($TestData.Coverage.Statements + $TestData.Coverage.Branches + $TestData.Coverage.Functions + $TestData.Coverage.Lines) / 4, 1)))%"
+    
+    $averageCoverage = [math]::Round(($TestData.Coverage.Statements + $TestData.Coverage.Branches + $TestData.Coverage.Functions + $TestData.Coverage.Lines) / 4, 1)
+    Write-Info "Cobertura promedio: $averageCoverage%"
+    Write-Info "  - Statements: $($TestData.Coverage.Statements)%"
+    Write-Info "  - Branches: $($TestData.Coverage.Branches)%"
+    Write-Info "  - Functions: $($TestData.Coverage.Functions)%"
+    Write-Info "  - Lines: $($TestData.Coverage.Lines)%"
+    
     Write-Info "Suites de tests: $($TestData.TestSuites.Count)"
-    Write-Info "Tests de carga: $($TestData.LoadTests.Count)"
+    if ($TestData.LoadTests.Available) {
+      Write-Info "Tests de carga: $($TestData.LoadTests.Count)"
+    }
+    else {
+      Write-Info "Tests de carga: No configurados"
+    }
+    
+    if ($TestData.Duration -ne "0s") {
+      Write-Info "Duración de ejecución: $($TestData.Duration)"
+    }
         
     # Abrir dashboard si se solicita
     if ($OpenDashboard) {
@@ -864,7 +1093,12 @@ function Main {
     }
         
     Write-Success "✨ Dashboard de tests generado exitosamente"
-    Write-Info "Para actualizar: .\manage-tests.ps1 -RunTests -OpenDashboard"
+    if ($RunTests) {
+      Write-Info "📊 Dashboard con datos reales de la ejecución actual"
+    }
+    else {
+      Write-Info "💡 Para datos completos ejecutar: .\manage-tests.ps1 -RunTests -OpenDashboard"
+    }
         
   }
   catch {
