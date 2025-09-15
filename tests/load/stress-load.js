@@ -136,8 +136,6 @@ export default function () {
         complexHtmlPayloads[
           Math.floor(Math.random() * complexHtmlPayloads.length)
         ];
-      const startTime = new Date();
-
       const response = http.post(
         `${BASE_URL}/api/analyze`,
         JSON.stringify({

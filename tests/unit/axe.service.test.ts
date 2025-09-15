@@ -1,3 +1,11 @@
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
 import path from 'path';
 import { Page } from 'playwright';
 import { runAxeOnPage } from '../../src/services/axe.service';
@@ -15,7 +23,7 @@ describe('Axe Service', () => {
 
   beforeEach(() => {
     mockPage = {
-      addScriptTag: jest.fn().mockResolvedValue({}),
+      addScriptTag: jest.fn(() => Promise.resolve({})),
       evaluate: jest.fn(),
     } as any;
   });
@@ -43,7 +51,9 @@ describe('Axe Service', () => {
     });
 
     it('debe hacer fallback a CDN si falla la carga local', async () => {
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const consoleSpy = jest
+        .spyOn(console, 'warn')
+        .mockImplementation(() => {});
       mockPage.addScriptTag.mockRejectedValueOnce(new Error('File not found'));
 
       const mockAxeResult = {
@@ -310,7 +320,7 @@ describe('Axe Service', () => {
 
       try {
         await runAxeOnPage(mockPage, customOptions);
-        fail('Should have thrown error');
+        throw new Error('Should have thrown error');
       } catch (error: any) {
         expect(error.message).toBe('Custom axe error');
         expect(error.code).toBe('AXE_RUN_ERROR');

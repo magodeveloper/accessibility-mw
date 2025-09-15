@@ -1,3 +1,11 @@
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
 import { NextFunction, Request, Response } from 'express';
 import { ENV } from '../../src/utils/environment';
 
@@ -6,7 +14,7 @@ let capturedConfig: any = null;
 
 jest.mock('express-rate-limit', () => ({
   __esModule: true,
-  default: jest.fn(config => {
+  default: jest.fn((config: any) => {
     capturedConfig = config;
     // Return a mock middleware function
     const middleware = jest.fn(
@@ -19,7 +27,7 @@ jest.mock('express-rate-limit', () => ({
         // If we reach here, we're testing the handler
         if (config.handler) {
           // Set mock headers
-          res.getHeader = jest
+          (res as any).getHeader = jest
             .fn()
             .mockReturnValueOnce('100') // RateLimit-Limit
             .mockReturnValueOnce('0') // RateLimit-Remaining
@@ -137,7 +145,7 @@ describe('Rate Limit Middleware', () => {
       ];
 
       testCases.forEach(({ path, expected }) => {
-        const testRequest = { path } as Request;
+        const testRequest = { path } as unknown as Request;
         const result = skipFunction(testRequest);
         expect(result).toBe(expected);
       });
@@ -150,7 +158,7 @@ describe('Rate Limit Middleware', () => {
       const { generalLimiter } = require('../../src/middlewares/rateLimit');
       const skipFunction = (generalLimiter as any)._config.skip;
 
-      const testRequest = { path: '/api/analyze' } as Request;
+      const testRequest = { path: '/api/analyze' } as unknown as Request;
       const result = skipFunction(testRequest);
 
       expect(result).toBe(true);
@@ -164,7 +172,7 @@ describe('Rate Limit Middleware', () => {
       const { generalLimiter } = require('../../src/middlewares/rateLimit');
       const skipFunction = (generalLimiter as any)._config.skip;
 
-      const testRequest = { path: '/api/analyze' } as Request;
+      const testRequest = { path: '/api/analyze' } as unknown as Request;
       const result = skipFunction(testRequest);
 
       expect(result).toBe(true);
@@ -181,7 +189,7 @@ describe('Rate Limit Middleware', () => {
       const testCases = ['/api/analyze', '/api/status', '/other/endpoint'];
 
       testCases.forEach(path => {
-        const testRequest = { path } as Request;
+        const testRequest = { path } as unknown as Request;
         const result = skipFunction(testRequest);
         expect(result).toBe(false);
       });
@@ -195,7 +203,7 @@ describe('Rate Limit Middleware', () => {
 
       let { generalLimiter } = require('../../src/middlewares/rateLimit');
       let skipFunction = (generalLimiter as any)._config.skip;
-      let testRequest = { path: '/health' } as Request;
+      let testRequest = { path: '/health' } as unknown as Request;
       expect(skipFunction(testRequest)).toBe(true);
 
       // Test environment flag - skip when NODE_ENV=test
@@ -205,7 +213,7 @@ describe('Rate Limit Middleware', () => {
 
       ({ generalLimiter } = require('../../src/middlewares/rateLimit'));
       skipFunction = (generalLimiter as any)._config.skip;
-      testRequest = { path: '/api/analyze' } as Request;
+      testRequest = { path: '/api/analyze' } as unknown as Request;
       expect(skipFunction(testRequest)).toBe(true);
 
       // Test rate limit flag - skip when ENFORCE_RATE_LIMIT=false

@@ -4,6 +4,8 @@
  * NOTE: This test is currently disabled due to accessibility-checker module conflicts
  */
 
+import { describe, expect, it } from '@jest/globals';
+
 // Temporarily skip this test suite to avoid puppeteer/accessibility-checker conflicts
 describe('EqualAccess Service - Enhanced Coverage', () => {
   it('placeholder test - module loading test', () => {

@@ -1,6 +1,14 @@
 // Additional tests to cover specific uncovered lines in security.ts
 
 import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
+import {
   validatePublicHttpUrl,
   type UrlValidationOptions,
 } from '../../src/utils/security';

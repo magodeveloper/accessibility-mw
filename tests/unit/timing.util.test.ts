@@ -1,4 +1,24 @@
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
 import { abortAfter } from '../../src/utils/timing';
+
+// Funciones auxiliares para evitar anidamiento excesivo
+const createDelayedPromise = (
+  value: string,
+  delay: number
+): Promise<string> => {
+  const resolver = (resolve: (value: string) => void) => resolve(value);
+
+  return new Promise<string>(resolve => {
+    setTimeout(() => resolver(resolve), delay);
+  });
+};
 
 describe('Timing Utility', () => {
   beforeEach(() => {
@@ -13,9 +33,7 @@ describe('Timing Utility', () => {
 
   describe('abortAfter', () => {
     it('debe resolver la promesa si se completa antes del timeout', async () => {
-      const promise = new Promise<string>(resolve => {
-        setTimeout(() => resolve('success'), 100);
-      });
+      const promise = createDelayedPromise('success', 100);
 
       const result = abortAfter(500, promise);
 
@@ -25,9 +43,7 @@ describe('Timing Utility', () => {
     });
 
     it('debe rechazar con TimeoutError si excede el tiempo límite', async () => {
-      const promise = new Promise<string>(resolve => {
-        setTimeout(() => resolve('success'), 1000);
-      });
+      const promise = createDelayedPromise('success', 1000);
 
       const result = abortAfter(500, promise);
 
@@ -91,9 +107,7 @@ describe('Timing Utility', () => {
     });
 
     it('debe manejar promesas que se resuelven exactamente en el timeout', async () => {
-      const promise = new Promise<string>(resolve => {
-        setTimeout(() => resolve('on-time'), 400);
-      });
+      const promise = createDelayedPromise('on-time', 400);
 
       const result = abortAfter(500, promise);
 

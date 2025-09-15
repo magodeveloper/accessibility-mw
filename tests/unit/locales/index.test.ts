@@ -2,6 +2,7 @@
  * Tests unitarios para locales/index.ts
  */
 
+import { describe, expect, it } from '@jest/globals';
 import locales, { t } from '../../../src/locales/index';
 
 describe('Locales Index', () => {

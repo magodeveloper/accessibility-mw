@@ -219,8 +219,6 @@ export default function () {
         extremeHtmlPayloads[
           Math.floor(Math.random() * extremeHtmlPayloads.length)
         ];
-      const requestStart = new Date();
-
       const response = http.post(
         `${BASE_URL}/api/analyze`,
         JSON.stringify({
@@ -533,13 +531,15 @@ function generateDetailedHtmlReport(data) {
                 }</p>
             </div>
             
-            <div class="metric ${
-              data.metrics.system_overload
-                ? data.metrics.system_overload.values.rate * 100 > 20
+            <div class="metric ${(() => {
+              if (data.metrics.system_overload) {
+                return data.metrics.system_overload.values.rate * 100 > 20
                   ? 'error'
-                  : 'warning'
-                : 'success'
-            }">
+                  : 'warning';
+              } else {
+                return 'success';
+              }
+            })()}">
                 <h3>🔥 Sobrecarga del Sistema</h3>
                 <p class="stat-value">${
                   data.metrics.system_overload

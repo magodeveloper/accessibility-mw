@@ -3,6 +3,7 @@
  * Focused on functions with low coverage: getPreferredLang, mapImpactToSeverity, getWcagCumulative
  */
 
+import { describe, expect, it } from '@jest/globals';
 import {
   getPreferredLang,
   getWcagCumulative,

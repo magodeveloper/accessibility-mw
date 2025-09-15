@@ -1,6 +1,13 @@
 // Test file specifically for covering uncovered utility functions in analyze.route.ts
 
-import { jest } from '@jest/globals';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
 
 // We need to test internal functions, so we'll create a way to access them
 // by requiring the module and testing the functions indirectly

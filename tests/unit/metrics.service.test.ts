@@ -1,8 +1,53 @@
+import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import * as express from 'express';
 import {
   metricsCollector,
   metricsMiddleware,
 } from '../../src/services/metrics.service';
+
+// Funciones auxiliares para evitar anidamiento excesivo en pruebas
+const createMockResponse = (
+  statusCode: number,
+  callback: () => void,
+  delay: number
+) => {
+  return {
+    statusCode,
+    on: jest.fn((event: string, finishCallback: () => void) => {
+      if (event === 'finish') {
+        setTimeout(() => {
+          finishCallback();
+          callback();
+        }, delay);
+      }
+    }),
+  } as unknown as express.Response;
+};
+
+const verifySuccessMetrics = (done: () => void) => {
+  const metrics = metricsCollector.getMetrics();
+  expect(metrics.requests.total).toBe(1);
+  expect(metrics.requests.success).toBe(1);
+  expect(metrics.performance.avgResponseTime).toBeGreaterThan(50);
+  done();
+};
+
+const verifyErrorMetrics = (done: () => void) => {
+  const metrics = metricsCollector.getMetrics();
+  expect(metrics.requests.total).toBe(1);
+  expect(metrics.requests.success).toBe(0);
+  expect(metrics.requests.errors).toBe(1);
+  done();
+};
+
+const verifyTimeoutMetrics = (done: () => void) => {
+  const metrics = metricsCollector.getMetrics();
+  expect(metrics.requests.total).toBe(1);
+  expect(metrics.requests.success).toBe(0);
+  expect(metrics.requests.errors).toBe(1);
+  expect(metrics.requests.timeouts).toBe(1);
+  done();
+};
 
 describe('Metrics Service', () => {
   beforeEach(() => {
@@ -341,25 +386,11 @@ describe('Metrics Service', () => {
 
       // Mock Express request/response
       const req = {} as express.Request;
-      const res = {
-        statusCode: 200,
-        on: jest.fn((event: string, callback: () => void) => {
-          if (event === 'finish') {
-            // Simular finalización después de 100ms
-            setTimeout(() => {
-              callback();
-
-              // Verificar métricas
-              const metrics = metricsCollector.getMetrics();
-              expect(metrics.requests.total).toBe(1);
-              expect(metrics.requests.success).toBe(1);
-              expect(metrics.performance.avgResponseTime).toBeGreaterThan(50);
-
-              done();
-            }, 100);
-          }
-        }),
-      } as unknown as express.Response;
+      const res = createMockResponse(
+        200,
+        () => verifySuccessMetrics(done),
+        100
+      );
 
       const next = jest.fn();
 
@@ -371,23 +402,7 @@ describe('Metrics Service', () => {
       const middleware = metricsMiddleware();
 
       const req = {} as express.Request;
-      const res = {
-        statusCode: 500,
-        on: jest.fn((event: string, callback: () => void) => {
-          if (event === 'finish') {
-            setTimeout(() => {
-              callback();
-
-              const metrics = metricsCollector.getMetrics();
-              expect(metrics.requests.total).toBe(1);
-              expect(metrics.requests.success).toBe(0);
-              expect(metrics.requests.errors).toBe(1);
-
-              done();
-            }, 50);
-          }
-        }),
-      } as unknown as express.Response;
+      const res = createMockResponse(500, () => verifyErrorMetrics(done), 50);
 
       const next = jest.fn();
 
@@ -398,24 +413,7 @@ describe('Metrics Service', () => {
       const middleware = metricsMiddleware();
 
       const req = {} as express.Request;
-      const res = {
-        statusCode: 504,
-        on: jest.fn((event: string, callback: () => void) => {
-          if (event === 'finish') {
-            setTimeout(() => {
-              callback();
-
-              const metrics = metricsCollector.getMetrics();
-              expect(metrics.requests.total).toBe(1);
-              expect(metrics.requests.success).toBe(0);
-              expect(metrics.requests.errors).toBe(1);
-              expect(metrics.requests.timeouts).toBe(1);
-
-              done();
-            }, 50);
-          }
-        }),
-      } as unknown as express.Response;
+      const res = createMockResponse(504, () => verifyTimeoutMetrics(done), 50);
 
       const next = jest.fn();
 

@@ -1,6 +1,14 @@
 // Simplified integration tests for analyze.route.ts focused on coverage improvement
 
-import { jest } from '@jest/globals';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
 
 describe('🎯 Analyze Route - Target 80% Coverage Boost', () => {
   let originalEnv: Record<string, string | undefined>;

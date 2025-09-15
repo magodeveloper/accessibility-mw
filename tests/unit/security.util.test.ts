@@ -1,3 +1,4 @@
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import {
   validatePublicHttpUrl,
   type UrlValidationOptions,
@@ -139,7 +140,8 @@ describe('Security Utils - URL Validation', () => {
 
       try {
         await validatePublicHttpUrl('invalid-url', options);
-        fail('Should have thrown an error');
+        // Si llegamos aquí, la función no lanzó un error cuando debería haberlo hecho
+        expect(true).toBe(false); // Forzar fallo del test
       } catch (error: any) {
         expect(error.message).toBe('Formato de URL inválido');
         expect(error.status).toBe(400);

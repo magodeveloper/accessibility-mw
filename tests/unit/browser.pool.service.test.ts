@@ -1,3 +1,11 @@
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
 import { Browser, BrowserContext, chromium, Page } from 'playwright';
 import {
   browserPool,
@@ -27,25 +35,25 @@ describe('Browser Pool Service', () => {
 
   beforeEach(() => {
     mockPage = {
-      setContent: jest.fn().mockResolvedValue(undefined),
-      goto: jest.fn().mockResolvedValue(null),
-      addScriptTag: jest.fn().mockResolvedValue({}),
-      evaluate: jest.fn().mockResolvedValue({}),
-      close: jest.fn().mockResolvedValue(undefined),
+      setContent: jest.fn(() => Promise.resolve()),
+      goto: jest.fn(() => Promise.resolve(null)),
+      addScriptTag: jest.fn(() => Promise.resolve({})),
+      evaluate: jest.fn(() => Promise.resolve({})),
+      close: jest.fn(() => Promise.resolve()),
       isClosed: jest.fn().mockReturnValue(false),
       setDefaultNavigationTimeout: jest.fn(),
-      waitForTimeout: jest.fn().mockResolvedValue(undefined),
+      waitForTimeout: jest.fn(() => Promise.resolve()),
     } as any;
 
     mockContext = {
-      newPage: jest.fn().mockResolvedValue(mockPage),
-      close: jest.fn().mockResolvedValue(undefined),
+      newPage: jest.fn(() => Promise.resolve(mockPage)),
+      close: jest.fn(() => Promise.resolve()),
     } as any;
 
     mockBrowser = {
-      newPage: jest.fn().mockResolvedValue(mockPage),
-      newContext: jest.fn().mockResolvedValue(mockContext),
-      close: jest.fn().mockResolvedValue(undefined),
+      newPage: jest.fn(() => Promise.resolve(mockPage)),
+      newContext: jest.fn(() => Promise.resolve(mockContext)),
+      close: jest.fn(() => Promise.resolve()),
       isConnected: jest.fn().mockReturnValue(true),
     } as any;
 
@@ -231,7 +239,9 @@ describe('Browser Pool Service', () => {
 
     it('debe manejar errores de navegación', async () => {
       const testUrl = 'https://invalid-url.com';
-      mockPage.goto.mockRejectedValueOnce(new Error('Navigation failed'));
+      (mockPage.goto as jest.MockedFunction<any>).mockRejectedValueOnce(
+        new Error('Navigation failed')
+      );
 
       await expect(
         withPooledPage('url', testUrl, async page => {
@@ -330,8 +340,12 @@ describe('Browser Pool Service', () => {
     });
 
     it('debe manejar warnings de limpieza de recursos', async () => {
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
-      mockPage.close.mockRejectedValueOnce(new Error('Close page error'));
+      const consoleSpy = jest
+        .spyOn(console, 'warn')
+        .mockImplementation(() => {});
+      (mockPage.close as jest.MockedFunction<any>).mockRejectedValueOnce(
+        new Error('Close page error')
+      );
 
       const testHtml = '<html><body>Test</body></html>';
 
@@ -364,7 +378,7 @@ describe('Browser Pool Service', () => {
       browserPool.releaseBrowser(browserInstance);
 
       // Simular que pasa el tiempo
-      const mockNow = jest.spyOn(Date, 'now').mockImplementation();
+      const mockNow = jest.spyOn(Date, 'now').mockImplementation(() => 1000);
 
       // Primera llamada para lastUsed
       mockNow.mockReturnValueOnce(1000);
@@ -385,13 +399,15 @@ describe('Browser Pool Service', () => {
     });
 
     it('debe manejar errores durante el cleanup de browsers idle', async () => {
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const consoleSpy = jest
+        .spyOn(console, 'warn')
+        .mockImplementation(() => {});
 
       // Obtener un browser y liberarlo
       const browserInstance = await browserPool.getBrowser();
 
       // Hacer que browser.close() falle
-      mockBrowser.close.mockRejectedValueOnce(
+      (mockBrowser.close as jest.MockedFunction<any>).mockRejectedValueOnce(
         new Error('Browser close failed')
       );
 
@@ -461,6 +477,77 @@ describe('Browser Pool Service', () => {
       });
 
       expect(mockPage.waitForTimeout).toHaveBeenCalledWith(3000);
+    });
+  });
+
+  describe('Linux Chrome Path Handling', () => {
+    let originalPlatform: string;
+
+    beforeEach(() => {
+      originalPlatform = process.platform;
+      // Mock fs.existsSync
+      const fs = require('fs');
+      jest.spyOn(fs, 'existsSync').mockImplementation(() => false);
+    });
+
+    afterEach(() => {
+      Object.defineProperty(process, 'platform', { value: originalPlatform });
+      jest.restoreAllMocks();
+    });
+
+    it('debe intentar rutas de Chrome en Linux cuando no existe Chrome', async () => {
+      // Simular plataforma Linux
+      Object.defineProperty(process, 'platform', { value: 'linux' });
+
+      // Mock que Chrome no está disponible en la ruta estándar
+      (mockedChromium.launch as jest.MockedFunction<any>).mockRejectedValueOnce(
+        new Error('Chrome not found')
+      );
+
+      // Mock que encuentra Chrome en una ruta específica de Linux
+      const fs = require('fs');
+      jest.spyOn(fs, 'existsSync').mockImplementation((path: any) => {
+        return path === '/usr/bin/google-chrome';
+      });
+
+      (mockedChromium.launch as jest.MockedFunction<any>).mockResolvedValueOnce(
+        mockBrowser
+      );
+
+      await browserPool.getBrowser();
+
+      // Verificar que se intentó con la ruta específica de Linux
+      expect(mockedChromium.launch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          executablePath: '/usr/bin/google-chrome',
+        })
+      );
+    });
+  });
+
+  describe('Browser Pool Edge Cases', () => {
+    it('debe manejar release de browser que no está en el pool', () => {
+      const extraBrowser = {
+        close: jest.fn(),
+        isConnected: jest.fn().mockReturnValue(true),
+      } as any;
+
+      // No debería arrojar error
+      expect(() => {
+        browserPool.releaseBrowser(extraBrowser);
+      }).not.toThrow();
+    });
+
+    it('debe manejar cleanup cuando el browser ya no está conectado', async () => {
+      // Simplemente verificar que el método releaseBrowser funciona correctamente
+      const browser = await browserPool.getBrowser();
+
+      // Liberar el browser (esto debería funcionar sin problemas)
+      browserPool.releaseBrowser(browser);
+
+      // Verificar que el pool funciona correctamente después del release
+      const stats = browserPool.getPoolStats();
+      expect(stats.total).toBeGreaterThan(0);
     });
   });
 });

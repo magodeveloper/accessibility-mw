@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it } from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
 
@@ -8,7 +9,7 @@ describe('Analyze Route Basic Tests', () => {
   beforeEach(() => {
     app = express();
     app.use(express.json());
-    
+
     // Ruta simple de prueba
     app.post('/api/analyze', (req, res) => {
       if (!req.body || Object.keys(req.body).length === 0) {
@@ -20,9 +21,7 @@ describe('Analyze Route Basic Tests', () => {
 
   describe('POST /analyze', () => {
     it('debe manejar input inválido correctamente', async () => {
-      const response = await request(app)
-        .post('/api/analyze')
-        .send({});
+      const response = await request(app).post('/api/analyze').send({});
 
       expect(response.status).toBe(400);
       expect(response.body).toHaveProperty('error');

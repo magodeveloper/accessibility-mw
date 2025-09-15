@@ -1,3 +1,11 @@
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
 
@@ -36,7 +44,7 @@ jest.mock('node:os', () => ({
 describe('Health Route Tests', () => {
   let app: express.Express;
   let mockGetMetrics: jest.Mock;
-  let mockMemoryUsage: jest.SpyInstance;
+  let mockMemoryUsage: any;
 
   beforeEach(async () => {
     // Clear mocks and reset cache

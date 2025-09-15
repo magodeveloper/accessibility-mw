@@ -1,4 +1,12 @@
 import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
+import {
   LRUCache,
   analysisCache,
   getCacheKey,
@@ -58,8 +66,9 @@ describe('Cache Service', () => {
 
     it('debe configurar limpieza automática periódica', () => {
       const setIntervalSpy = jest.spyOn(global, 'setInterval');
-      new LRUCache(5, 2);
+      const testCache = new LRUCache(5, 2);
 
+      expect(testCache).toBeInstanceOf(LRUCache);
       expect(setIntervalSpy).toHaveBeenCalledWith(
         expect.any(Function),
         5 * 60 * 1000 // 5 minutos

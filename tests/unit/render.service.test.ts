@@ -1,3 +1,11 @@
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
 import { Browser, chromium, Page } from 'playwright';
 import { withPooledPage } from '../../src/services/browser.pool.service';
 import { withOptimizedPage, withPage } from '../../src/services/render.service';
@@ -17,23 +25,23 @@ describe('Render Service', () => {
 
   beforeEach(() => {
     mockPage = {
-      setContent: jest.fn().mockResolvedValue(undefined),
-      goto: jest.fn().mockResolvedValue(null),
-      addScriptTag: jest.fn().mockResolvedValue({}),
-      evaluate: jest.fn().mockResolvedValue({}),
-      close: jest.fn().mockResolvedValue(undefined),
-      isClosed: jest.fn().mockReturnValue(false),
+      setContent: (jest.fn() as any).mockResolvedValue(undefined),
+      goto: (jest.fn() as any).mockResolvedValue(null),
+      addScriptTag: (jest.fn() as any).mockResolvedValue({}),
+      evaluate: (jest.fn() as any).mockResolvedValue({}),
+      close: (jest.fn() as any).mockResolvedValue(undefined),
+      isClosed: (jest.fn() as any).mockReturnValue(false),
     } as any;
 
     mockBrowser = {
-      newPage: jest.fn().mockResolvedValue(mockPage),
-      close: jest.fn().mockResolvedValue(undefined),
-      isConnected: jest.fn().mockReturnValue(true),
+      newPage: (jest.fn() as any).mockResolvedValue(mockPage),
+      close: (jest.fn() as any).mockResolvedValue(undefined),
+      isConnected: (jest.fn() as any).mockReturnValue(true),
     } as any;
 
-    mockedChromium.launch.mockResolvedValue(mockBrowser);
+    (mockedChromium.launch as any).mockResolvedValue(mockBrowser);
     mockedWithPooledPage.mockImplementation(
-      async (inputType, value, fn, opts) => {
+      async (inputType: any, value: any, fn: any, opts?: any) => {
         return await fn(mockPage);
       }
     );
@@ -46,7 +54,7 @@ describe('Render Service', () => {
   describe('withPage (legacy)', () => {
     it('debe delegar a withPooledPage para HTML', async () => {
       const testHtml = '<html><body><h1>Test</h1></body></html>';
-      const testFn = jest.fn().mockResolvedValue('test-result');
+      const testFn = (jest.fn() as any).mockResolvedValue('test-result');
 
       const result = await withPage('html', testHtml, testFn);
 
@@ -61,7 +69,7 @@ describe('Render Service', () => {
 
     it('debe delegar a withPooledPage para URL', async () => {
       const testUrl = 'https://example.com';
-      const testFn = jest.fn().mockResolvedValue('url-result');
+      const testFn = (jest.fn() as any).mockResolvedValue('url-result');
 
       const result = await withPage('url', testUrl, testFn);
 
@@ -76,7 +84,7 @@ describe('Render Service', () => {
 
     it('debe pasar opciones correctamente', async () => {
       const testHtml = '<html><body><h1>Test</h1></body></html>';
-      const testFn = jest.fn().mockResolvedValue('test-result');
+      const testFn = (jest.fn() as any).mockResolvedValue('test-result');
       const options = { overallTimeoutMs: 5000, navTimeoutMs: 3000 };
 
       const result = await withPage('html', testHtml, testFn, options);
@@ -91,9 +99,11 @@ describe('Render Service', () => {
     });
 
     it('debe suprimir warning de deprecación en tests', async () => {
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const consoleSpy = jest
+        .spyOn(console, 'warn')
+        .mockImplementation(() => {});
       const testHtml = '<html><body><h1>Test</h1></body></html>';
-      const testFn = jest.fn().mockResolvedValue('test-result');
+      const testFn = (jest.fn() as any).mockResolvedValue('test-result');
 
       await withPage('html', testHtml, testFn);
 
@@ -110,7 +120,7 @@ describe('Render Service', () => {
       mockedWithPooledPage.mockRejectedValueOnce(testError);
 
       const testHtml = '<html><body><h1>Test</h1></body></html>';
-      const testFn = jest.fn();
+      const testFn = jest.fn() as any;
 
       await expect(withPage('html', testHtml, testFn)).rejects.toThrow(
         'Pooled page error'

@@ -3,7 +3,15 @@
  * Tests unitarios para el servidor Express principal
  */
 
-import { jest } from '@jest/globals';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
 
@@ -300,7 +308,7 @@ describe('Server Utility Functions', () => {
 
   beforeAll(() => {
     // Test the utility function by importing the module after mocks
-    const serverModule = require('../../src/server');
+    require('../../src/server');
     // Since the function is not exported, we'll test it indirectly through requests
   });
 

@@ -1,3 +1,11 @@
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
 import { HealthMonitor } from '../../src/services/health-monitor.service';
 
 // Mock global fetch
@@ -507,13 +515,11 @@ describe('Health Monitor Service', () => {
     });
 
     it('debe manejar timeout de red', async () => {
-      // Mock que simula timeout
-      mockFetch.mockImplementation(
-        () =>
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('timeout')), 100)
-          )
-      );
+      // Mock que simula timeout usando Promise.reject después de un delay
+      mockFetch.mockImplementation(() => {
+        // Simular async timeout con Promise reject directo
+        return Promise.reject(new Error('timeout'));
+      });
 
       const config = {
         name: 'network-timeout-service',

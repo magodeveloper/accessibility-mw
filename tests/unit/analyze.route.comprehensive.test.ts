@@ -1,6 +1,13 @@
 // Comprehensive tests for analyze.route.ts to improve coverage from 30.87%
 
-import { jest } from '@jest/globals';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
 
 // Simple test to execute the module and exercise uncovered code paths
 describe('🔍 Analyze Route Coverage Improvement', () => {

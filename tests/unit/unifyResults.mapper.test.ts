@@ -3,6 +3,7 @@
  * Addressing 0% coverage for critical data transformation logic
  */
 
+import { describe, expect, it } from '@jest/globals';
 import {
   buildUnifiedResponse,
   EqualAccessReport,

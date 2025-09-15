@@ -3,6 +3,15 @@
  * Tests para el servicio de logging con Pino
  */
 
+import {
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  jest,
+  test,
+} from '@jest/globals';
+
 // Mock de pino ANTES de cualquier import
 jest.mock('pino', () => {
   const mockLogger = {
@@ -40,8 +49,7 @@ describe('Logging Service', () => {
 
   beforeAll(() => {
     // Importar después de los mocks
-    const pino = require('pino');
-    mockLogger = pino();
+    require('pino');
   });
 
   beforeEach(() => {

@@ -3,6 +3,14 @@
  */
 
 import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
+import {
   getHealthDashboard,
   getServicesStatus,
   setupHealthChecks,
@@ -10,10 +18,10 @@ import {
 } from '../../../src/config/health.config';
 
 describe('Health Config', () => {
-  let consoleSpy: jest.SpyInstance;
+  let consoleSpy: any;
 
   beforeEach(() => {
-    consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+    consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
   });
 
   afterEach(() => {

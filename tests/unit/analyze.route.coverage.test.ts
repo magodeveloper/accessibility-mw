@@ -1,4 +1,4 @@
-import express from 'express';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 
 // Test specific internal functions from analyze.route.ts
 describe('Analyze Route Internal Functions Coverage', () => {
@@ -90,13 +90,6 @@ describe('Analyze Route Internal Functions Coverage', () => {
     });
 
     it('debe testear resolveAcceptLanguage function logic', () => {
-      // Mock request object
-      const mockReq = {
-        headers: {
-          'accept-language': 'en-US,en;q=0.9,es;q=0.8',
-        },
-      } as express.Request;
-
       const analyzeModule = require('../../src/routes/analyze.route');
       expect(analyzeModule).toBeDefined();
     });

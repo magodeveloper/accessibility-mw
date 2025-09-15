@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
 
@@ -17,16 +18,16 @@ jest.mock('../../src/services/logging.service');
 jest.mock('../../src/utils/environment');
 
 const mockValidateAndSanitizeInput = jest.fn();
-const mockPerformAnalysis = jest.fn();
+const mockPerformAnalysis = jest.fn() as jest.MockedFunction<any>;
 
 // Set up the mocks before importing
 const analyzeMocks = {
   validateAndSanitizeInput: mockValidateAndSanitizeInput,
   performAnalysis: mockPerformAnalysis,
-  validateUrlIfNeeded: jest.fn().mockReturnValue({ isValid: true }),
-  runAnalysisTools: jest.fn().mockResolvedValue({ ok: true }),
-  extractStats: jest.fn().mockReturnValue({}),
-  buildUnified: jest.fn().mockReturnValue({ results: [] }),
+  validateUrlIfNeeded: jest.fn(() => ({ isValid: true })),
+  runAnalysisTools: jest.fn(() => Promise.resolve({ ok: true })),
+  extractStats: jest.fn(() => ({})),
+  buildUnified: jest.fn(() => ({ results: [] })),
 };
 
 const loggingMocks = {
@@ -88,7 +89,7 @@ describe('Analyze Route Basic Tests', () => {
         results: [],
         requestId: 'test-request-id',
       },
-    });
+    } as any);
   });
 
   it('should return 400 for validation errors', async () => {

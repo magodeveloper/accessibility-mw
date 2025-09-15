@@ -3,6 +3,14 @@
  * Focused on edge cases, error scenarios, and basic functionality
  */
 
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
 import { Browser, chromium } from 'playwright';
 import { browserPool } from '../../src/services/browser.pool.service';
 
@@ -24,14 +32,14 @@ describe('Browser Pool Service - Coverage Improvements', () => {
     mockBrowser = {
       newPage: jest.fn(),
       newContext: jest.fn(),
-      close: jest.fn().mockResolvedValue(undefined),
+      close: jest.fn(() => Promise.resolve()),
       isConnected: jest.fn().mockReturnValue(true),
       contexts: jest.fn().mockReturnValue([]),
     } as any;
 
     // Setup mock chromium
     mockChromium = chromium as jest.Mocked<typeof chromium>;
-    mockChromium.launch = jest.fn().mockResolvedValue(mockBrowser);
+    mockChromium.launch = jest.fn(() => Promise.resolve(mockBrowser)) as any;
 
     // Reset browser pool
     (browserPool as any)._browserPool = null;
@@ -73,7 +81,7 @@ describe('Browser Pool Service - Coverage Improvements', () => {
   describe('Browser Pool Resource Management', () => {
     it('should handle browser acquisition failure gracefully', async () => {
       // Mock Playwright failure
-      mockChromium.launch
+      (mockChromium.launch as jest.MockedFunction<any>)
         .mockRejectedValueOnce(new Error('Failed to launch browser'))
         .mockRejectedValueOnce(new Error('Chrome fallback also failed'));
 
@@ -89,7 +97,7 @@ describe('Browser Pool Service - Coverage Improvements', () => {
         value: 'win32',
       });
 
-      mockChromium.launch
+      (mockChromium.launch as jest.MockedFunction<any>)
         .mockRejectedValueOnce(new Error('Playwright browsers not found'))
         .mockResolvedValueOnce(mockBrowser);
 
@@ -124,7 +132,9 @@ describe('Browser Pool Service - Coverage Improvements', () => {
       await browserPool.getBrowser();
 
       // Mock browser close to throw an error
-      mockBrowser.close.mockRejectedValueOnce(new Error('Close failed'));
+      (mockBrowser.close as jest.MockedFunction<any>).mockRejectedValueOnce(
+        new Error('Close failed')
+      );
 
       // Should not throw despite browser close error
       await expect(browserPool.shutdown()).resolves.not.toThrow();

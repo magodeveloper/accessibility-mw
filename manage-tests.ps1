@@ -126,7 +126,7 @@ $TestData = @{
   }
 }
 
-function Generate-DashboardHTML {
+function Get-DashboardHTML {
   $timestamp = Get-Date -Format "dd 'de' MMMM yyyy, HH:mm"
   $totalCoverage = [math]::Round((($TestData.Coverage.Statements + $TestData.Coverage.Branches + $TestData.Coverage.Functions + $TestData.Coverage.Lines) / 4), 1)
   
@@ -840,7 +840,7 @@ function Main {
     Write-Info "=== ACCESSIBILITY-MW TEST DASHBOARD GENERATOR ==="
     Write-Info "Generando dashboard HTML..."
         
-    $dashboardHTML = Generate-DashboardHTML
+    $dashboardHTML = Get-DashboardHTML
         
     # Escribir archivo
     $dashboardHTML | Out-File -FilePath $OutputPath -Encoding UTF8

@@ -166,18 +166,7 @@ export async function validatePublicHttpUrl(
           message: 'La conexión excedió el tiempo límite',
           details: base,
         };
-      case 'ESOCKETTIMEDOUT':
-        return {
-          status: 504,
-          message: 'La conexión excedió el tiempo límite',
-          details: base,
-        };
       case 'ENOTFOUND':
-        return {
-          status: 502,
-          message: 'No se pudo resolver el host de la URL',
-          details: base,
-        };
       case 'EAI_AGAIN':
         return {
           status: 502,
@@ -209,29 +198,8 @@ export async function validatePublicHttpUrl(
           details: base,
         };
       case 'TLS_ERROR':
-        return {
-          status: 502,
-          message: 'Error de certificado/TLS al conectar con la URL',
-          details: base,
-        };
-      case 'ERR_TLS_CERT_ALTNAME_INVALID':
-        return {
-          status: 502,
-          message: 'Error de certificado/TLS al conectar con la URL',
-          details: base,
-        };
       case 'CERT_HAS_EXPIRED':
-        return {
-          status: 502,
-          message: 'Error de certificado/TLS al conectar con la URL',
-          details: base,
-        };
       case 'UNABLE_TO_VERIFY_LEAF_SIGNATURE':
-        return {
-          status: 502,
-          message: 'Error de certificado/TLS al conectar con la URL',
-          details: base,
-        };
       case 'DEPTH_ZERO_SELF_SIGNED_CERT':
         return {
           status: 502,

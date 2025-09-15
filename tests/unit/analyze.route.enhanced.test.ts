@@ -4,6 +4,8 @@
  * NOTE: Simplified version using mocks to avoid integration issues
  */
 
+import { beforeEach, describe, expect, it } from '@jest/globals';
+
 import express from 'express';
 import request from 'supertest';
 

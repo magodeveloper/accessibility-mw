@@ -2,6 +2,7 @@
  * Tests unitarios para locales/rules.ts
  */
 
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import rules, { getRuleDescription } from '../../../src/locales/rules';
 
 // Mock the JSON files

@@ -54,8 +54,9 @@ class BrowserPool {
       if (process.platform === 'win32') {
         // Usar variables de entorno para encontrar Chrome dinámicamente
         const programFiles = process.env['PROGRAMFILES'] || 'C:\\Program Files';
-        const programFilesX86 = process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)';
-        
+        const programFilesX86 =
+          process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)';
+
         const chromePaths = [
           `${programFiles}\\Google\\Chrome\\Application\\chrome.exe`,
           `${programFilesX86}\\Google\\Chrome\\Application\\chrome.exe`,
@@ -82,7 +83,7 @@ class BrowserPool {
           '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
           '/Applications/Chromium.app/Contents/MacOS/Chromium',
         ];
-        
+
         for (const chromePath of macChromePaths) {
           try {
             const fs = require('fs');
@@ -100,9 +101,11 @@ class BrowserPool {
         // Linux paths - intentar comando which primero
         try {
           const { execSync } = require('child_process');
-          const chromePath = execSync('which google-chrome || which chromium-browser || which chromium', 
-            { encoding: 'utf8' }).trim();
-          
+          const chromePath = execSync(
+            'which google-chrome || which chromium-browser || which chromium',
+            { encoding: 'utf8' }
+          ).trim();
+
           if (chromePath) {
             return await chromium.launch({
               ...launchOptions,
@@ -117,7 +120,7 @@ class BrowserPool {
             '/usr/bin/chromium',
             '/snap/bin/chromium',
           ];
-          
+
           for (const chromePath of linuxChromePaths) {
             try {
               const fs = require('fs');

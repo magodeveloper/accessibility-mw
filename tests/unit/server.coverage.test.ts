@@ -3,6 +3,7 @@
  * Focused on helper functions, middleware, and edge cases not covered in main server.test.ts
  */
 
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import express, { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
 import { advancedLogger } from '../../src/services/logging.service';
@@ -24,6 +25,12 @@ const getRequestIdAsString = (id: unknown): string => {
   return 'unknown';
 };
 
+// Helper functions to avoid anidamiento excesivo
+const createObjectWithToString = (value: string) => {
+  const toStringMethod = () => value;
+  return { toString: toStringMethod };
+};
+
 describe('Server Coverage Improvements', () => {
   let app: express.Application;
   let mockLogger: jest.Mocked<typeof advancedLogger>;
@@ -39,7 +46,7 @@ describe('Server Coverage Improvements', () => {
       error: jest.fn(),
       warn: jest.fn(),
       debug: jest.fn(),
-    });
+    }) as any;
     mockLogger.setRequestContext = jest.fn();
     mockLogger.cleanupContext = jest.fn();
 
@@ -103,7 +110,7 @@ describe('Server Coverage Improvements', () => {
 
     it('should handle object with toString method', async () => {
       app.use((req: Request & { id?: unknown }, res: Response, next) => {
-        req.id = { toString: () => 'object-id' };
+        req.id = createObjectWithToString('object-id');
         const requestId = getRequestIdAsString(req.id);
         mockLogger.setRequestContext(requestId, expect.any(Object));
         next();
@@ -280,7 +287,9 @@ describe('Server Coverage Improvements', () => {
     it('should add metrics middleware when feature flag is enabled', () => {
       (FeatureFlags.enableMetrics as jest.Mock).mockReturnValue(true);
 
-      const mockMiddleware = jest.fn((req, res, next) => next());
+      const mockMiddleware = jest.fn(
+        (req: Request, res: Response, next: NextFunction) => next()
+      );
       const testApp = express();
 
       // Simulate conditional metrics middleware
