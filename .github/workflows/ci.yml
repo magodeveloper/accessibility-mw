@@ -1,4 +1,4 @@
-name: CI
+name: 🚀 CI/CD Pipeline - Build, Test & Deploy
 
 on:
   push:
@@ -15,10 +15,11 @@ env:
   NODE_ENV: 'test'
   CI: 'true'
   # Configurar límites de memoria para evitar memory leaks
-  NODE_OPTIONS: '--max-old-space-size=4096 --max-listeners=30'
+  NODE_OPTIONS: '--max-old-space-size=4096'
 
 jobs:
   setup-and-build:
+    name: '📦 Build & Setup'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -62,6 +63,7 @@ jobs:
           retention-days: 1
 
   lint-and-typecheck:
+    name: '🔍 Code Quality & Linting'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: setup-and-build
@@ -86,6 +88,7 @@ jobs:
         run: npm run type-check
 
   test-unit:
+    name: '🧪 Unit Tests'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: setup-and-build
@@ -151,6 +154,7 @@ jobs:
           fail_ci_if_error: false
 
   test-integration:
+    name: '🔄 Integration Tests'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: setup-and-build
@@ -216,6 +220,7 @@ jobs:
           PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
 
   docker-build-test:
+    name: '🐳 Docker Build & Test'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [setup-and-build, test-unit]

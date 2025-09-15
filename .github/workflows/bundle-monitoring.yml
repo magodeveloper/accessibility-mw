@@ -1,4 +1,4 @@
-name: Bundle Monitoring
+name: 📦 Bundle Size Monitoring & Analysis
 
 on:
   pull_request:

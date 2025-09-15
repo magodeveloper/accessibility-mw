@@ -1,5 +1,5 @@
 # Etapa 1: Compilación completa
-FROM node:20.19.1-alpine3.20 AS builder
+FROM node:20.19.2-alpine3.20 AS builder
 WORKDIR /app
 
 # Instalar dependencias del sistema y actualizaciones de seguridad

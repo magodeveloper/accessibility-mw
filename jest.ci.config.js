@@ -21,7 +21,6 @@ module.exports = {
       'ts-jest',
       {
         useESM: false,
-        isolatedModules: true, // Mejora performance
         tsconfig: 'tsconfig.json',
       },
     ],
@@ -61,7 +60,7 @@ module.exports = {
   cacheDirectory: '<rootDir>/node_modules/.cache/jest',
 
   // Configuración de módulos
-  moduleNameMapping: {
+  moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@tests/(.*)$': '<rootDir>/tests/$1',
   },
