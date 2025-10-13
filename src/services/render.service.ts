@@ -1,5 +1,6 @@
 import type { Page } from 'playwright';
 import { withPooledPage } from './browser.pool.service';
+import { advancedLogger } from './logging.service';
 
 type WithPageOptions = {
   overallTimeoutMs?: number; // tiempo total duro (cierra browser si vence)
@@ -23,7 +24,7 @@ export async function withPage<T>(
   if (!global.__WITH_PAGE_LEGACY_WARNED__ && !isTest) {
     // @ts-ignore
     global.__WITH_PAGE_LEGACY_WARNED__ = true;
-    console.warn(
+    advancedLogger.warn(
       '[withPage] Using legacy non-pooled browser. Consider migrating to withPooledPage for better performance.'
     );
   }

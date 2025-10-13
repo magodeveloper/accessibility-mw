@@ -3,6 +3,7 @@ import dns from 'node:dns/promises';
 import http from 'node:http';
 import https from 'node:https';
 import { URL } from 'node:url';
+import { advancedLogger } from '../services/logging.service';
 
 export type UrlValidationResult = {
   ok: boolean;
@@ -208,7 +209,7 @@ export async function validatePublicHttpUrl(
         };
       default:
         if ((process.env.DEBUG_URL_VALIDATOR ?? '').toLowerCase() === 'true') {
-          console.warn('[normalizeNetError:default]', {
+          advancedLogger.warn('[normalizeNetError:default]', {
             code,
             rawMessage,
             ip,
@@ -309,7 +310,7 @@ export async function validatePublicHttpUrl(
       } catch (e: unknown) {
         // Log the error for debugging purposes, but not in test environment
         if (process.env.NODE_ENV !== 'test') {
-          console.error(`DNS lookup failed for ${hostname}:`, e);
+          advancedLogger.error('DNS lookup failed', { hostname, error: e });
         }
       }
     }

@@ -1,6 +1,7 @@
 import * as aChecker from 'accessibility-checker';
 import * as fs from 'fs';
 import * as path from 'path';
+import { advancedLogger } from './logging.service';
 
 import type { Page } from 'playwright';
 
@@ -18,10 +19,10 @@ export async function runEqualAccess(content: string | Page, label: string) {
       fs.mkdirSync(cacheDir, { recursive: true, mode: 0o755 });
     }
   } catch (error) {
-    console.warn(
-      'Warning: Could not create .achecker_cache/engine directory:',
-      error
-    );
+    advancedLogger.warn('Could not create .achecker_cache/engine directory', {
+      cacheDir,
+      error,
+    });
   }
 
   const report = await aChecker.getCompliance(content as unknown, label);

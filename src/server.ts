@@ -6,10 +6,15 @@ import http from 'http';
 import { AddressInfo } from 'net';
 import pinoHttp from 'pino-http';
 import swaggerUi from 'swagger-ui-express';
+import { isGatewayValidationEnabled } from './config/gateway.config';
 import { setupHealthChecks } from './config/health.config';
+import { isJwtEnabled } from './config/jwt.config';
+import { authenticateJWT } from './middlewares/auth.middleware';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
+import { validateGatewaySecret } from './middlewares/gateway.middleware';
 import { analyzeLimiter, generalLimiter } from './middlewares/rateLimit';
 import { attachRequestId } from './middlewares/requestId';
+import { extractUserContext } from './middlewares/user-context.middleware';
 import analyzeRouter from './routes/analyze.route';
 import bundleRouter from './routes/bundle.route';
 import healthRouter from './routes/health.route';
@@ -180,10 +185,70 @@ app.get('/api/docs.json', (_req, res) => {
   res.json(swaggerSpec);
 });
 
-// Rutas de análisis
-app.use('/api/analyze', analyzeLimiter, analyzeRouter);
+// JWT Authentication status endpoint (for debugging)
+app.get('/api/auth/status', (_req, res) => {
+  res.json({
+    jwtEnabled: isJwtEnabled(),
+    gatewayValidationEnabled: isGatewayValidationEnabled(),
+    message: isJwtEnabled()
+      ? 'JWT authentication is enabled'
+      : 'JWT authentication is disabled (development mode)',
+  });
+});
 
-// Bundle monitoring routes
+// Rutas de análisis - PROTEGIDAS CON GATEWAY SECRET + JWT
+// ORDEN CRÍTICO DE MIDDLEWARES:
+// 1. validateGatewaySecret - Valida origen (Gateway)
+// 2. authenticateJWT - Valida usuario
+// 3. extractUserContext - Extrae contexto de usuario (X-User-* headers)
+// 4. analyzeLimiter - Rate limiting
+// 5. analyzeRouter - Lógica de negocio
+
+const gatewayEnabled = isGatewayValidationEnabled();
+const jwtEnabled = isJwtEnabled();
+
+if (gatewayEnabled && jwtEnabled) {
+  advancedLogger.info(
+    'Gateway Secret + JWT authentication + User Context enabled - fully protecting /api/analyze routes'
+  );
+  app.use(
+    '/api/analyze',
+    validateGatewaySecret,
+    authenticateJWT,
+    extractUserContext,
+    analyzeLimiter,
+    analyzeRouter
+  );
+} else if (gatewayEnabled) {
+  advancedLogger.warn(
+    'Gateway Secret enabled but JWT disabled - /api/analyze routes protected by Gateway only (User Context extracted)'
+  );
+  app.use(
+    '/api/analyze',
+    validateGatewaySecret,
+    extractUserContext,
+    analyzeLimiter,
+    analyzeRouter
+  );
+} else if (jwtEnabled) {
+  advancedLogger.warn(
+    'JWT enabled but Gateway Secret disabled - /api/analyze routes protected by JWT only (User Context extracted)'
+  );
+  app.use(
+    '/api/analyze',
+    authenticateJWT,
+    extractUserContext,
+    analyzeLimiter,
+    analyzeRouter
+  );
+} else {
+  advancedLogger.warn(
+    '⚠️  SECURITY WARNING: Both Gateway Secret and JWT disabled - /api/analyze routes are COMPLETELY UNPROTECTED (User Context extracted if available)'
+  );
+  app.use('/api/analyze', extractUserContext, analyzeLimiter, analyzeRouter);
+}
+
+// Bundle monitoring routes - NO requieren autenticación (métricas internas)
 app.use('/api/bundle', bundleRouter);
 
 // Health shallow/deep

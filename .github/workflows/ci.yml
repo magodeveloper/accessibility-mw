@@ -7,79 +7,37 @@ on:
     branches: [master, main]
   schedule:
     # Ejecutar semanalmente para verificar dependencias
-    - cron: '0 6 * * 1'
+    - cron: "0 6 * * 1"
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: "20"
   # Reducir console.log en tests
-  NODE_ENV: 'test'
-  CI: 'true'
-  # Configurar límites de memoria para evitar memory leaks
-  NODE_OPTIONS: '--max-old-space-size=4096'
+  NODE_ENV: "test"
+  CI: "true"
+  # Configurar límites de memoria (reducido de 4GB a 2GB para detección temprana de leaks)
+  NODE_OPTIONS: "--max-old-space-size=2048"
 
 jobs:
-  setup-and-build:
-    name: '📦 Build & Setup'
+  build-and-quality:
+    name: "📦 Build & Code Quality"
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    outputs:
-      cache-hit: ${{ steps.cache-build.outputs.cache-hit }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
-
-      - name: Cache build artifacts
-        id: cache-build
-        uses: actions/cache@v4
-        with:
-          path: |
-            dist/
-            node_modules/.cache/
-          key: build-${{ runner.os }}-${{ hashFiles('package-lock.json', 'src/**/*', 'tsconfig.json') }}
-          restore-keys: |
-            build-${{ runner.os }}-
 
       - name: Build project
-        if: steps.cache-build.outputs.cache-hit != 'true'
         run: npm run build
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-artifacts
-          path: dist/
-          retention-days: 1
-
-  lint-and-typecheck:
-    name: '🔍 Code Quality & Linting'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    needs: setup-and-build
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci --no-audit --no-fund
 
       - name: Lint code
         run: npm run lint:check
@@ -88,10 +46,10 @@ jobs:
         run: npm run type-check
 
   test-unit:
-    name: '🧪 Unit Tests'
+    name: "🧪 Unit Tests"
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: setup-and-build
+    needs: build-and-quality
 
     steps:
       - name: Checkout repository
@@ -101,27 +59,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-artifacts
-          path: dist/
-
       - name: Setup test directories
-        run: |
-          # Crear directorios necesarios con permisos correctos
-          mkdir -p .achecker_cache/engine
-          chmod 755 .achecker_cache
-          chmod 755 .achecker_cache/engine
-
-          # Crear directorio temporal para tests
-          mkdir -p tmp/test-data
-          chmod 755 tmp/test-data
+        run: bash scripts/setup-test-dirs.sh
 
       - name: Run unit tests with optimizations
         run: |
@@ -132,16 +76,12 @@ jobs:
             --maxWorkers=2 \
             --logHeapUsage \
             --detectOpenHandles \
-            --forceExit \
-            --silent \
             --config=jest.ci.config.js
         env:
           NODE_ENV: test
           CI: true
           ANALYSIS_API_URL: http://localhost:8082
           REPORTS_API_URL: http://reports.internal:8080
-          # Suprimir logs verbosos en CI
-          SUPPRESS_CI_LOGS: true
           # Configurar timeouts para evitar memory leaks
           JEST_TIMEOUT: 30000
 
@@ -154,29 +94,45 @@ jobs:
           fail_ci_if_error: false
 
   test-integration:
-    name: '🔄 Integration Tests'
+    name: "🔄 Integration Tests"
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: setup-and-build
+    needs: build-and-quality
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Start supporting services
+        run: |
+          echo "🚀 Starting MS Analysis and MS Reports services..."
+          docker compose -f docker-compose.ci.yml up -d mysql-analysis mysql-reports ms-analysis ms-reports
+
+          echo "⏳ Waiting for services to be healthy..."
+          timeout 120 bash -c 'until docker compose -f docker-compose.ci.yml ps | grep -q "healthy"; do sleep 2; done' || {
+            echo "❌ Services failed to start. Checking logs..."
+            docker compose -f docker-compose.ci.yml logs
+            exit 1
+          }
+
+          echo "✅ All services are healthy"
+          docker compose -f docker-compose.ci.yml ps
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-artifacts
-          path: dist/
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
@@ -194,11 +150,7 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
 
       - name: Setup test environment
-        run: |
-          # Crear directorios necesarios
-          mkdir -p .achecker_cache/engine
-          mkdir -p tmp/test-data
-          chmod 755 .achecker_cache .achecker_cache/engine tmp/test-data
+        run: bash scripts/setup-test-dirs.sh
 
       - name: Run integration tests
         run: |
@@ -206,34 +158,33 @@ jobs:
             --testTimeout=60000 \
             --maxWorkers=1 \
             --detectOpenHandles \
-            --forceExit \
-            --silent \
             --config=jest.ci.config.js
         env:
           NODE_ENV: test
           CI: true
+          # URLs reales de microservicios (ya no mockeadas)
           ANALYSIS_API_URL: http://localhost:8082
-          REPORTS_API_URL: http://reports.internal:8080
-          SUPPRESS_CI_LOGS: true
+          REPORTS_API_URL: http://localhost:8080
           JEST_TIMEOUT: 60000
           # Configurar Playwright para CI
           PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
 
+      - name: Cleanup services
+        if: always()
+        run: |
+          echo "🧹 Stopping services..."
+          docker compose -f docker-compose.ci.yml logs ms-analysis ms-reports
+          docker compose -f docker-compose.ci.yml down -v
+
   docker-build-test:
-    name: '🐳 Docker Build & Test'
+    name: "🐳 Docker Build & Test"
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [setup-and-build, test-unit]
+    needs: [build-and-quality, test-unit]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-artifacts
-          path: dist/
 
       - name: Build Docker image
         run: |
@@ -242,6 +193,9 @@ jobs:
 
       - name: Test Docker image
         run: |
+          # Trap para capturar logs en caso de error
+          trap 'echo "❌ Docker test failed. Capturing container logs..."; docker logs test-container || echo "No logs available"; docker stop test-container 2>/dev/null || true' ERR
+
           # Iniciar contenedor en background
           docker run --rm -d --name test-container \
             -p 3001:3001 \
@@ -249,17 +203,37 @@ jobs:
             accessibility-mw:${{ github.sha }}
 
           # Esperar que el servicio esté listo
+          HEALTH_CHECK_PASSED=false
           for i in {1..30}; do
             if curl -f http://localhost:3001/health 2>/dev/null; then
               echo "✅ Health check passed"
+              HEALTH_CHECK_PASSED=true
               break
             fi
             echo "⏳ Waiting for service... ($i/30)"
             sleep 2
           done
 
+          # Si el health check falló, capturar logs y salir
+          if [ "$HEALTH_CHECK_PASSED" = "false" ]; then
+            echo "❌ Health check timeout after 60 seconds"
+            echo "📋 Container logs:"
+            docker logs test-container
+            docker stop test-container
+            exit 1
+          fi
+
           # Ejecutar tests básicos del endpoint
-          curl -f http://localhost:3001/health || exit 1
+          echo "🧪 Running smoke tests..."
+          if ! curl -f http://localhost:3001/health; then
+            echo "❌ Smoke test failed"
+            echo "📋 Container logs:"
+            docker logs test-container
+            docker stop test-container
+            exit 1
+          fi
+
+          echo "✅ All smoke tests passed"
 
           # Cleanup
           docker stop test-container
@@ -267,61 +241,14 @@ jobs:
   ci-summary:
     runs-on: ubuntu-latest
     if: always()
-    needs:
-      [
-        setup-and-build,
-        lint-and-typecheck,
-        test-unit,
-        test-integration,
-        docker-build-test,
-      ]
+    needs: [build-and-quality, test-unit, test-integration, docker-build-test]
 
     steps:
       - name: Generate CI Summary
         run: |
           echo "## 🚀 CI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Build Status
-          if [ "${{ needs.setup-and-build.result }}" = "success" ]; then
-            echo "- **Build**: ✅ Successful" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- **Build**: ❌ Failed" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          # Code Quality Status
-          if [ "${{ needs.lint-and-typecheck.result }}" = "success" ]; then
-            echo "- **Code Quality**: ✅ Linting and type checking passed" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- **Code Quality**: ❌ Linting or type checking failed" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          # Unit Tests Status
-          if [ "${{ needs.test-unit.result }}" = "success" ]; then
-            echo "- **Unit Tests**: ✅ All tests passed with coverage" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- **Unit Tests**: ❌ Some tests failed" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          # Integration Tests Status
-          if [ "${{ needs.test-integration.result }}" = "success" ]; then
-            echo "- **Integration Tests**: ✅ All tests passed" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- **Integration Tests**: ❌ Some tests failed" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          # Docker Status
-          if [ "${{ needs.docker-build-test.result }}" = "success" ]; then
-            echo "- **Docker**: ✅ Image built and tested successfully" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- **Docker**: ❌ Docker build or test failed" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔧 Optimizations Applied" >> $GITHUB_STEP_SUMMARY
-          echo "- **Parallel Jobs**: Build, linting, unit tests, and integration tests run in parallel" >> $GITHUB_STEP_SUMMARY
-          echo "- **Smart Caching**: Build artifacts cached and reused across jobs" >> $GITHUB_STEP_SUMMARY
-          echo "- **Memory Management**: Node.js configured with increased memory limits" >> $GITHUB_STEP_SUMMARY
-          echo "- **Test Optimization**: Silent mode, reduced workers, proper cleanup" >> $GITHUB_STEP_SUMMARY
-          echo "- **Playwright Optimization**: Only Chromium installed, proper caching" >> $GITHUB_STEP_SUMMARY
-          echo "- **File Permissions**: Proper setup for .achecker_cache and test directories" >> $GITHUB_STEP_SUMMARY
+          echo "- Build & Code Quality: ${{ needs.build-and-quality.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Unit Tests: ${{ needs.test-unit.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Integration Tests: ${{ needs.test-integration.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Docker Build & Test: ${{ needs.docker-build-test.result }}" >> $GITHUB_STEP_SUMMARY

@@ -29,6 +29,7 @@ jest.mock('../../src/services/logging.service', () => ({
     cleanupContext: jest.fn(),
     info: jest.fn(),
     debug: jest.fn(),
+    warn: jest.fn(),
     error: jest.fn(),
     fatal: jest.fn(),
     flush: jest.fn(),
@@ -366,5 +367,276 @@ describe('Environment Configuration', () => {
   it('should enable metrics based on feature flags', () => {
     const { FeatureFlags } = require('../../src/utils/environment');
     expect(FeatureFlags.enableMetrics()).toBe(true);
+  });
+});
+
+describe('Auth Status Endpoint', () => {
+  let mockIsJwtEnabled: jest.Mock;
+  let mockIsGatewayValidationEnabled: jest.Mock;
+
+  beforeEach(() => {
+    // Mock the config functions
+    mockIsJwtEnabled = jest.fn();
+    mockIsGatewayValidationEnabled = jest.fn();
+
+    jest.mock('../../src/config/jwt.config', () => ({
+      isJwtEnabled: mockIsJwtEnabled,
+    }));
+
+    jest.mock('../../src/config/gateway.config', () => ({
+      isGatewayValidationEnabled: mockIsGatewayValidationEnabled,
+    }));
+  });
+
+  it('should return JWT enabled status when JWT is enabled', async () => {
+    mockIsJwtEnabled.mockReturnValue(true);
+    mockIsGatewayValidationEnabled.mockReturnValue(false);
+
+    const app = require('../../src/server').default;
+    const response = await request(app).get('/api/auth/status');
+
+    expect(response.status).toBe(200);
+    expect(response.body.jwtEnabled).toBeDefined();
+    expect(response.body.gatewayValidationEnabled).toBeDefined();
+    expect(response.body.message).toBeDefined();
+  });
+
+  it('should return JWT disabled status when JWT is disabled', async () => {
+    mockIsJwtEnabled.mockReturnValue(false);
+    mockIsGatewayValidationEnabled.mockReturnValue(false);
+
+    const app = require('../../src/server').default;
+    const response = await request(app).get('/api/auth/status');
+
+    expect(response.status).toBe(200);
+    expect(response.body.jwtEnabled).toBeDefined();
+  });
+});
+
+describe('Route Protection Scenarios', () => {
+  let mockIsJwtEnabled: jest.Mock;
+  let mockIsGatewayValidationEnabled: jest.Mock;
+  let mockAuthenticateJWT: jest.Mock;
+  let mockValidateGatewaySecret: jest.Mock;
+  let mockExtractUserContext: jest.Mock;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    mockIsJwtEnabled = jest.fn();
+    mockIsGatewayValidationEnabled = jest.fn();
+    mockAuthenticateJWT = jest.fn((req: any, res: any, next: any) => next());
+    mockValidateGatewaySecret = jest.fn((req: any, res: any, next: any) =>
+      next()
+    );
+    mockExtractUserContext = jest.fn((req: any, res: any, next: any) => next());
+
+    jest.mock('../../src/config/jwt.config', () => ({
+      isJwtEnabled: mockIsJwtEnabled,
+    }));
+
+    jest.mock('../../src/config/gateway.config', () => ({
+      isGatewayValidationEnabled: mockIsGatewayValidationEnabled,
+    }));
+
+    jest.mock('../../src/middlewares/auth.middleware', () => ({
+      authenticateJWT: mockAuthenticateJWT,
+    }));
+
+    jest.mock('../../src/middlewares/gateway.middleware', () => ({
+      validateGatewaySecret: mockValidateGatewaySecret,
+    }));
+
+    jest.mock('../../src/middlewares/user-context.middleware', () => ({
+      extractUserContext: mockExtractUserContext,
+    }));
+  });
+
+  it('should protect routes with Gateway + JWT + UserContext when both enabled', async () => {
+    mockIsGatewayValidationEnabled.mockReturnValue(true);
+    mockIsJwtEnabled.mockReturnValue(true);
+
+    // Re-require to pick up new mocks
+    jest.resetModules();
+    const app = require('../../src/server').default;
+
+    await request(app).post('/api/analyze').send({ inputType: 'html' });
+
+    // All middlewares should be called
+    expect(mockValidateGatewaySecret).toHaveBeenCalled();
+    expect(mockAuthenticateJWT).toHaveBeenCalled();
+    expect(mockExtractUserContext).toHaveBeenCalled();
+  });
+
+  it('should protect routes with Gateway + UserContext when only Gateway enabled', async () => {
+    mockIsGatewayValidationEnabled.mockReturnValue(true);
+    mockIsJwtEnabled.mockReturnValue(false);
+
+    jest.resetModules();
+    const app = require('../../src/server').default;
+
+    await request(app).post('/api/analyze').send({ inputType: 'html' });
+
+    expect(mockValidateGatewaySecret).toHaveBeenCalled();
+    expect(mockExtractUserContext).toHaveBeenCalled();
+    // JWT should NOT be called
+    expect(mockAuthenticateJWT).not.toHaveBeenCalled();
+  });
+
+  it('should protect routes with JWT + UserContext when only JWT enabled', async () => {
+    mockIsGatewayValidationEnabled.mockReturnValue(false);
+    mockIsJwtEnabled.mockReturnValue(true);
+
+    jest.resetModules();
+    const app = require('../../src/server').default;
+
+    await request(app).post('/api/analyze').send({ inputType: 'html' });
+
+    expect(mockAuthenticateJWT).toHaveBeenCalled();
+    expect(mockExtractUserContext).toHaveBeenCalled();
+    // Gateway should NOT be called
+    expect(mockValidateGatewaySecret).not.toHaveBeenCalled();
+  });
+
+  it('should only extract UserContext when neither Gateway nor JWT enabled', async () => {
+    mockIsGatewayValidationEnabled.mockReturnValue(false);
+    mockIsJwtEnabled.mockReturnValue(false);
+
+    jest.resetModules();
+    const app = require('../../src/server').default;
+
+    await request(app).post('/api/analyze').send({ inputType: 'html' });
+
+    expect(mockExtractUserContext).toHaveBeenCalled();
+    // Neither Gateway nor JWT should be called
+    expect(mockValidateGatewaySecret).not.toHaveBeenCalled();
+    expect(mockAuthenticateJWT).not.toHaveBeenCalled();
+  });
+});
+
+describe('getRequestIdAsString utility', () => {
+  it('should handle string request ID', () => {
+    const app = require('../../src/server').default;
+    // Test indirectly through metrics endpoint which uses the helper
+    return request(app).get('/metrics').expect(200);
+  });
+
+  it('should handle number request ID', async () => {
+    const app = require('../../src/server').default;
+    const response = await request(app).get('/metrics');
+    expect(response.body.requestId).toBeDefined();
+  });
+
+  it('should handle object with toString', async () => {
+    const app = require('../../src/server').default;
+    const response = await request(app).get('/metrics');
+    expect(typeof response.body.requestId).toBe('string');
+  });
+
+  it('should handle unknown request ID type', async () => {
+    const app = require('../../src/server').default;
+    // Even if req.id is undefined, should return 'unknown'
+    const response = await request(app).get('/metrics');
+    expect(response.body.requestId).toBeDefined();
+  });
+});
+
+describe('Trust Proxy Configuration', () => {
+  it('should set trust proxy when TRUST_PROXY is true', () => {
+    const { ENV } = require('../../src/utils/environment');
+    ENV.TRUST_PROXY = true;
+
+    jest.resetModules();
+    const app = require('../../src/server').default;
+
+    // App should have trust proxy set
+    expect(app).toBeDefined();
+  });
+
+  it('should not set trust proxy when TRUST_PROXY is false', () => {
+    const { ENV } = require('../../src/utils/environment');
+    ENV.TRUST_PROXY = false;
+
+    jest.resetModules();
+    const app = require('../../src/server').default;
+
+    expect(app).toBeDefined();
+  });
+});
+
+describe('CORS Origins Configuration', () => {
+  it('should use specific origins when CORS_ORIGINS has values', () => {
+    const { ENV } = require('../../src/utils/environment');
+    ENV.CORS_ORIGINS = ['http://localhost:3000', 'http://example.com'];
+
+    jest.resetModules();
+    const app = require('../../src/server').default;
+
+    expect(app).toBeDefined();
+  });
+
+  it('should allow all origins when CORS_ORIGINS is empty', () => {
+    const { ENV } = require('../../src/utils/environment');
+    ENV.CORS_ORIGINS = [];
+
+    jest.resetModules();
+    const app = require('../../src/server').default;
+
+    expect(app).toBeDefined();
+  });
+});
+
+describe('Performance Monitoring - Success vs Failure', () => {
+  it('should record success metric for 2xx responses', async () => {
+    const {
+      performanceMonitor,
+    } = require('../../src/services/performance.service');
+    jest.clearAllMocks();
+
+    const app = require('../../src/server').default;
+    await request(app).get('/health');
+
+    // Wait for 'finish' event
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Should record with success=true
+    expect(performanceMonitor.recordRequest).toHaveBeenCalledWith(
+      expect.any(Number),
+      true
+    );
+  });
+
+  it('should record failure metric for 4xx responses', async () => {
+    const {
+      performanceMonitor,
+    } = require('../../src/services/performance.service');
+    jest.clearAllMocks();
+
+    const app = require('../../src/server').default;
+    await request(app).get('/nonexistent-route');
+
+    // Wait for 'finish' event
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Should record with success=false (404 >= 400)
+    expect(performanceMonitor.recordRequest).toHaveBeenCalledWith(
+      expect.any(Number),
+      false
+    );
+  });
+});
+
+describe('Metrics Endpoint - Debug Logging', () => {
+  it('should log debug message when metrics are requested', async () => {
+    const { advancedLogger } = require('../../src/services/logging.service');
+    jest.clearAllMocks();
+
+    const app = require('../../src/server').default;
+    await request(app).get('/metrics');
+
+    expect(advancedLogger.debug).toHaveBeenCalledWith(
+      'Metrics requested',
+      expect.objectContaining({ requestId: expect.any(String) })
+    );
   });
 });

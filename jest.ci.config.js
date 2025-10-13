@@ -2,14 +2,23 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  testMatch: ['**/tests/**/*.test.ts'],
+
+  // Configuración de test patterns
+  // Incluye tests reales (real-*.test.ts) que requieren servicios Docker
+  testMatch: [
+    '**/tests/unit/**/*.test.ts',
+    '**/tests/integration/**/*.test.ts',
+  ],
+
   moduleFileExtensions: ['ts', 'js', 'json'],
 
-  // Configuración de logging optimizada para CI
-  verbose: !process.env.SUPPRESS_CI_LOGS,
-  silent: process.env.SUPPRESS_CI_LOGS === 'true',
+  // Configuración de logging optimizada para CI (Fase 1: habilitar visibilidad)
+  verbose: true,
+  // silent removido en Fase 1 - mostrar errores completos en CI
+  // silent: process.env.SUPPRESS_CI_LOGS === 'true',
 
   // Timeouts optimizados
+  // Tests reales E2E requieren más tiempo (60s default, 90s para flujos completos)
   testTimeout: parseInt(process.env.JEST_TIMEOUT) || 60000,
 
   // Setup files
@@ -30,8 +39,9 @@ module.exports = {
   maxWorkers: process.env.CI ? 2 : 1,
   maxConcurrency: 2,
 
-  // Configuración de cleanup para evitar memory leaks
-  forceExit: true,
+  // Configuración de cleanup (Fase 1: remover forceExit para detectar leaks)
+  // forceExit removido - permitir que Jest detecte handles abiertos y memory leaks
+  // forceExit: true,
   detectOpenHandles: true,
   logHeapUsage: process.env.CI === 'true',
 

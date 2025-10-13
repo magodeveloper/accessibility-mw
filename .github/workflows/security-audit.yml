@@ -7,45 +7,37 @@ on:
     branches: [master, main]
   schedule:
     # Ejecutar diariamente a las 2 AM UTC
-    - cron: '0 2 * * *'
+    - cron: "0 2 * * *"
   workflow_dispatch: # Permite ejecución manual
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: "20"
 
 jobs:
-  security-audit:
-    name: Security Analysis
+  npm-audit:
+    name: NPM Security Audit
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    permissions:
-      contents: read
-      security-events: write
-      actions: read
-      repository-projects: read
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          cache: "npm"
 
       - name: Install dependencies
-        run: npm ci --no-audit --no-fund --production
+        run: npm ci --no-audit --no-fund
 
       - name: NPM Audit (High/Critical)
         run: |
           echo "Running NPM Audit for high/critical vulnerabilities..."
-          npm audit --audit-level=high --production || true
+          npm audit --audit-level=high || true
           echo "Generating detailed audit report..."
-          npm audit --json --production > npm-audit-report.json || true
+          npm audit --json > npm-audit-report.json || true
 
       - name: Upload NPM Audit Report
         uses: actions/upload-artifact@v4
@@ -55,40 +47,27 @@ jobs:
           path: npm-audit-report.json
           retention-days: 30
 
-      # CodeQL Analysis deshabilitado temporalmente para evitar warnings
-      # Habilitar cuando se configure Code Scanning en el repositorio:
-      # Settings → Security & analysis → Code scanning → Set up → Configure CodeQL
+  trivy-image-scan:
+    name: Docker Image Scan (Trivy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name != 'schedule'
 
-      # - name: Check CodeQL availability
-      #   id: check-codeql
-      #   run: |
-      #     # Simplificamos la verificación para evitar warnings adicionales
-      #     echo "codeql-available=false" >> $GITHUB_OUTPUT
-      #     echo "⚠️  CodeQL Analysis is skipped to avoid unnecessary warnings"
-      #     echo "   Code Scanning is not enabled for this repository"
-      #     echo "   To enable: Settings → Security & analysis → Code scanning → Set up → Configure CodeQL"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      # - name: CodeQL Analysis - Initialize
-      #   uses: github/codeql-action/init@v3
-      #   id: codeql-init
-      #   if: steps.check-codeql.outputs.codeql-available == 'true'
-      #   continue-on-error: true
-      #   with:
-      #     languages: javascript
-      #     queries: security-and-quality
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      # - name: Perform CodeQL Analysis
-      #   uses: github/codeql-action/analyze@v3
-      #   if: steps.codeql-init.outcome == 'success' && steps.check-codeql.outputs.codeql-available == 'true'
-      #   continue-on-error: true
-
-      - name: Docker Security Scan
-        if: github.event_name != 'schedule'
+      - name: Build image for scanning
         run: |
           echo "Building Docker image for security scan..."
           docker build -t accessibility-mw-security:latest .
 
-          echo "Running Docker security scan..."
+      - name: Run Trivy scan on image
+        run: |
+          echo "Running Trivy security scan..."
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
             -v "$(pwd)":/project \
             aquasec/trivy:latest image --exit-code 0 --no-progress --format json \
@@ -96,33 +75,11 @@ jobs:
 
       - name: Upload Trivy Report
         uses: actions/upload-artifact@v4
-        if: always() && github.event_name != 'schedule'
+        if: always()
         with:
           name: trivy-report-${{ github.sha }}
           path: trivy-report.json
           retention-days: 30
-
-      - name: Security Summary
-        if: always()
-        run: |
-          echo "## Security Audit Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- **NPM Audit**: $(test -f npm-audit-report.json && echo '✅ Completed' || echo '❌ Failed')" >> $GITHUB_STEP_SUMMARY
-          echo "- **CodeQL**: ⚠️  Disabled (to avoid warnings - Code Scanning not enabled)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Docker Scan**: $(test -f trivy-report.json && echo '✅ Completed' || echo '⚠️  Skipped')" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          echo "### 🔧 Optional Enhancement" >> $GITHUB_STEP_SUMMARY
-          echo "**Enable Code Scanning for enhanced security:**" >> $GITHUB_STEP_SUMMARY
-          echo "1. Go to **Settings** → **Security & analysis**" >> $GITHUB_STEP_SUMMARY
-          echo "2. Click **Set up** next to **Code scanning**" >> $GITHUB_STEP_SUMMARY
-          echo "3. Choose **Configure CodeQL**" >> $GITHUB_STEP_SUMMARY
-          echo "4. Uncomment CodeQL steps in security-audit.yml" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          echo "### 📊 Security Status" >> $GITHUB_STEP_SUMMARY
-          echo "- Dependencies scanned for vulnerabilities" >> $GITHUB_STEP_SUMMARY
-          echo "- Docker image security validated" >> $GITHUB_STEP_SUMMARY
-          echo "- All reports available in workflow artifacts" >> $GITHUB_STEP_SUMMARY
 
   dependency-review:
     name: Dependency Review
@@ -143,3 +100,16 @@ jobs:
           fail-on-severity: moderate
           allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC
           deny-licenses: GPL-2.0, GPL-3.0
+
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [npm-audit, trivy-image-scan]
+
+    steps:
+      - name: Generate Summary
+        run: |
+          echo "## 🔒 Security Audit Results" >> $GITHUB_STEP_SUMMARY
+          echo "- NPM Audit: ${{ needs.npm-audit.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Trivy: ${{ needs.trivy-image-scan.result }}" >> $GITHUB_STEP_SUMMARY

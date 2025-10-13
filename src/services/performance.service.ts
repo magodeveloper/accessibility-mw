@@ -4,6 +4,7 @@
  */
 
 import { FeatureFlags } from '../utils/environment';
+import { advancedLogger } from './logging.service';
 
 interface PerformanceMetrics {
   // Request metrics
@@ -278,10 +279,13 @@ class PerformanceMonitor {
       this.alerts.unshift(alert);
 
       // Log alert
-      console.warn(
-        `[PERFORMANCE ALERT] ${level.toUpperCase()}: ${message} (${value.toFixed(
-          2
-        )} > ${threshold})`
+      advancedLogger.warn(
+        `[PERFORMANCE ALERT] ${level.toUpperCase()}: ${message}`,
+        {
+          value: value.toFixed(2),
+          threshold,
+          metric,
+        }
       );
     }
   }
@@ -328,7 +332,67 @@ class PerformanceMonitor {
   // Export metrics in Prometheus format
   toPrometheusMetrics(): string {
     const m = this.metrics;
-    return `
+    // Project-specific metrics kept for compatibility
+    const projectSpecific = `
+# HELP accessibility_mw_perf_total_requests Total number of requests (performance monitor)
+# TYPE accessibility_mw_perf_total_requests counter
+accessibility_mw_perf_total_requests ${m.totalRequests}
+
+# HELP accessibility_mw_perf_successful_requests Total number of successful requests (performance monitor)
+# TYPE accessibility_mw_perf_successful_requests counter
+accessibility_mw_perf_successful_requests ${m.successfulRequests}
+
+# HELP accessibility_mw_perf_failed_requests Total number of failed requests (performance monitor)
+# TYPE accessibility_mw_perf_failed_requests counter
+accessibility_mw_perf_failed_requests ${m.failedRequests}
+
+# HELP accessibility_mw_perf_response_time_avg Average response time in milliseconds (performance monitor)
+# TYPE accessibility_mw_perf_response_time_avg gauge
+accessibility_mw_perf_response_time_avg ${m.avgResponseTime}
+
+# HELP accessibility_mw_perf_response_time_p95 95th percentile response time in milliseconds (performance monitor)
+# TYPE accessibility_mw_perf_response_time_p95 gauge
+accessibility_mw_perf_response_time_p95 ${m.p95ResponseTime}
+
+# HELP accessibility_mw_perf_response_time_p99 99th percentile response time in milliseconds (performance monitor)
+# TYPE accessibility_mw_perf_response_time_p99 gauge
+accessibility_mw_perf_response_time_p99 ${m.p99ResponseTime}
+
+# HELP accessibility_mw_perf_analysis_count Total number of analyses performed (performance monitor)
+# TYPE accessibility_mw_perf_analysis_count counter
+accessibility_mw_perf_analysis_count ${m.analysisCount}
+
+# HELP accessibility_mw_perf_analysis_time_avg Average analysis time in milliseconds (performance monitor)
+# TYPE accessibility_mw_perf_analysis_time_avg gauge
+accessibility_mw_perf_analysis_time_avg ${m.avgAnalysisTime}
+
+# HELP accessibility_mw_perf_cache_hit_rate Cache hit rate percentage (performance monitor)
+# TYPE accessibility_mw_perf_cache_hit_rate gauge
+accessibility_mw_perf_cache_hit_rate ${m.cacheHitRate}
+
+# HELP accessibility_mw_perf_health_score System health score 0-100 (performance monitor)
+# TYPE accessibility_mw_perf_health_score gauge
+accessibility_mw_perf_health_score ${m.healthScore}
+
+# HELP accessibility_mw_perf_memory_heap_used Memory heap used in bytes (performance monitor)
+# TYPE accessibility_mw_perf_memory_heap_used gauge
+accessibility_mw_perf_memory_heap_used ${m.memoryUsage.heapUsed}
+
+# HELP accessibility_mw_perf_cpu_usage CPU usage percentage (performance monitor)
+# TYPE accessibility_mw_perf_cpu_usage gauge
+accessibility_mw_perf_cpu_usage ${m.cpuUsage}
+
+# HELP accessibility_mw_perf_active_connections Number of active connections (performance monitor)
+# TYPE accessibility_mw_perf_active_connections gauge
+accessibility_mw_perf_active_connections ${m.activeConnections}
+
+# HELP accessibility_mw_perf_uptime Process uptime in seconds (performance monitor)
+# TYPE accessibility_mw_perf_uptime counter
+accessibility_mw_perf_uptime ${m.uptime}
+  `.trim();
+
+    // Generic metrics expected by tests/consumers
+    const generic = `
 # HELP accessibility_requests_total Total number of requests
 # TYPE accessibility_requests_total counter
 accessibility_requests_total ${m.totalRequests}
@@ -337,15 +401,15 @@ accessibility_requests_total ${m.totalRequests}
 # TYPE accessibility_requests_success_total counter
 accessibility_requests_success_total ${m.successfulRequests}
 
-# HELP accessibility_response_time_avg Average response time in milliseconds
+# HELP accessibility_requests_failed_total Total number of failed requests
+# TYPE accessibility_requests_failed_total counter
+accessibility_requests_failed_total ${m.failedRequests}
+
+# HELP accessibility_response_time_avg Average response time in ms
 # TYPE accessibility_response_time_avg gauge
 accessibility_response_time_avg ${m.avgResponseTime}
 
-# HELP accessibility_response_time_p95 95th percentile response time in milliseconds
-# TYPE accessibility_response_time_p95 gauge
-accessibility_response_time_p95 ${m.p95ResponseTime}
-
-# HELP accessibility_health_score System health score (0-100)
+# HELP accessibility_health_score Overall health score (0-100)
 # TYPE accessibility_health_score gauge
 accessibility_health_score ${m.healthScore}
 
@@ -353,10 +417,12 @@ accessibility_health_score ${m.healthScore}
 # TYPE accessibility_cache_hit_rate gauge
 accessibility_cache_hit_rate ${m.cacheHitRate}
 
-# HELP accessibility_memory_used_bytes Memory usage in bytes
+# HELP accessibility_memory_used_bytes Process memory used in bytes
 # TYPE accessibility_memory_used_bytes gauge
 accessibility_memory_used_bytes ${m.memoryUsage.heapUsed}
-    `.trim();
+  `.trim();
+
+    return `${projectSpecific}\n${generic}`.trim();
   }
 
   /**

@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { advancedLogger } from './logging.service';
 
 interface HealthCheckConfig {
   name: string;
@@ -45,9 +46,10 @@ class HealthMonitor extends EventEmitter {
    * Registra un nuevo health check
    */
   registerCheck(config: HealthCheckConfig): void {
-    console.log(
-      `[HealthMonitor] Registering health check: ${config.name} -> ${config.url}`
-    );
+    advancedLogger.info('[HealthMonitor] Registering health check', {
+      name: config.name,
+      url: config.url,
+    });
 
     this.checks.set(config.name, config);
     this.results.set(config.name, {
@@ -95,7 +97,7 @@ class HealthMonitor extends EventEmitter {
     };
 
     try {
-      console.log(`[HealthMonitor] Executing check: ${checkName}`);
+      advancedLogger.debug('[HealthMonitor] Executing check', { checkName });
 
       for (let attempt = 1; attempt <= config.retries; attempt++) {
         try {
@@ -136,10 +138,12 @@ class HealthMonitor extends EventEmitter {
             throw error; // Re-throw on final attempt
           }
 
-          console.warn(
-            `[HealthMonitor] Check attempt ${attempt}/${config.retries} failed: ${checkName}`,
-            error
-          );
+          advancedLogger.warn('[HealthMonitor] Check attempt failed', {
+            checkName,
+            attempt,
+            retries: config.retries,
+            error,
+          });
 
           // Wait before retry
           await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
@@ -178,9 +182,11 @@ class HealthMonitor extends EventEmitter {
       }
     }
 
-    console.log(
-      `[HealthMonitor] Check completed: ${checkName} - ${result.status} (${result.responseTime}ms)`
-    );
+    advancedLogger.info('[HealthMonitor] Check completed', {
+      checkName,
+      status: result.status,
+      responseTime: result.responseTime,
+    });
   }
 
   /**
@@ -194,8 +200,11 @@ class HealthMonitor extends EventEmitter {
     const lastAlert = this.alertCooldowns.get(cooldownKey) || 0;
 
     if (now - lastAlert < this.alertConfig.cooldownMs) {
-      console.log(
-        `[HealthMonitor] Alert cooldown active for ${result.name}, skipping notification`
+      advancedLogger.debug(
+        '[HealthMonitor] Alert cooldown active, skipping notification',
+        {
+          serviceName: result.name,
+        }
       );
       return;
     }
@@ -235,10 +244,11 @@ class HealthMonitor extends EventEmitter {
   ): Promise<void> {
     if (!this.alertConfig.enabled) return;
 
-    console.warn(
-      `[HealthMonitor] ALERT: ${type.toUpperCase()} - ${result.name}:`,
-      message
-    );
+    advancedLogger.warn('[HealthMonitor] ALERT', {
+      type: type.toUpperCase(),
+      serviceName: result.name,
+      message,
+    });
 
     // Webhook genérico
     if (this.alertConfig.webhook) {
@@ -260,9 +270,11 @@ class HealthMonitor extends EventEmitter {
         });
 
         clearTimeout(timeoutId);
-        console.log(`[HealthMonitor] Webhook alert sent successfully`);
+        advancedLogger.info('[HealthMonitor] Webhook alert sent successfully');
       } catch (error) {
-        console.error(`[HealthMonitor] Failed to send webhook alert:`, error);
+        advancedLogger.error('[HealthMonitor] Failed to send webhook alert', {
+          error,
+        });
       }
     }
 
@@ -303,9 +315,11 @@ class HealthMonitor extends EventEmitter {
         });
 
         clearTimeout(timeoutId);
-        console.log(`[HealthMonitor] Slack alert sent successfully`);
+        advancedLogger.info('[HealthMonitor] Slack alert sent successfully');
       } catch (error) {
-        console.error(`[HealthMonitor] Failed to send Slack alert:`, error);
+        advancedLogger.error('[HealthMonitor] Failed to send Slack alert', {
+          error,
+        });
       }
     }
   }
@@ -354,7 +368,7 @@ class HealthMonitor extends EventEmitter {
    * Detiene todos los checks
    */
   stop(): void {
-    console.log('[HealthMonitor] Stopping health monitor');
+    advancedLogger.info('[HealthMonitor] Stopping health monitor');
 
     for (const timer of this.timers.values()) {
       clearInterval(timer);

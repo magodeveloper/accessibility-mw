@@ -1,0 +1,111 @@
+# Docker Compose para CI/CD Pipeline
+# Este archivo configura los servicios necesarios para tests de integración en GitHub Actions
+
+services:
+  # Base de datos MySQL para MS Analysis
+  mysql-analysis:
+    image: mysql:8.4
+    container_name: ci-mysql-analysis
+    environment:
+      MYSQL_ROOT_PASSWORD: CI_ROOT_PASSWORD_2025
+      MYSQL_DATABASE: analysisdb
+      MYSQL_USER: ciuser
+      MYSQL_PASSWORD: CI_TEST_PASSWORD_2025
+    ports:
+      - "3308:3306"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-pCI_ROOT_PASSWORD_2025",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    tmpfs:
+      - /var/lib/mysql:size=512m # Usar tmpfs para mayor velocidad en CI
+
+  # Base de datos MySQL para MS Reports
+  mysql-reports:
+    image: mysql:8.4
+    container_name: ci-mysql-reports
+    environment:
+      MYSQL_ROOT_PASSWORD: CI_ROOT_PASSWORD_2025
+      MYSQL_DATABASE: reportsdb
+      MYSQL_USER: ciuser
+      MYSQL_PASSWORD: CI_TEST_PASSWORD_2025
+    ports:
+      - "3309:3306"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-pCI_ROOT_PASSWORD_2025",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    tmpfs:
+      - /var/lib/mysql:size=512m
+
+  # Microservicio Analysis API
+  ms-analysis:
+    image: ghcr.io/magodeveloper/accessibility-ms-analysis:latest
+    container_name: ci-ms-analysis
+    depends_on:
+      mysql-analysis:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Default: "server=mysql-analysis;port=3306;database=analysisdb;user=ciuser;password=CI_TEST_PASSWORD_2025;TreatTinyAsBoolean=false"
+      JwtSettings__SecretKey: "CI_JWT_SECRET_KEY_32_CHARACTERS_MINIMUM_LENGTH_REQUIRED"
+      JwtSettings__Issuer: "AccessibilityAnalysisAPI"
+      JwtSettings__Audience: "AccessibilityClients"
+      JwtSettings__ExpiryHours: "24"
+      GatewaySecret: "CI_GATEWAY_SECRET_FOR_TESTING"
+    ports:
+      - "8082:8082"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # Microservicio Reports API
+  ms-reports:
+    image: ghcr.io/magodeveloper/accessibility-ms-reports:latest
+    container_name: ci-ms-reports
+    depends_on:
+      mysql-reports:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Default: "server=mysql-reports;port=3306;database=reportsdb;user=ciuser;password=CI_TEST_PASSWORD_2025;TreatTinyAsBoolean=false"
+      JwtSettings__SecretKey: "CI_JWT_SECRET_KEY_32_CHARACTERS_MINIMUM_LENGTH_REQUIRED"
+      JwtSettings__Issuer: "AccessibilityReportsAPI"
+      JwtSettings__Audience: "AccessibilityClients"
+      JwtSettings__ExpiryHours: "24"
+      GatewaySecret: "CI_GATEWAY_SECRET_FOR_TESTING"
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+networks:
+  default:
+    name: accessibility-ci-network

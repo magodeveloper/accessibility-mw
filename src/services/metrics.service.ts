@@ -195,36 +195,128 @@ class MetricsCollector {
   // Métricas en formato Prometheus (opcional)
   toPrometheusFormat(): string {
     const m = this.getMetrics();
-    return `
-# HELP accessibility_requests_total Total number of requests
+    // Existing project-specific metrics (kept for backward compatibility)
+    const projectSpecific = `
+# HELP accessibility_mw_requests_total Total number of requests processed by the middleware
+# TYPE accessibility_mw_requests_total counter
+accessibility_mw_requests_total ${m.requests.total}
+
+# HELP accessibility_mw_requests_success Total number of successful requests
+# TYPE accessibility_mw_requests_success counter
+accessibility_mw_requests_success ${m.requests.success}
+
+# HELP accessibility_mw_requests_errors Total number of failed requests
+# TYPE accessibility_mw_requests_errors counter
+accessibility_mw_requests_errors ${m.requests.errors}
+
+# HELP accessibility_mw_requests_timeouts Total number of timeout requests
+# TYPE accessibility_mw_requests_timeouts counter
+accessibility_mw_requests_timeouts ${m.requests.timeouts}
+
+# HELP accessibility_mw_response_time_avg Average response time in milliseconds
+# TYPE accessibility_mw_response_time_avg gauge
+accessibility_mw_response_time_avg ${m.performance.avgResponseTime}
+
+# HELP accessibility_mw_response_time_p95 P95 response time in milliseconds
+# TYPE accessibility_mw_response_time_p95 gauge
+accessibility_mw_response_time_p95 ${m.performance.p95ResponseTime}
+
+# HELP accessibility_mw_response_time_max Maximum response time in milliseconds
+# TYPE accessibility_mw_response_time_max gauge
+accessibility_mw_response_time_max ${m.performance.maxResponseTime}
+
+# HELP accessibility_mw_response_time_min Minimum response time in milliseconds
+# TYPE accessibility_mw_response_time_min gauge
+accessibility_mw_response_time_min ${m.performance.minResponseTime}
+
+# HELP accessibility_mw_analysis_axecore_total Total number of Axe-Core analyses
+# TYPE accessibility_mw_analysis_axecore_total counter
+accessibility_mw_analysis_axecore_total ${m.analysis.axeCore.total}
+
+# HELP accessibility_mw_analysis_axecore_avg_duration Average duration of Axe-Core analysis in milliseconds
+# TYPE accessibility_mw_analysis_axecore_avg_duration gauge
+accessibility_mw_analysis_axecore_avg_duration ${m.analysis.axeCore.avgDuration}
+
+# HELP accessibility_mw_analysis_axecore_errors Total number of Axe-Core analysis errors
+# TYPE accessibility_mw_analysis_axecore_errors counter
+accessibility_mw_analysis_axecore_errors ${m.analysis.axeCore.errors}
+
+# HELP accessibility_mw_analysis_equalaccess_total Total number of Equal-Access analyses
+# TYPE accessibility_mw_analysis_equalaccess_total counter
+accessibility_mw_analysis_equalaccess_total ${m.analysis.equalAccess.total}
+
+# HELP accessibility_mw_analysis_equalaccess_avg_duration Average duration of Equal-Access analysis in milliseconds
+# TYPE accessibility_mw_analysis_equalaccess_avg_duration gauge
+accessibility_mw_analysis_equalaccess_avg_duration ${m.analysis.equalAccess.avgDuration}
+
+# HELP accessibility_mw_analysis_equalaccess_errors Total number of Equal-Access analysis errors
+# TYPE accessibility_mw_analysis_equalaccess_errors counter
+accessibility_mw_analysis_equalaccess_errors ${m.analysis.equalAccess.errors}
+
+# HELP accessibility_mw_health_score Overall health score (0-100)
+# TYPE accessibility_mw_health_score gauge
+accessibility_mw_health_score ${m.healthScore}
+
+# HELP accessibility_mw_memory_rss Resident set size memory in bytes
+# TYPE accessibility_mw_memory_rss gauge
+accessibility_mw_memory_rss ${m.system.memoryUsage.rss}
+
+# HELP accessibility_mw_memory_heap_total Total heap memory in bytes
+# TYPE accessibility_mw_memory_heap_total gauge
+accessibility_mw_memory_heap_total ${m.system.memoryUsage.heapTotal}
+
+# HELP accessibility_mw_memory_heap_used Used heap memory in bytes
+# TYPE accessibility_mw_memory_heap_used gauge
+accessibility_mw_memory_heap_used ${m.system.memoryUsage.heapUsed}
+
+# HELP accessibility_mw_memory_external External memory in bytes
+# TYPE accessibility_mw_memory_external gauge
+accessibility_mw_memory_external ${m.system.memoryUsage.external}
+
+# HELP accessibility_mw_uptime Process uptime in seconds
+# TYPE accessibility_mw_uptime counter
+accessibility_mw_uptime ${m.system.uptime}
+`.trim();
+
+    // Generic metrics expected by some tests/consumers
+    const generic = `
+# HELP accessibility_requests_total Total number of requests processed
 # TYPE accessibility_requests_total counter
 accessibility_requests_total{status="success"} ${m.requests.success}
 accessibility_requests_total{status="error"} ${m.requests.errors}
 accessibility_requests_total{status="timeout"} ${m.requests.timeouts}
 
-# HELP accessibility_response_time_ms Response time in milliseconds
+# HELP accessibility_response_time_ms Response time summary in milliseconds
 # TYPE accessibility_response_time_ms summary
 accessibility_response_time_ms{quantile="0.5"} ${m.performance.avgResponseTime}
 accessibility_response_time_ms{quantile="0.95"} ${m.performance.p95ResponseTime}
-accessibility_response_time_ms_max ${m.performance.maxResponseTime}
-accessibility_response_time_ms_min ${m.performance.minResponseTime}
+accessibility_response_time_ms_sum ${
+      m.performance.avgResponseTime * Math.max(1, this.responseTimes.length)
+    }
+accessibility_response_time_ms_count ${this.responseTimes.length}
 
-# HELP accessibility_analysis_duration_ms Analysis duration in milliseconds
+# HELP accessibility_analysis_duration_ms Analysis duration by tool in milliseconds
 # TYPE accessibility_analysis_duration_ms gauge
-accessibility_analysis_duration_ms{tool="axe-core"} ${m.analysis.axeCore.avgDuration}
-accessibility_analysis_duration_ms{tool="equal-access"} ${m.analysis.equalAccess.avgDuration}
+accessibility_analysis_duration_ms{tool="axe-core"} ${
+      m.analysis.axeCore.avgDuration
+    }
+accessibility_analysis_duration_ms{tool="equal-access"} ${
+      m.analysis.equalAccess.avgDuration
+    }
 
-# HELP accessibility_health_score Health score (0-100)
+# HELP accessibility_health_score Overall health score (0-100)
 # TYPE accessibility_health_score gauge
 accessibility_health_score ${m.healthScore}
 
-# HELP nodejs_memory_usage_bytes Node.js memory usage
+# HELP nodejs_memory_usage_bytes Node.js process memory usage in bytes
 # TYPE nodejs_memory_usage_bytes gauge
 nodejs_memory_usage_bytes{type="rss"} ${m.system.memoryUsage.rss}
 nodejs_memory_usage_bytes{type="heapTotal"} ${m.system.memoryUsage.heapTotal}
 nodejs_memory_usage_bytes{type="heapUsed"} ${m.system.memoryUsage.heapUsed}
 nodejs_memory_usage_bytes{type="external"} ${m.system.memoryUsage.external}
 `.trim();
+
+    return `${projectSpecific}\n${generic}`.trim();
   }
 
   /**

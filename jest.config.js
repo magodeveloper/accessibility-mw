@@ -1,3 +1,7 @@
+// Habilitar cobertura solo en CI o cuando se pida explícitamente
+const isCI = !!process.env.CI;
+const collect = process.env.COLLECT_COVERAGE === 'true' || isCI;
+
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
@@ -24,8 +28,9 @@ module.exports = {
     ],
   },
   maxWorkers: process.env.CI ? 1 : '50%',
-  forceExit: true,
-  collectCoverage: true, // Enable coverage by default
+  // forceExit removido en Fase 1 - permitir que Jest detecte handles abiertos
+  // forceExit: true,
+  collectCoverage: collect, // Solo cubrir en CI o cuando COLLECT_COVERAGE=true
   coverageDirectory: 'coverage',
   collectCoverageFrom: [
     'src/**/*.{ts,js}',
@@ -41,12 +46,14 @@ module.exports = {
       : []),
   ],
   coverageReporters: ['text', 'lcov', 'html', 'json'],
-  coverageThreshold: {
-    global: {
-      branches: 40, // Reduced due to excluding browser services in CI
-      functions: 55, // Reduced due to excluding browser services in CI
-      lines: 55, // Reduced due to excluding browser services in CI
-      statements: 55, // Reduced due to excluding browser services in CI
-    },
-  },
+  coverageThreshold: collect
+    ? {
+        global: {
+          branches: 40, // Reduced due to excluding browser services in CI
+          functions: 55, // Reduced due to excluding browser services in CI
+          lines: 55, // Reduced due to excluding browser services in CI
+          statements: 55, // Reduced due to excluding browser services in CI
+        },
+      }
+    : undefined,
 };

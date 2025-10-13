@@ -236,4 +236,29 @@ healthRouter.get('/', async (req, res) => {
   }
 });
 
+// Alias de health live para compatibilidad con configuraciones Docker
+healthRouter.get('/live', async (req, res) => {
+  const requestId = req.id;
+  const quickMetrics = metricsCollector.getMetrics();
+  return res.json({
+    ok: true,
+    data: {
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+      healthScore: quickMetrics.healthScore,
+      requests: {
+        total: quickMetrics.requests.total,
+        successRate:
+          quickMetrics.requests.success /
+          Math.max(quickMetrics.requests.total, 1),
+      },
+      memory: {
+        used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+        total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
+      },
+    },
+    requestId,
+  });
+});
+
 export default healthRouter;

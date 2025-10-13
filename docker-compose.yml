@@ -1,53 +1,86 @@
-version: '3.9'
-
 services:
   accessibility-mw:
     build:
       context: .
       dockerfile: Dockerfile
       target: accessibility-mw
-    image: accessibility-mw:production
-    container_name: accessibility-mw
-    env_file:
-      - .env.production
+    image: accessibility-mw:${NODE_ENV:-production}
+    container_name: accessibility-mw-${NODE_ENV:-production}
     environment:
-      - NODE_OPTIONS=--enable-source-maps --max-old-space-size=2048
-      - ANALYSIS_API_URL=http://host.docker.internal:8082
+      - NODE_OPTIONS=--enable-source-maps --max-old-space-size=${NODE_HEAP_SIZE:-2048}
+      - NODE_ENV=${NODE_ENV:-production}
+      - HOST=${HOST:-0.0.0.0}
+      - ANALYSIS_API_URL=${ANALYSIS_API_URL:-http://host.docker.internal:8082}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_ISSUER=${JWT_ISSUER:-https://api.accessibility.company.com/middleware}
+      - JWT_AUDIENCE=${JWT_AUDIENCE:-https://accessibility.company.com}
+      - JWT_EXPIRY_HOURS=${JWT_EXPIRY_HOURS:-24}
+      - JWT_CLOCK_TOLERANCE=${JWT_CLOCK_TOLERANCE:-0}
+      - GATEWAY_SECRET=${GATEWAY_SECRET}
+      - GATEWAY_VALIDATION_ENABLED=${GATEWAY_VALIDATION_ENABLED:-false}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
+      - PORT=${PORT:-3001}
+      - TRUST_PROXY=${TRUST_PROXY:-false}
     ports:
-      - '3001:3001'
+      - "${MW_HOST_PORT:-3001}:3001"
     restart: unless-stopped
-    shm_size: '2g'  # Memoria compartida aumentada para Playwright
-    mem_limit: 3g   # Límite de memoria del contenedor
-    memswap_limit: 3g  # Límite de swap igual a memoria
+    shm_size: ${SHM_SIZE:-2g}
+    deploy:
+      resources:
+        limits:
+          memory: ${MEMORY_LIMIT:-3G}
+    memswap_limit: ${MEMORY_LIMIT:-3G}
     ulimits:
-      nofile: 65536  # Aumentar límite de archivos abiertos
+      nofile: ${ULIMIT_NOFILE:-65536}
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', r => process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:3001/health/live', r => process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: ${HEALTH_INTERVAL:-30s}
+      timeout: ${HEALTH_TIMEOUT:-10s}
+      retries: ${HEALTH_RETRIES:-3}
+      start_period: ${HEALTH_START_PERIOD:-20s}
+    labels:
+      - "prometheus.scrape=true"
+      - "prometheus.port=3001"
+      - "prometheus.path=/metrics"
+      - "service.name=accessibility-middleware"
+      - "service.version=1.0"
+      - "service.type=analysis-engine"
+      - "service.environment=${NODE_ENV:-production}"
     logging:
-      driver: 'json-file'
+      driver: "json-file"
       options:
-        max-size: '10m'
-        max-file: '3'
+        max-size: ${LOG_MAX_SIZE:-10m}
+        max-file: "${LOG_MAX_FILES:-3}"
     tmpfs:
-      - /app/logs:size=100m,mode=1777
-      - /app/.achecker_cache:size=256m,mode=1777
-      - /tmp:size=512m,mode=1777  # Optimizar directorio temporal
+      - /app/logs:size=${TMPFS_LOGS_SIZE:-100m},mode=1777
+      - /app/.achecker_cache:size=${TMPFS_CACHE_SIZE:-256m},mode=1777
+      - /tmp:size=${TMPFS_TMP_SIZE:-512m},mode=1777
     networks:
       - accessibility_network
+      - accessibility-shared
 
 networks:
   accessibility_network:
     driver: bridge
     driver_opts:
       com.docker.network.driver.mtu: 1500
-      com.docker.network.bridge.enable_ip_masquerade: 'true'
+      com.docker.network.bridge.enable_ip_masquerade: "true"
     # Optimización DNS para mejor rendimiento de red
     ipam:
       driver: default
       config:
         - subnet: 172.18.0.0/16
           gateway: 172.18.0.1
+
+  accessibility-shared:
+    external: true
+    name: accessibility-shared
+# Para usar un archivo de entorno específico:
+#   docker compose --env-file .env.development up
+#   docker compose --env-file .env.production up

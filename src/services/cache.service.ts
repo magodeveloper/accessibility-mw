@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import { advancedLogger } from './logging.service';
 
 interface CacheEntry<T> {
   value: T;
@@ -70,9 +71,10 @@ export class LRUCache<T> {
 
     // Verificar límites de memoria
     if (size > maxMemoryBytes / 4) {
-      console.warn(
-        `[Cache] Entry too large: ${Math.round(size / 1024)}KB, skipping cache`
-      );
+      advancedLogger.warn('[Cache] Entry too large, skipping cache', {
+        sizeKB: Math.round(size / 1024),
+        maxMemoryMB: this.maxMemoryMB,
+      });
       return;
     }
 
@@ -161,7 +163,9 @@ export class LRUCache<T> {
 
     if (toDelete.length > 0) {
       if (process.env.NODE_ENV !== 'production') {
-        console.log(`[Cache] Cleaned up ${toDelete.length} expired entries`);
+        advancedLogger.debug('[Cache] Cleaned up expired entries', {
+          count: toDelete.length,
+        });
       }
       this.updateStats();
     }
