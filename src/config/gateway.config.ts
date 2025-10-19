@@ -11,7 +11,7 @@
  * - Users API
  */
 
-import { z } from 'zod';
+import { z, ZodIssue } from 'zod';
 import { advancedLogger } from '../services/logging.service';
 
 /**
@@ -99,7 +99,7 @@ export function loadGatewayConfig(): GatewayConfig {
     if (error instanceof z.ZodError) {
       const errorMessages = error.issues
         .map(
-          (issue: z.ZodIssue) => `  - ${issue.path.join('.')}: ${issue.message}`
+          (issue: ZodIssue) => `  - ${issue.path.join('.')}: ${issue.message}`
         )
         .join('\n');
 

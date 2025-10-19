@@ -1,5 +1,6 @@
 import { Request, Router } from 'express';
 import { getHealthDashboard, getServicesStatus } from '../config/health.config';
+import { advancedLogger } from '../services/logging.service';
 
 // Interfaces para el sistema de monitoreo
 type RequestWithId = Request & {
@@ -52,9 +53,13 @@ export const monitoringRouter = Router();
  */
 monitoringRouter.get('/dashboard', async (req, res) => {
   const requestId = (req as RequestWithId).id;
+  const requestIdStr = requestId ? String(requestId) : undefined;
 
   try {
-    console.log('[Monitoring] Dashboard solicitado (modo simplificado)');
+    advancedLogger.debug('Dashboard solicitado (modo simplificado)', {
+      requestId: requestIdStr,
+      operation: 'monitoring.dashboard',
+    });
 
     const dashboard = getHealthDashboard();
 
@@ -64,7 +69,12 @@ monitoringRouter.get('/dashboard', async (req, res) => {
     });
   } catch (error: unknown) {
     const err = error as Error;
-    console.error('[Monitoring] Error en dashboard:', err);
+    advancedLogger.error('Error al obtener dashboard de monitoreo', {
+      requestId: requestIdStr,
+      operation: 'monitoring.dashboard',
+      error: err.message,
+      stack: err.stack,
+    });
     res.status(500).json({
       ok: false,
       error: 'Error interno del servidor',
@@ -79,6 +89,7 @@ monitoringRouter.get('/dashboard', async (req, res) => {
  */
 monitoringRouter.get('/status', async (req, res) => {
   const requestId = (req as RequestWithId).id;
+  const requestIdStr = requestId ? String(requestId) : undefined;
 
   try {
     const systemStatus: SystemStatus = {
@@ -94,7 +105,12 @@ monitoringRouter.get('/status', async (req, res) => {
     res.json(systemStatus);
   } catch (error: unknown) {
     const err = error as Error;
-    console.error('[Monitoring] Error en status:', err);
+    advancedLogger.error('Error al obtener status del sistema', {
+      requestId: requestIdStr,
+      operation: 'monitoring.status',
+      error: err.message,
+      stack: err.stack,
+    });
     res.status(500).json({
       ok: false,
       error: 'Error interno del servidor',
@@ -109,6 +125,7 @@ monitoringRouter.get('/status', async (req, res) => {
  */
 monitoringRouter.get('/services', async (req, res) => {
   const requestId = (req as RequestWithId).id;
+  const requestIdStr = requestId ? String(requestId) : undefined;
 
   try {
     const services = getServicesStatus() as ServiceStatus[];
@@ -125,7 +142,12 @@ monitoringRouter.get('/services', async (req, res) => {
     res.json(servicesResponse);
   } catch (error: unknown) {
     const err = error as Error;
-    console.error('[Monitoring] Error en services:', err);
+    advancedLogger.error('Error al obtener servicios monitoreados', {
+      requestId: requestIdStr,
+      operation: 'monitoring.services',
+      error: err.message,
+      stack: err.stack,
+    });
     res.status(500).json({
       ok: false,
       error: 'Error interno del servidor',
@@ -140,6 +162,7 @@ monitoringRouter.get('/services', async (req, res) => {
  */
 monitoringRouter.get('/metrics', async (req, res) => {
   const requestId = (req as RequestWithId).id;
+  const requestIdStr = requestId ? String(requestId) : undefined;
 
   try {
     const metrics: SystemMetrics = {
@@ -157,7 +180,12 @@ monitoringRouter.get('/metrics', async (req, res) => {
     res.json(metrics);
   } catch (error: unknown) {
     const err = error as Error;
-    console.error('[Monitoring] Error en metrics:', err);
+    advancedLogger.error('Error al obtener métricas del sistema', {
+      requestId: requestIdStr,
+      operation: 'monitoring.metrics',
+      error: err.message,
+      stack: err.stack,
+    });
     res.status(500).json({
       ok: false,
       error: 'Error interno del servidor',
@@ -167,11 +195,12 @@ monitoringRouter.get('/metrics', async (req, res) => {
   }
 });
 
-console.log(
-  '[MonitoringRouter] ✅ Rutas de monitoreo simplificadas configuradas'
-);
-console.log('[MonitoringRouter] 📍 Endpoints disponibles:');
-console.log('[MonitoringRouter]     - GET /api/monitoring/dashboard');
-console.log('[MonitoringRouter]     - GET /api/monitoring/status');
-console.log('[MonitoringRouter]     - GET /api/monitoring/services');
-console.log('[MonitoringRouter]     - GET /api/monitoring/metrics');
+advancedLogger.info('[OK] Rutas de monitoreo simplificadas configuradas', {
+  operation: 'monitoring.router.init',
+  endpoints: [
+    'GET /api/monitoring/dashboard',
+    'GET /api/monitoring/status',
+    'GET /api/monitoring/services',
+    'GET /api/monitoring/metrics',
+  ],
+});

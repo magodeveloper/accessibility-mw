@@ -75,12 +75,8 @@ services:
       GatewaySecret: "CI_GATEWAY_SECRET_FOR_TESTING"
     ports:
       - "8082:8082"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
+    # Healthcheck removido - los servicios .NET no incluyen curl/wget
+    # Los tests verificarán la disponibilidad directamente
 
   # Microservicio Reports API
   ms-reports:
@@ -98,13 +94,9 @@ services:
       JwtSettings__ExpiryHours: "24"
       GatewaySecret: "CI_GATEWAY_SECRET_FOR_TESTING"
     ports:
-      - "8080:8080"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
+      - "8083:8083"
+    # Healthcheck removido - los servicios .NET no incluyen curl/wget
+    # Los tests verificarán la disponibilidad directamente
 
 networks:
   default:

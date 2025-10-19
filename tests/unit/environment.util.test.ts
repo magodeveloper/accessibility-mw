@@ -234,7 +234,7 @@ describe('Environment Utility', () => {
         const config = getEnvironmentConfig();
 
         expect(config.NODE_ENV).toBe('development');
-        expect(config.HOST).toBe('localhost'); // Development default
+        expect(config.HOST).toBe('127.0.0.1'); // Development default (127.0.0.1 in implementation)
         expect(config.ANALYZE_TIMEOUT_MS).toBe(30000); // Development default
         expect(config.CACHE_MAX_ENTRIES).toBe(100); // Development default
         expect(config.CACHE_MAX_MEMORY_MB).toBe(50); // Development default
@@ -581,6 +581,7 @@ describe('Environment Utility', () => {
 
   describe('Integration Scenarios', () => {
     it('should handle mixed environment configurations correctly', () => {
+      delete process.env.HOST; // Limpiar para usar defaults
       process.env.NODE_ENV = 'production';
       process.env.PORT = '443';
       process.env.ENABLE_FILE_LOGGING = 'true'; // Override production default
@@ -600,6 +601,7 @@ describe('Environment Utility', () => {
     });
 
     it('should handle development with custom overrides', () => {
+      delete process.env.HOST; // Limpiar para usar defaults
       process.env.NODE_ENV = 'development';
       process.env.BROWSER_POOL_SIZE = '1'; // Override for development
       process.env.ENABLE_METRICS = 'false';
@@ -609,7 +611,7 @@ describe('Environment Utility', () => {
 
       expect(config.NODE_ENV).toBe('development');
       expect(config.BROWSER_POOL_SIZE).toBe(1); // Override
-      expect(config.HOST).toBe('localhost'); // Development default
+      expect(config.HOST).toBe('127.0.0.1'); // Development default
       expect(config.ENABLE_FILE_LOGGING).toBe(true); // Development default
       expect(config.CORS_ORIGINS).toEqual([
         'http://localhost:3000',

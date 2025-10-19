@@ -10,6 +10,7 @@ const DEEP_CACHE_MS = 60_000;
 import { Router } from 'express';
 import os from 'node:os';
 import { metricsCollector } from '../services/metrics.service';
+import { advancedLogger } from '../services/logging.service';
 
 // --- Tipos auxiliares ---
 type CheckResult = {
@@ -219,7 +220,18 @@ healthRouter.get('/', async (req, res) => {
     return res.status(overallOk ? 200 : 503).json(payload);
   } catch (error) {
     const err = error instanceof Error ? error : new Error('Unknown error');
-    req.log?.error({ requestId, error: err }, 'Health check deep failed');
+    const requestId = req.id;
+    const requestIdStr =
+      typeof requestId === 'string' || typeof requestId === 'number'
+        ? String(requestId)
+        : undefined;
+
+    advancedLogger.error('Deep health check failed', {
+      requestId: requestIdStr,
+      operation: 'health.deep',
+      error: err.message,
+      stack: err.stack,
+    });
 
     const errorPayload = {
       ok: false,

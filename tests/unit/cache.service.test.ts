@@ -12,24 +12,28 @@ import {
   getCacheKey,
 } from '../../src/services/cache.service';
 
+// Mock del advancedLogger antes de importar el servicio
+jest.mock('../../src/services/logging.service', () => ({
+  advancedLogger: {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+  },
+}));
+
+import { advancedLogger } from '../../src/services/logging.service';
+
 // Mock para TextEncoder
-global.TextEncoder = jest.fn(() => ({
+globalThis.TextEncoder = jest.fn(() => ({
   encode: jest.fn((str: string) => new Uint8Array(str.length)),
 })) as any;
-
-// Mock para console methods
-const originalConsoleWarn = console.warn;
-const originalConsoleLog = console.log;
-const mockConsoleWarn = jest.fn();
-const mockConsoleLog = jest.fn();
 
 describe('Cache Service', () => {
   let cache: LRUCache<any>;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    console.warn = mockConsoleWarn;
-    console.log = mockConsoleLog;
 
     // Crear nueva instancia para cada test
     cache = new LRUCache<any>(3, 1); // maxSize=3, maxMemoryMB=1
@@ -39,8 +43,6 @@ describe('Cache Service', () => {
   });
 
   afterEach(() => {
-    console.warn = originalConsoleWarn;
-    console.log = originalConsoleLog;
     jest.restoreAllMocks();
   });
 
@@ -65,7 +67,7 @@ describe('Cache Service', () => {
     });
 
     it('debe configurar limpieza automática periódica', () => {
-      const setIntervalSpy = jest.spyOn(global, 'setInterval');
+      const setIntervalSpy = jest.spyOn(globalThis, 'setInterval');
       const testCache = new LRUCache(5, 2);
 
       expect(testCache).toBeInstanceOf(LRUCache);
@@ -224,8 +226,12 @@ describe('Cache Service', () => {
 
       cache.set('html', '<div>large</div>', largeData);
 
-      expect(mockConsoleWarn).toHaveBeenCalledWith(
-        expect.stringContaining('[Cache] Entry too large')
+      expect(advancedLogger.warn).toHaveBeenCalledWith(
+        '[Cache] Entry too large, skipping cache',
+        expect.objectContaining({
+          sizeKB: expect.any(Number),
+          maxMemoryMB: expect.any(Number),
+        })
       );
       expect(cache.get('html', '<div>large</div>')).toBeNull();
     });
@@ -336,8 +342,11 @@ describe('Cache Service', () => {
       // Simular cleanup automática (acceder al método privado via any)
       (cache as any).cleanup();
 
-      expect(mockConsoleLog).toHaveBeenCalledWith(
-        '[Cache] Cleaned up 1 expired entries'
+      expect(advancedLogger.debug).toHaveBeenCalledWith(
+        '[Cache] Cleaned up expired entries',
+        expect.objectContaining({
+          count: 1,
+        })
       );
 
       expect(cache.get('html', '<div>test1</div>')).toBeNull();
@@ -356,7 +365,7 @@ describe('Cache Service', () => {
       jest.spyOn(Date, 'now').mockReturnValue(1000000 + 2 * 60 * 1000);
       (cache as any).cleanup();
 
-      expect(mockConsoleLog).not.toHaveBeenCalled();
+      expect(advancedLogger.debug).not.toHaveBeenCalled();
 
       process.env.NODE_ENV = originalEnv;
     });
@@ -368,7 +377,7 @@ describe('Cache Service', () => {
       (cache as any).cleanup();
 
       expect(cache.get('html', '<div>test</div>')).toEqual({ data: 'test' });
-      expect(mockConsoleLog).not.toHaveBeenCalled();
+      expect(advancedLogger.debug).not.toHaveBeenCalled();
     });
   });
 

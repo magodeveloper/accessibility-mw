@@ -1,3 +1,17 @@
+/**
+ * Tests de CONTRATO para el endpoint /api/analyze con equal-access
+ *
+ * ⚠️ IMPORTANTE: Usa endpoint MOCK - NO llama a servicios reales
+ *
+ * Propósito:
+ * - Validar comportamiento del endpoint con equal-access sin dependencias externas
+ * - Verificar integración de múltiples engines
+ * - Tests rápidos sin requerir docker ni microservicios
+ *
+ * Para tests de integración REALES ver:
+ * - tests/integration/analyze-real.integration.test.ts
+ */
+
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
@@ -6,7 +20,7 @@ import { TestServer } from '../helpers/testServer';
 // Importar las rutas de la aplicación
 let app: express.Express;
 
-describe('POST /api/analyze (equal-access)', () => {
+describe('POST /api/analyze (equal-access) - Contract Tests', () => {
   let testServer: TestServer;
 
   beforeAll(async () => {

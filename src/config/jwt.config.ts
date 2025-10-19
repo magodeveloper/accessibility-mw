@@ -11,11 +11,31 @@ const jwtConfigSchema = z.object({
     .describe('Secret key for signing JWT tokens'),
   issuer: z
     .string()
-    .url('JWT Issuer must be a valid URL')
+    .refine(
+      (val) => {
+        try {
+          new URL(val);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { message: 'JWT Issuer must be a valid URL' }
+    )
     .describe('JWT token issuer (iss claim)'),
   audience: z
     .string()
-    .url('JWT Audience must be a valid URL')
+    .refine(
+      (val) => {
+        try {
+          new URL(val);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { message: 'JWT Audience must be a valid URL' }
+    )
     .describe('JWT token audience (aud claim)'),
   expiryHours: z
     .number()

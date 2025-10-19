@@ -1,3 +1,17 @@
+/**
+ * Tests de CONTRATO básicos para la ruta /api/analyze
+ *
+ * ⚠️ IMPORTANTE: Usa MOCKS (jest.mock) - NO hace requests reales
+ *
+ * Propósito:
+ * - Validar comportamiento básico del endpoint sin dependencias externas
+ * - Verificar validación de entrada y manejo de errores
+ * - Tests rápidos sin requerir docker ni servicios externos
+ *
+ * Para tests de integración REALES ver:
+ * - tests/integration/analyze-real.integration.test.ts
+ */
+
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
@@ -66,7 +80,7 @@ require('../../src/utils/environment').ENV = envMocks.ENV;
 const { analyzeRouter } = require('../../src/routes/analyze.route');
 app.use('/api/analyze', analyzeRouter);
 
-describe('Analyze Route Basic Tests', () => {
+describe('Analyze Route - Basic Contract Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 

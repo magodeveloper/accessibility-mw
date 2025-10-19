@@ -33,10 +33,10 @@ describe('Health Config', () => {
       setupHealthChecks();
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[HealthSetup] 🚫 Health checks automáticos DESHABILITADOS'
+        '[HealthSetup] [DISABLED] Health checks automáticos DESHABILITADOS'
       );
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[HealthSetup] ℹ️  Solo endpoints básicos disponibles:'
+        '[HealthSetup] [INFO] Solo endpoints básicos disponibles:'
       );
       expect(consoleSpy).toHaveBeenCalledWith(
         '[HealthSetup]     - GET /health (health check básico)'
@@ -54,10 +54,10 @@ describe('Health Config', () => {
         '[HealthSetup]     - GET /health/live (liveness check)'
       );
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[HealthSetup] 💡 Esto mejora la estabilidad y reduce la complejidad del sistema'
+        '[HealthSetup] [TIP] Esto mejora la estabilidad y reduce la complejidad del sistema'
       );
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[HealthSetup] ✅ Configuración simplificada completada'
+        '[HealthSetup] [OK] Configuración simplificada completada'
       );
     });
 
@@ -111,9 +111,9 @@ describe('Health Config', () => {
         { path: '/health/live', description: 'Liveness check' },
       ];
 
-      expectedEndpoints.forEach((expectedEndpoint, index) => {
+      for (const [index, expectedEndpoint] of expectedEndpoints.entries()) {
         expect(endpoints[index]).toEqual(expectedEndpoint);
-      });
+      }
     });
 
     it('should include system information', () => {
@@ -183,7 +183,7 @@ describe('Health Config', () => {
 
       expect(service.name).toBe('middleware-core');
       expect(service.status).toBe('healthy');
-      expect(service.statusIcon).toBe('✅');
+      expect(service.statusIcon).toBe('[OK]');
       expect(service.description).toBe('Servicio principal funcionando');
       expect(service.responseTime).toBe(0);
     });
@@ -220,10 +220,10 @@ describe('Health Config', () => {
       stopHealthMonitoring();
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[HealthSetup] 🛑 Health monitoring ya estaba deshabilitado'
+        '[HealthSetup] [STOP] Health monitoring ya estaba deshabilitado'
       );
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[HealthSetup] ✅ No hay procesos que detener'
+        '[HealthSetup] [OK] No hay procesos que detener'
       );
     });
 

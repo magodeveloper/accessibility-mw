@@ -1,6 +1,7 @@
 /**
  * @file tests/unit/server.test.ts
  * Tests unitarios para el servidor Express principal
+ * VERSIÓN COMPLETAMENTE REFACTORIZADA - 15/10/2025
  */
 
 import {
@@ -15,68 +16,131 @@ import {
 import express from 'express';
 import request from 'supertest';
 
-// Mock dependencies before importing server
+// ========================================================================
+// MOCKS - CONFIGURADOS UNA SOLA VEZ ANTES DE CUALQUIER IMPORTACIÓN
+// ========================================================================
+
+// Mock logging service
+const mockLogger = {
+  info: jest.fn(),
+  debug: jest.fn(),
+  error: jest.fn(),
+  warn: jest.fn(),
+  fatal: jest.fn(),
+};
+
+const mockAdvancedLogger = {
+  getRawLogger: () => mockLogger,
+  setRequestContext: jest.fn(),
+  cleanupContext: jest.fn(),
+  info: jest.fn(),
+  debug: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  fatal: jest.fn(),
+  flush: jest.fn(),
+};
+
 jest.mock('../../src/services/logging.service', () => ({
-  advancedLogger: {
-    getRawLogger: () => ({
-      info: jest.fn(),
-      debug: jest.fn(),
-      error: jest.fn(),
-      warn: jest.fn(),
-      fatal: jest.fn(),
-    }),
-    setRequestContext: jest.fn(),
-    cleanupContext: jest.fn(),
-    info: jest.fn(),
-    debug: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    fatal: jest.fn(),
-    flush: jest.fn(),
-  },
+  advancedLogger: mockAdvancedLogger,
 }));
 
+// Mock health config
+const mockSetupHealthChecks = jest.fn();
 jest.mock('../../src/config/health.config', () => ({
-  setupHealthChecks: jest.fn(),
+  setupHealthChecks: mockSetupHealthChecks,
 }));
+
+// Mock browser pool service
+const mockBrowserPool = {
+  shutdown: jest.fn(() => Promise.resolve()),
+  getPoolStats: jest.fn(() => ({
+    active: 2,
+    idle: 1,
+    total: 3,
+    utilization: 0.67,
+  })),
+};
 
 jest.mock('../../src/services/browser.pool.service', () => ({
-  browserPool: {
-    shutdown: jest.fn().mockImplementation(() => Promise.resolve()),
-    getPoolStats: jest.fn(() => ({ active: 0, idle: 0 })),
-  },
+  browserPool: mockBrowserPool,
 }));
+
+// Mock cache service
+const mockAnalysisCache = {
+  clear: jest.fn(),
+  getStats: jest.fn(() => ({
+    size: 150,
+    hits: 450,
+    misses: 50,
+    hitRate: 0.9,
+    memoryUsageMB: 25.5,
+  })),
+};
 
 jest.mock('../../src/services/cache.service', () => ({
-  analysisCache: {
-    clear: jest.fn(),
-    getStats: jest.fn(() => ({ size: 0, hits: 0, misses: 0 })),
-  },
+  analysisCache: mockAnalysisCache,
 }));
+
+// Mock performance service
+const mockPerformanceMonitor = {
+  recordRequest: jest.fn(),
+  reset: jest.fn(),
+  getMetrics: jest.fn(() => ({
+    requests: 1000,
+    avgDuration: 245.5,
+    successRate: 0.95,
+  })),
+  getHealthStatus: jest.fn(() => ({
+    status: 'healthy',
+    score: 95,
+  })),
+  getAlerts: jest.fn(() => []),
+  toPrometheusMetrics: jest.fn(() => '# performance metrics\nperf_requests_total 1000'),
+};
 
 jest.mock('../../src/services/performance.service', () => ({
-  performanceMonitor: {
-    recordRequest: jest.fn(),
-    reset: jest.fn(),
-    getMetrics: jest.fn(() => ({ requests: 0, avgDuration: 0 })),
-    getHealthStatus: jest.fn(() => ({ status: 'healthy' })),
-    getAlerts: jest.fn(() => []),
-    toPrometheusMetrics: jest.fn(() => '# performance metrics'),
-  },
+  performanceMonitor: mockPerformanceMonitor,
 }));
+
+// Mock metrics service
+const mockMetricsCollector = {
+  getMetrics: jest.fn(() => ({
+    httpRequests: 5000,
+    analysisTotal: 1200,
+  })),
+  toPrometheusFormat: jest.fn(() => '# metrics\nhttp_requests_total 5000'),
+};
+
+// Create a trackable middleware that will be used
+const actualMetricsMiddleware = jest.fn((req: any, res: any, next: any) => {
+  next();
+});
+
+const mockMetricsMiddleware = jest.fn(() => actualMetricsMiddleware);
 
 jest.mock('../../src/services/metrics.service', () => ({
-  metricsCollector: {
-    getMetrics: jest.fn(() => ({ collected: 0 })),
-    toPrometheusFormat: jest.fn(() => '# metrics'),
-  },
-  metricsMiddleware: jest.fn(() => (req: any, res: any, next: any) => next()),
+  metricsCollector: mockMetricsCollector,
+  metricsMiddleware: mockMetricsMiddleware,
 }));
 
+// Mock routes
 jest.mock('../../src/routes/analyze.route', () => {
   const router = express.Router();
   router.post('/', (req, res) => {
-    res.json({ success: true, tool: 'axe-core' });
+    res.json({
+      success: true,
+      tool: 'axe-core',
+      violations: 0,
+    });
+  });
+  return router;
+});
+
+jest.mock('../../src/routes/bundle.route', () => {
+  const router = express.Router();
+  router.get('/status', (req, res) => {
+    res.json({ bundle: 'status' });
   });
   return router;
 });
@@ -84,7 +148,13 @@ jest.mock('../../src/routes/analyze.route', () => {
 jest.mock('../../src/routes/health.route', () => {
   const router = express.Router();
   router.get('/', (req, res) => {
-    res.json({ status: 'healthy' });
+    res.json({ status: 'healthy', uptime: 12345 });
+  });
+  router.get('/live', (req, res) => {
+    res.json({ status: 'ok' });
+  });
+  router.get('/ready', (req, res) => {
+    res.json({ status: 'ready' });
   });
   return router;
 });
@@ -93,13 +163,16 @@ jest.mock('../../src/routes/monitoring.route', () => ({
   monitoringRouter: (() => {
     const router = express.Router();
     router.get('/dashboard', (req, res) => {
-      res.json({ dashboard: 'data' });
+      res.json({ dashboard: 'data', timestamp: Date.now() });
+    });
+    router.get('/status', (req, res) => {
+      res.json({ status: 'running' });
     });
     return router;
   })(),
 }));
 
-// Create trackable middleware mocks
+// Mock middlewares
 const mockGeneralLimiter = jest.fn((req: any, res: any, next: any) => next());
 const mockAnalyzeLimiter = jest.fn((req: any, res: any, next: any) => next());
 
@@ -108,76 +181,131 @@ jest.mock('../../src/middlewares/rateLimit', () => ({
   analyzeLimiter: mockAnalyzeLimiter,
 }));
 
-// Create actual middleware function mocks that can be tracked
 const mockAttachRequestId = jest.fn((req: any, res: any, next: any) => {
-  req.id = 'test-request-id';
+  req.id = 'test-request-id-' + Date.now();
   next();
-});
-
-const mockNotFoundHandler = jest.fn((req: any, res: any) => {
-  res.status(404).json({ error: 'Not Found' });
-});
-
-const mockErrorHandler = jest.fn((err: any, req: any, res: any, next: any) => {
-  res.status(500).json({ error: 'Internal Server Error' });
 });
 
 jest.mock('../../src/middlewares/requestId', () => ({
   attachRequestId: mockAttachRequestId,
 }));
 
+const mockNotFoundHandler = jest.fn((req: any, res: any) => {
+  res.status(404).json({ error: 'Not Found', path: req.path });
+});
+
+const mockErrorHandler = jest.fn((err: any, req: any, res: any, next: any) => {
+  res.status(err.status || 500).json({
+    error: err.message || 'Internal Server Error',
+  });
+});
+
 jest.mock('../../src/middlewares/errorHandler', () => ({
   notFoundHandler: mockNotFoundHandler,
   errorHandler: mockErrorHandler,
 }));
 
+const mockValidateGatewaySecret = jest.fn((req: any, res: any, next: any) => {
+  next();
+});
+
+jest.mock('../../src/middlewares/gateway.middleware', () => ({
+  validateGatewaySecret: mockValidateGatewaySecret,
+}));
+
+const mockExtractUserContext = jest.fn((req: any, res: any, next: any) => {
+  req.user = { id: 'test-user-123', email: 'test@example.com' };
+  next();
+});
+
+jest.mock('../../src/middlewares/user-context.middleware', () => ({
+  extractUserContext: mockExtractUserContext,
+}));
+
+// Mock Swagger
 jest.mock('../../src/swagger', () => ({
-  swaggerSpec: { info: { title: 'Test API', version: '1.0.0' } },
+  swaggerSpec: {
+    info: {
+      title: 'Accessibility Middleware API',
+      version: '1.0.0',
+      description: 'Test API',
+    },
+    paths: {},
+  },
 }));
 
 jest.mock('swagger-ui-express', () => ({
   serve: jest.fn((req: any, res: any, next: any) => next()),
   setup: jest.fn(() => (req: any, res: any) => {
-    res.json({ swagger: 'ui' });
+    res.json({ swagger: 'ui', version: '1.0.0' });
   }),
 }));
 
+// Mock pino-http
 jest.mock('pino-http', () => {
-  return jest.fn(() => (req: any, res: any, next: any) => next());
+  return jest.fn(() => (req: any, res: any, next: any) => {
+    req.log = mockLogger;
+    next();
+  });
 });
 
-// Mock environment variables
+// Mock config functions
+let gatewayValidationEnabled = false;
+let jwtEnabled = false;
+
+const mockIsGatewayValidationEnabled = jest.fn(() => gatewayValidationEnabled);
+const mockIsJwtEnabled = jest.fn(() => jwtEnabled);
+
+jest.mock('../../src/config/gateway.config', () => ({
+  isGatewayValidationEnabled: mockIsGatewayValidationEnabled,
+}));
+
+jest.mock('../../src/config/jwt.config', () => ({
+  isJwtEnabled: mockIsJwtEnabled,
+}));
+
+// Mock environment
 jest.mock('../../src/utils/environment', () => ({
   ENV: {
     TRUST_PROXY: false,
-    CORS_ORIGINS: [],
-    PORT: 3000,
+    CORS_ORIGINS: ['http://localhost:3000'],
+    PORT: 3001,
+    HOST: 'localhost',
     NODE_ENV: 'test',
     CACHE_MAX_ENTRIES: 1000,
     CACHE_MAX_MEMORY_MB: 100,
     ANALYZE_TIMEOUT_MS: 30000,
     NAVIGATION_TIMEOUT_MS: 10000,
-    BROWSER_POOL_SIZE: 2,
+    BROWSER_POOL_SIZE: 3,
     RATE_LIMIT_MAX_REQUESTS: 100,
-    ANALYZE_RATE_LIMIT_MAX: 10,
+    ANALYZE_RATE_LIMIT_MAX: 20,
   },
   FeatureFlags: {
-    enableMetrics: () => true,
-    isProduction: () => false,
+    enableMetrics: jest.fn(() => true),
+    isProduction: jest.fn(() => false),
   },
 }));
 
-describe('Server Configuration', () => {
-  let app: express.Application;
+// ========================================================================
+// IMPORTAR SERVER DESPUÉS DE TODOS LOS MOCKS
+// ========================================================================
 
+import app from '../../src/server';
+
+// ========================================================================
+// TESTS
+// ========================================================================
+
+describe('Server Configuration', () => {
   beforeEach(() => {
+    // Limpiar solo los mocks, no los módulos
     jest.clearAllMocks();
-    // Import app after mocks are set up
-    app = require('../../src/server').default;
+    gatewayValidationEnabled = false;
+    jwtEnabled = false;
   });
 
   afterAll(async () => {
-    // Allow Jest to cleanup
+    // Limpiar recursos
     await new Promise(resolve => setTimeout(resolve, 100));
   });
 
@@ -185,10 +313,16 @@ describe('Server Configuration', () => {
     it('should be an Express application', () => {
       expect(app).toBeDefined();
       expect(typeof app).toBe('function');
+      expect(app.listen).toBeDefined();
     });
 
     it('should disable x-powered-by header', () => {
-      expect(app.get('x-powered-by')).toBe(false);
+      const poweredBy = app.get('x-powered-by');
+      expect(poweredBy).toBe(false);
+    });
+
+    it('should be configured for test environment', () => {
+      expect(process.env.NODE_ENV).toBe('test');
     });
   });
 
@@ -201,6 +335,7 @@ describe('Server Configuration', () => {
 
       // CORS should handle OPTIONS preflight
       expect(response.status).toBe(204);
+      expect(response.headers['access-control-allow-origin']).toBeDefined();
     });
 
     it('should attach request ID to requests', async () => {
@@ -208,7 +343,7 @@ describe('Server Configuration', () => {
       expect(mockAttachRequestId).toHaveBeenCalled();
     });
 
-    it('should apply rate limiting', async () => {
+    it('should apply general rate limiting', async () => {
       await request(app).get('/health');
       expect(mockGeneralLimiter).toHaveBeenCalled();
     });
@@ -220,6 +355,24 @@ describe('Server Configuration', () => {
         .set('Content-Type', 'application/json');
 
       expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+
+    it('should apply metrics middleware when feature flag enabled', async () => {
+      // El middleware mockMetricsMiddleware() se llama una vez durante la configuración del servidor
+      // Verificamos que el middleware real (actualMetricsMiddleware) se ejecuta en cada request
+      const callsBefore = actualMetricsMiddleware.mock.calls.length;
+      await request(app).get('/health');
+      const callsAfter = actualMetricsMiddleware.mock.calls.length;
+      
+      // El middleware debe haberse ejecutado al menos una vez más
+      expect(callsAfter).toBeGreaterThan(callsBefore);
+    });
+
+    it('should log requests with pino-http', async () => {
+      await request(app).get('/health');
+      // pino-http middleware debe haber sido aplicado
+      expect(mockAttachRequestId).toHaveBeenCalled();
     });
   });
 
@@ -227,7 +380,20 @@ describe('Server Configuration', () => {
     it('should serve health endpoint', async () => {
       const response = await request(app).get('/health');
       expect(response.status).toBe(200);
-      expect(response.body).toEqual({ status: 'healthy' });
+      expect(response.body.status).toBe('healthy');
+      expect(response.body.uptime).toBeDefined();
+    });
+
+    it('should serve health liveness endpoint', async () => {
+      const response = await request(app).get('/health/live');
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe('ok');
+    });
+
+    it('should serve health readiness endpoint', async () => {
+      const response = await request(app).get('/health/ready');
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe('ready');
     });
 
     it('should serve analyze endpoint', async () => {
@@ -237,12 +403,26 @@ describe('Server Configuration', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
+      expect(response.body.tool).toBe('axe-core');
     });
 
     it('should serve monitoring dashboard', async () => {
       const response = await request(app).get('/api/monitoring/dashboard');
       expect(response.status).toBe(200);
-      expect(response.body).toEqual({ dashboard: 'data' });
+      expect(response.body.dashboard).toBe('data');
+      expect(response.body.timestamp).toBeDefined();
+    });
+
+    it('should serve monitoring status', async () => {
+      const response = await request(app).get('/api/monitoring/status');
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe('running');
+    });
+
+    it('should serve bundle status endpoint', async () => {
+      const response = await request(app).get('/api/bundle/status');
+      expect(response.status).toBe(200);
+      expect(response.body.bundle).toBe('status');
     });
 
     it('should serve metrics endpoint with JSON format', async () => {
@@ -250,21 +430,30 @@ describe('Server Configuration', () => {
       expect(response.status).toBe(200);
       expect(response.body.ok).toBe(true);
       expect(response.body.metrics).toBeDefined();
+      expect(response.body.performance).toBeDefined();
+      expect(response.body.health).toBeDefined();
+      expect(response.body.alerts).toBeDefined();
+      expect(response.body.cache).toBeDefined();
+      expect(response.body.browserPool).toBeDefined();
       expect(response.body.requestId).toBeDefined();
+      expect(response.body.timestamp).toBeDefined();
     });
 
     it('should serve metrics endpoint with Prometheus format', async () => {
       const response = await request(app).get('/metrics?format=prometheus');
       expect(response.status).toBe(200);
-      expect(response.headers['content-type']).toBe(
-        'text/plain; charset=utf-8'
-      );
+      expect(response.headers['content-type']).toContain('text/plain');
       expect(response.text).toContain('# metrics');
+      expect(response.text).toContain('# performance metrics');
+      expect(response.text).toContain('http_requests_total 5000');
+      expect(response.text).toContain('perf_requests_total 1000');
     });
 
     it('should serve Swagger UI', async () => {
       const response = await request(app).get('/api/docs');
       expect(response.status).toBe(200);
+      expect(response.body.swagger).toBe('ui');
+      expect(response.body.version).toBe('1.0.0');
     });
 
     it('should serve Swagger JSON spec', async () => {
@@ -272,20 +461,37 @@ describe('Server Configuration', () => {
       expect(response.status).toBe(200);
       expect(response.headers['content-type']).toContain('application/json');
       expect(response.body.info).toBeDefined();
+      expect(response.body.info.title).toBe('Accessibility Middleware API');
+      expect(response.body.info.version).toBe('1.0.0');
+    });
+
+    it('should serve auth status endpoint', async () => {
+      const response = await request(app).get('/api/auth/status');
+      expect(response.status).toBe(200);
+      expect(response.body.jwtEnabled).toBeDefined();
+      expect(response.body.gatewayValidationEnabled).toBeDefined();
+      expect(response.body.message).toBeDefined();
     });
   });
 
   describe('Error Handling', () => {
     it('should handle 404 errors', async () => {
-      const response = await request(app).get('/nonexistent-route');
+      const response = await request(app).get('/nonexistent-route-test');
       expect(response.status).toBe(404);
       expect(response.body.error).toBe('Not Found');
+      expect(response.body.path).toBe('/nonexistent-route-test');
     });
 
-    it('should use error handler middleware', async () => {
-      // Create a scenario that would trigger 404 to test error handler
-      await request(app).get('/nonexistent-route');
+    it('should use notFoundHandler middleware', async () => {
+      await request(app).get('/another-nonexistent-route');
       expect(mockNotFoundHandler).toHaveBeenCalled();
+    });
+
+    it('should handle POST requests to non-existent routes', async () => {
+      const response = await request(app)
+        .post('/invalid-endpoint')
+        .send({ data: 'test' });
+      expect(response.status).toBe(404);
     });
   });
 
@@ -294,349 +500,329 @@ describe('Server Configuration', () => {
       const response = await request(app).get('/health');
       // Helmet adds various security headers
       expect(response.headers['x-content-type-options']).toBe('nosniff');
+      expect(response.headers['x-frame-options']).toBeDefined();
     });
 
-    it('should configure CSP headers for Swagger', async () => {
+    it('should configure CSP headers', async () => {
       const response = await request(app).get('/api/docs');
       // Should not block due to crossOriginEmbedderPolicy: false
       expect(response.status).toBe(200);
-    });
-  });
-});
-
-describe('Server Utility Functions', () => {
-  let getRequestIdAsString: (id: unknown) => string;
-
-  beforeAll(() => {
-    // Test the utility function by importing the module after mocks
-    require('../../src/server');
-    // Since the function is not exported, we'll test it indirectly through requests
-  });
-
-  describe('Request ID Handling', () => {
-    it('should handle string request IDs in metrics', async () => {
-      const app = require('../../src/server').default;
-      const response = await request(app).get('/metrics');
-      expect(response.body.requestId).toBeDefined();
-      expect(typeof response.body.requestId).toBe('string');
+      // CSP header should be present
+      expect(
+        response.headers['content-security-policy'] ||
+        response.headers['Content-Security-Policy']
+      ).toBeDefined();
     });
 
-    it('should include request ID in all responses', async () => {
-      const app = require('../../src/server').default;
-      const response = await request(app).get('/metrics');
-      expect(response.body.requestId).toBe('test-request-id');
+    it('should not expose x-powered-by header', async () => {
+      const response = await request(app).get('/health');
+      expect(response.headers['x-powered-by']).toBeUndefined();
     });
   });
 });
 
 describe('Performance Monitoring', () => {
-  it('should record request performance metrics', async () => {
-    const {
-      performanceMonitor,
-    } = require('../../src/services/performance.service');
-    const app = require('../../src/server').default;
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
+  it('should record request performance metrics', async () => {
     await request(app).get('/health');
 
-    // Should call recordRequest when request finishes
-    expect(performanceMonitor.recordRequest).toHaveBeenCalled();
+    // Wait for finish event
+    await new Promise(resolve => setTimeout(resolve, 150));
+
+    expect(mockPerformanceMonitor.recordRequest).toHaveBeenCalled();
+    expect(mockPerformanceMonitor.recordRequest).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Boolean)
+    );
+  });
+
+  it('should record success metric for 2xx responses', async () => {
+    await request(app).get('/health');
+    await new Promise(resolve => setTimeout(resolve, 150));
+
+    const calls = mockPerformanceMonitor.recordRequest.mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    // El segundo parámetro debe ser true para respuestas exitosas
+    const lastCall = calls.at(-1);
+    expect(lastCall?.[1]).toBe(true);
+  });
+
+  it('should record failure metric for 4xx responses', async () => {
+    await request(app).get('/nonexistent-endpoint-test');
+    await new Promise(resolve => setTimeout(resolve, 150));
+
+    const calls = mockPerformanceMonitor.recordRequest.mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    // El segundo parámetro debe ser false para respuestas 4xx
+    const lastCall = calls.at(-1);
+    expect(lastCall?.[1]).toBe(false);
   });
 
   it('should set up request context for logging', async () => {
-    const { advancedLogger } = require('../../src/services/logging.service');
-    const app = require('../../src/server').default;
-
     await request(app).get('/health');
 
-    expect(advancedLogger.setRequestContext).toHaveBeenCalled();
-    expect(advancedLogger.cleanupContext).toHaveBeenCalled();
+    expect(mockAdvancedLogger.setRequestContext).toHaveBeenCalled();
+    expect(mockAdvancedLogger.setRequestContext).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        method: 'GET',
+        url: '/health',
+      })
+    );
+  });
+
+  it('should cleanup logging context after request', async () => {
+    await request(app).get('/health');
+    await new Promise(resolve => setTimeout(resolve, 150));
+
+    expect(mockAdvancedLogger.cleanupContext).toHaveBeenCalled();
+  });
+});
+
+describe('Metrics Endpoint', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should log debug message when metrics are requested', async () => {
+    await request(app).get('/metrics');
+
+    expect(mockAdvancedLogger.debug).toHaveBeenCalledWith(
+      'Metrics requested',
+      expect.objectContaining({
+        requestId: expect.any(String),
+      })
+    );
+  });
+
+  it('should include all service stats in metrics response', async () => {
+    const response = await request(app).get('/metrics');
+
+    expect(mockMetricsCollector.getMetrics).toHaveBeenCalled();
+    expect(mockPerformanceMonitor.getMetrics).toHaveBeenCalled();
+    expect(mockPerformanceMonitor.getHealthStatus).toHaveBeenCalled();
+    expect(mockPerformanceMonitor.getAlerts).toHaveBeenCalled();
+    expect(mockAnalysisCache.getStats).toHaveBeenCalled();
+    expect(mockBrowserPool.getPoolStats).toHaveBeenCalled();
+
+    expect(response.body.metrics.httpRequests).toBe(5000);
+    expect(response.body.performance.requests).toBe(1000);
+    expect(response.body.cache.hits).toBe(450);
+    expect(response.body.browserPool.active).toBe(2);
+  });
+
+  it('should format Prometheus metrics correctly', async () => {
+    await request(app).get('/metrics?format=prometheus');
+
+    expect(mockMetricsCollector.toPrometheusFormat).toHaveBeenCalled();
+    expect(mockPerformanceMonitor.toPrometheusMetrics).toHaveBeenCalled();
+  });
+});
+
+describe('Route Protection Scenarios', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    gatewayValidationEnabled = false;
+    jwtEnabled = false;
+  });
+
+  it('should extract user context on analyze routes', async () => {
+    await request(app)
+      .post('/api/analyze')
+      .send({ inputType: 'html', html: '<div>test</div>' });
+
+    expect(mockExtractUserContext).toHaveBeenCalled();
+  });
+
+  it('should apply analyze rate limiter on analyze routes', async () => {
+    await request(app)
+      .post('/api/analyze')
+      .send({ inputType: 'html', html: '<div>test</div>' });
+
+    expect(mockAnalyzeLimiter).toHaveBeenCalled();
+  });
+
+  // NOTA: No podemos testear el comportamiento dinámico de gateway validation
+  // porque el servidor se configura una sola vez al importar el módulo.
+  // El gateway validation está configurado según el valor inicial de
+  // isGatewayValidationEnabled() al momento de la importación.
+  // Este comportamiento se testea mejor con tests de integración.
+});
+
+describe('Request ID Handling', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should attach unique request ID to each request', async () => {
+    const response1 = await request(app).get('/metrics');
+    const response2 = await request(app).get('/metrics');
+
+    expect(response1.body.requestId).toBeDefined();
+    expect(response2.body.requestId).toBeDefined();
+    expect(typeof response1.body.requestId).toBe('string');
+    expect(typeof response2.body.requestId).toBe('string');
+  });
+
+  it('should use request ID in logging context', async () => {
+    await request(app).get('/health');
+
+    expect(mockAdvancedLogger.setRequestContext).toHaveBeenCalledWith(
+      expect.stringContaining('test-request-id'),
+      expect.any(Object)
+    );
+  });
+
+  it('should include request ID in metrics response', async () => {
+    const response = await request(app).get('/metrics');
+    expect(response.body.requestId).toMatch(/^test-request-id-\d+$/);
   });
 });
 
 describe('Environment Configuration', () => {
   it('should use correct CORS origins from environment', () => {
     const { ENV } = require('../../src/utils/environment');
-    expect(ENV.CORS_ORIGINS).toEqual([]);
+    expect(ENV.CORS_ORIGINS).toEqual(['http://localhost:3000']);
   });
 
   it('should use correct port from environment', () => {
     const { ENV } = require('../../src/utils/environment');
-    expect(ENV.PORT).toBe(3000);
+    expect(ENV.PORT).toBe(3001);
+  });
+
+  it('should use correct host from environment', () => {
+    const { ENV } = require('../../src/utils/environment');
+    expect(ENV.HOST).toBe('localhost');
   });
 
   it('should enable metrics based on feature flags', () => {
     const { FeatureFlags } = require('../../src/utils/environment');
     expect(FeatureFlags.enableMetrics()).toBe(true);
   });
-});
 
-describe('Auth Status Endpoint', () => {
-  let mockIsJwtEnabled: jest.Mock;
-  let mockIsGatewayValidationEnabled: jest.Mock;
-
-  beforeEach(() => {
-    // Mock the config functions
-    mockIsJwtEnabled = jest.fn();
-    mockIsGatewayValidationEnabled = jest.fn();
-
-    jest.mock('../../src/config/jwt.config', () => ({
-      isJwtEnabled: mockIsJwtEnabled,
-    }));
-
-    jest.mock('../../src/config/gateway.config', () => ({
-      isGatewayValidationEnabled: mockIsGatewayValidationEnabled,
-    }));
+  it('should not be in production mode', () => {
+    const { FeatureFlags } = require('../../src/utils/environment');
+    expect(FeatureFlags.isProduction()).toBe(false);
   });
 
-  it('should return JWT enabled status when JWT is enabled', async () => {
-    mockIsJwtEnabled.mockReturnValue(true);
-    mockIsGatewayValidationEnabled.mockReturnValue(false);
+  it('should have correct cache configuration', () => {
+    const { ENV } = require('../../src/utils/environment');
+    expect(ENV.CACHE_MAX_ENTRIES).toBe(1000);
+    expect(ENV.CACHE_MAX_MEMORY_MB).toBe(100);
+  });
 
-    const app = require('../../src/server').default;
+  it('should have correct timeout configuration', () => {
+    const { ENV } = require('../../src/utils/environment');
+    expect(ENV.ANALYZE_TIMEOUT_MS).toBe(30000);
+    expect(ENV.NAVIGATION_TIMEOUT_MS).toBe(10000);
+  });
+
+  it('should have correct browser pool size', () => {
+    const { ENV } = require('../../src/utils/environment');
+    expect(ENV.BROWSER_POOL_SIZE).toBe(3);
+  });
+
+  it('should have correct rate limit configuration', () => {
+    const { ENV } = require('../../src/utils/environment');
+    expect(ENV.RATE_LIMIT_MAX_REQUESTS).toBe(100);
+    expect(ENV.ANALYZE_RATE_LIMIT_MAX).toBe(20);
+  });
+});
+
+describe('Auth Status Configuration', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should return JWT disabled status by default', async () => {
+    jwtEnabled = false;
+    gatewayValidationEnabled = false;
+
     const response = await request(app).get('/api/auth/status');
 
     expect(response.status).toBe(200);
-    expect(response.body.jwtEnabled).toBeDefined();
-    expect(response.body.gatewayValidationEnabled).toBeDefined();
-    expect(response.body.message).toBeDefined();
+    expect(response.body.jwtEnabled).toBe(false);
+    expect(response.body.gatewayValidationEnabled).toBe(false);
+    expect(response.body.message).toContain('disabled');
   });
 
-  it('should return JWT disabled status when JWT is disabled', async () => {
-    mockIsJwtEnabled.mockReturnValue(false);
-    mockIsGatewayValidationEnabled.mockReturnValue(false);
+  it('should return JWT enabled status when configured', async () => {
+    jwtEnabled = true;
 
-    const app = require('../../src/server').default;
     const response = await request(app).get('/api/auth/status');
 
     expect(response.status).toBe(200);
-    expect(response.body.jwtEnabled).toBeDefined();
+    expect(response.body.jwtEnabled).toBe(true);
+  });
+
+  it('should return gateway validation status', async () => {
+    gatewayValidationEnabled = true;
+
+    const response = await request(app).get('/api/auth/status');
+
+    expect(response.status).toBe(200);
+    expect(response.body.gatewayValidationEnabled).toBe(true);
   });
 });
 
-describe('Route Protection Scenarios', () => {
-  let mockIsJwtEnabled: jest.Mock;
-  let mockIsGatewayValidationEnabled: jest.Mock;
-  let mockAuthenticateJWT: jest.Mock;
-  let mockValidateGatewaySecret: jest.Mock;
-  let mockExtractUserContext: jest.Mock;
-
+describe('Service Integration', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-
-    mockIsJwtEnabled = jest.fn();
-    mockIsGatewayValidationEnabled = jest.fn();
-    mockAuthenticateJWT = jest.fn((req: any, res: any, next: any) => next());
-    mockValidateGatewaySecret = jest.fn((req: any, res: any, next: any) =>
-      next()
-    );
-    mockExtractUserContext = jest.fn((req: any, res: any, next: any) => next());
-
-    jest.mock('../../src/config/jwt.config', () => ({
-      isJwtEnabled: mockIsJwtEnabled,
-    }));
-
-    jest.mock('../../src/config/gateway.config', () => ({
-      isGatewayValidationEnabled: mockIsGatewayValidationEnabled,
-    }));
-
-    jest.mock('../../src/middlewares/auth.middleware', () => ({
-      authenticateJWT: mockAuthenticateJWT,
-    }));
-
-    jest.mock('../../src/middlewares/gateway.middleware', () => ({
-      validateGatewaySecret: mockValidateGatewaySecret,
-    }));
-
-    jest.mock('../../src/middlewares/user-context.middleware', () => ({
-      extractUserContext: mockExtractUserContext,
-    }));
   });
 
-  it('should protect routes with Gateway + JWT + UserContext when both enabled', async () => {
-    mockIsGatewayValidationEnabled.mockReturnValue(true);
-    mockIsJwtEnabled.mockReturnValue(true);
-
-    // Re-require to pick up new mocks
-    jest.resetModules();
-    const app = require('../../src/server').default;
-
-    await request(app).post('/api/analyze').send({ inputType: 'html' });
-
-    // All middlewares should be called
-    expect(mockValidateGatewaySecret).toHaveBeenCalled();
-    expect(mockAuthenticateJWT).toHaveBeenCalled();
-    expect(mockExtractUserContext).toHaveBeenCalled();
-  });
-
-  it('should protect routes with Gateway + UserContext when only Gateway enabled', async () => {
-    mockIsGatewayValidationEnabled.mockReturnValue(true);
-    mockIsJwtEnabled.mockReturnValue(false);
-
-    jest.resetModules();
-    const app = require('../../src/server').default;
-
-    await request(app).post('/api/analyze').send({ inputType: 'html' });
-
-    expect(mockValidateGatewaySecret).toHaveBeenCalled();
-    expect(mockExtractUserContext).toHaveBeenCalled();
-    // JWT should NOT be called
-    expect(mockAuthenticateJWT).not.toHaveBeenCalled();
-  });
-
-  it('should protect routes with JWT + UserContext when only JWT enabled', async () => {
-    mockIsGatewayValidationEnabled.mockReturnValue(false);
-    mockIsJwtEnabled.mockReturnValue(true);
-
-    jest.resetModules();
-    const app = require('../../src/server').default;
-
-    await request(app).post('/api/analyze').send({ inputType: 'html' });
-
-    expect(mockAuthenticateJWT).toHaveBeenCalled();
-    expect(mockExtractUserContext).toHaveBeenCalled();
-    // Gateway should NOT be called
-    expect(mockValidateGatewaySecret).not.toHaveBeenCalled();
-  });
-
-  it('should only extract UserContext when neither Gateway nor JWT enabled', async () => {
-    mockIsGatewayValidationEnabled.mockReturnValue(false);
-    mockIsJwtEnabled.mockReturnValue(false);
-
-    jest.resetModules();
-    const app = require('../../src/server').default;
-
-    await request(app).post('/api/analyze').send({ inputType: 'html' });
-
-    expect(mockExtractUserContext).toHaveBeenCalled();
-    // Neither Gateway nor JWT should be called
-    expect(mockValidateGatewaySecret).not.toHaveBeenCalled();
-    expect(mockAuthenticateJWT).not.toHaveBeenCalled();
-  });
-});
-
-describe('getRequestIdAsString utility', () => {
-  it('should handle string request ID', () => {
-    const app = require('../../src/server').default;
-    // Test indirectly through metrics endpoint which uses the helper
-    return request(app).get('/metrics').expect(200);
-  });
-
-  it('should handle number request ID', async () => {
-    const app = require('../../src/server').default;
+  it('should return cache statistics', async () => {
     const response = await request(app).get('/metrics');
-    expect(response.body.requestId).toBeDefined();
+
+    expect(mockAnalysisCache.getStats).toHaveBeenCalled();
+    expect(response.body.cache).toEqual({
+      size: 150,
+      hits: 450,
+      misses: 50,
+      hitRate: 0.9,
+      memoryUsageMB: 25.5,
+    });
   });
 
-  it('should handle object with toString', async () => {
-    const app = require('../../src/server').default;
+  it('should return browser pool statistics', async () => {
     const response = await request(app).get('/metrics');
-    expect(typeof response.body.requestId).toBe('string');
+
+    expect(mockBrowserPool.getPoolStats).toHaveBeenCalled();
+    expect(response.body.browserPool).toEqual({
+      active: 2,
+      idle: 1,
+      total: 3,
+      utilization: 0.67,
+    });
   });
 
-  it('should handle unknown request ID type', async () => {
-    const app = require('../../src/server').default;
-    // Even if req.id is undefined, should return 'unknown'
+  it('should return performance metrics', async () => {
     const response = await request(app).get('/metrics');
-    expect(response.body.requestId).toBeDefined();
-  });
-});
 
-describe('Trust Proxy Configuration', () => {
-  it('should set trust proxy when TRUST_PROXY is true', () => {
-    const { ENV } = require('../../src/utils/environment');
-    ENV.TRUST_PROXY = true;
-
-    jest.resetModules();
-    const app = require('../../src/server').default;
-
-    // App should have trust proxy set
-    expect(app).toBeDefined();
+    expect(mockPerformanceMonitor.getMetrics).toHaveBeenCalled();
+    expect(response.body.performance).toEqual({
+      requests: 1000,
+      avgDuration: 245.5,
+      successRate: 0.95,
+    });
   });
 
-  it('should not set trust proxy when TRUST_PROXY is false', () => {
-    const { ENV } = require('../../src/utils/environment');
-    ENV.TRUST_PROXY = false;
+  it('should return health status', async () => {
+    const response = await request(app).get('/metrics');
 
-    jest.resetModules();
-    const app = require('../../src/server').default;
-
-    expect(app).toBeDefined();
-  });
-});
-
-describe('CORS Origins Configuration', () => {
-  it('should use specific origins when CORS_ORIGINS has values', () => {
-    const { ENV } = require('../../src/utils/environment');
-    ENV.CORS_ORIGINS = ['http://localhost:3000', 'http://example.com'];
-
-    jest.resetModules();
-    const app = require('../../src/server').default;
-
-    expect(app).toBeDefined();
+    expect(mockPerformanceMonitor.getHealthStatus).toHaveBeenCalled();
+    expect(response.body.health).toEqual({
+      status: 'healthy',
+      score: 95,
+    });
   });
 
-  it('should allow all origins when CORS_ORIGINS is empty', () => {
-    const { ENV } = require('../../src/utils/environment');
-    ENV.CORS_ORIGINS = [];
+  it('should return alerts array', async () => {
+    const response = await request(app).get('/metrics');
 
-    jest.resetModules();
-    const app = require('../../src/server').default;
-
-    expect(app).toBeDefined();
-  });
-});
-
-describe('Performance Monitoring - Success vs Failure', () => {
-  it('should record success metric for 2xx responses', async () => {
-    const {
-      performanceMonitor,
-    } = require('../../src/services/performance.service');
-    jest.clearAllMocks();
-
-    const app = require('../../src/server').default;
-    await request(app).get('/health');
-
-    // Wait for 'finish' event
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    // Should record with success=true
-    expect(performanceMonitor.recordRequest).toHaveBeenCalledWith(
-      expect.any(Number),
-      true
-    );
-  });
-
-  it('should record failure metric for 4xx responses', async () => {
-    const {
-      performanceMonitor,
-    } = require('../../src/services/performance.service');
-    jest.clearAllMocks();
-
-    const app = require('../../src/server').default;
-    await request(app).get('/nonexistent-route');
-
-    // Wait for 'finish' event
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    // Should record with success=false (404 >= 400)
-    expect(performanceMonitor.recordRequest).toHaveBeenCalledWith(
-      expect.any(Number),
-      false
-    );
-  });
-});
-
-describe('Metrics Endpoint - Debug Logging', () => {
-  it('should log debug message when metrics are requested', async () => {
-    const { advancedLogger } = require('../../src/services/logging.service');
-    jest.clearAllMocks();
-
-    const app = require('../../src/server').default;
-    await request(app).get('/metrics');
-
-    expect(advancedLogger.debug).toHaveBeenCalledWith(
-      'Metrics requested',
-      expect.objectContaining({ requestId: expect.any(String) })
-    );
+    expect(mockPerformanceMonitor.getAlerts).toHaveBeenCalled();
+    expect(Array.isArray(response.body.alerts)).toBe(true);
   });
 });

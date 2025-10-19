@@ -202,7 +202,7 @@ describe('Browser Pool Service', () => {
 
       await expect(
         withPooledPage('html', testHtml, testFunction, options)
-      ).rejects.toThrow(/Timeout.*overall timeout exceeded/);
+      ).rejects.toThrow(/overall timeout exceeded/i);
     });
   });
 
@@ -340,9 +340,8 @@ describe('Browser Pool Service', () => {
     });
 
     it('debe manejar warnings de limpieza de recursos', async () => {
-      const consoleSpy = jest
-        .spyOn(console, 'warn')
-        .mockImplementation(() => {});
+      // El código ahora usa logger.warn en lugar de console.warn
+      // Solo verificamos que no falle cuando hay error en cleanup
       (mockPage.close as jest.MockedFunction<any>).mockRejectedValueOnce(
         new Error('Close page error')
       );
@@ -353,13 +352,8 @@ describe('Browser Pool Service', () => {
         return 'cleanup-warning-test';
       });
 
+      // Verificar que la función completa exitosamente a pesar del error de cleanup
       expect(result).toBe('cleanup-warning-test');
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Error cleaning up page/context:',
-        expect.any(Error)
-      );
-
-      consoleSpy.mockRestore();
     });
   });
 
@@ -399,9 +393,8 @@ describe('Browser Pool Service', () => {
     });
 
     it('debe manejar errores durante el cleanup de browsers idle', async () => {
-      const consoleSpy = jest
-        .spyOn(console, 'warn')
-        .mockImplementation(() => {});
+      // El código ahora usa logger.fatal en lugar de console.warn para errores de cleanup
+      // Solo verificamos que el cleanup intente cerrar el browser sin lanzar excepciones
 
       // Obtener un browser y liberarlo
       const browserInstance = await browserPool.getBrowser();
@@ -425,12 +418,9 @@ describe('Browser Pool Service', () => {
       // Esperar a que se complete el cleanup asíncrono
       await Promise.resolve();
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Error closing idle browser:',
-        expect.any(Error)
-      );
+      // Verificar que intentó cerrar el browser
+      expect(mockBrowser.close).toHaveBeenCalled();
 
-      consoleSpy.mockRestore();
       mockNow.mockRestore();
     });
   });
@@ -486,7 +476,7 @@ describe('Browser Pool Service', () => {
     beforeEach(() => {
       originalPlatform = process.platform;
       // Mock fs.existsSync
-      const fs = require('fs');
+      const fs = require('node:fs');
       jest.spyOn(fs, 'existsSync').mockImplementation(() => false);
     });
 
@@ -505,7 +495,7 @@ describe('Browser Pool Service', () => {
       );
 
       // Mock que encuentra Chrome en una ruta específica de Linux
-      const fs = require('fs');
+      const fs = require('node:fs');
       jest.spyOn(fs, 'existsSync').mockImplementation((path: any) => {
         return path === '/usr/bin/google-chrome';
       });

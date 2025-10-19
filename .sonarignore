@@ -1,0 +1,62 @@
+# SonarQube Analysis Exclusions
+# Files and directories to exclude from all SonarQube analysis
+
+# Dependencies
+node_modules/
+**/node_modules/**
+
+# Build outputs
+dist/
+build/
+**/dist/**
+**/build/**
+
+# Coverage reports
+coverage/
+**/coverage/**
+*.lcov
+
+# Test artifacts
+**/*.test.ts.snap
+**/__snapshots__/**
+
+# Configuration files
+*.config.js
+*.config.ts
+**/jest.*.config.js
+**/eslint.config.js
+**/babel.config.js
+
+# Environment files
+.env*
+*.env
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Swagger/OpenAPI generated
+**/swagger.ts
+**/swagger.json
+
+# Development utilities
+**/debug_*.json
+**/debug_*.txt

@@ -1,20 +1,105 @@
 // Setup optimizado para tests de Jest con mejores prácticas para CI
 import { jest } from '@jest/globals';
+import dotenv from 'dotenv';
+import path from 'node:path';
+
+// Cargar variables de entorno desde .env.test
+dotenv.config({ path: path.resolve(process.cwd(), '.env.test') });
 
 process.env.NODE_ENV = 'test';
 
-// Aumentar el límite de listeners para evitar warnings en tests
-// Configuración más alta para CI donde hay más procesos concurrentes
-const maxListeners = process.env.CI ? 30 : 20;
+// ═══════════════════════════════════════════════════════════════════════════
+// CONFIGURACIÓN DINÁMICA - Todas las constantes configurables
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Configuración centralizada para tests
+ * Todos los valores pueden ser sobrescritos mediante variables de entorno
+ */
+const TEST_CONFIG = {
+  // Listeners
+  maxListeners: {
+    ci: Number.parseInt(process.env.MAX_LISTENERS_CI || '30'),
+    local: Number.parseInt(process.env.MAX_LISTENERS_LOCAL || '20'),
+  },
+  
+  // Timeouts (en milisegundos)
+  timeout: {
+    ci: Number.parseInt(process.env.JEST_TIMEOUT_CI || '60000'),
+    local: Number.parseInt(process.env.JEST_TIMEOUT_LOCAL || '30000'),
+  },
+  
+  // API URLs
+  apis: {
+    analysis: process.env.ANALYSIS_API_URL || 'http://localhost:8082',
+    reports: process.env.REPORTS_API_URL || 'http://localhost:8083',
+    users: process.env.USERS_API_URL || 'http://localhost:8081',
+  },
+  
+  // Puppeteer arguments
+  puppeteer: {
+    args: process.env.PUPPETEER_ARGS || 
+      '--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-renderer-backgrounding',
+  },
+  
+  // Playwright
+  playwright: {
+    browsersPath: {
+      ci: process.env.PLAYWRIGHT_BROWSERS_PATH_CI || '/home/runner/.cache/ms-playwright',
+      local: process.env.PLAYWRIGHT_BROWSERS_PATH_LOCAL || '0',
+    },
+  },
+  
+  // Node.js memory
+  memory: {
+    maxOldSpaceSize: Number.parseInt(process.env.NODE_MAX_OLD_SPACE_SIZE || '4096'),
+  },
+  
+  // Cache directories
+  cache: {
+    achecker: process.env.ACHECKER_CACHE_DIR || (process.env.CI ? '/tmp/.achecker_cache' : '.achecker_cache'),
+  },
+  
+  // Log suppression
+  logs: {
+    suppress: process.env.SUPPRESS_CI_LOGS === 'true' || process.env.CI === 'true',
+  },
+  
+  // SSRF validation
+  security: {
+    bypassSsrfValidation: process.env.BYPASS_SSRF_VALIDATION_IN_DEV !== 'false',
+  },
+  
+  // Coverage
+  coverage: {
+    disableBrowserCoverage: process.env.DISABLE_BROWSER_COVERAGE === 'true' || process.env.CI === 'true',
+  },
+} as const;
+
+// Aplicar configuración de listeners
+const maxListeners = process.env.CI 
+  ? TEST_CONFIG.maxListeners.ci 
+  : TEST_CONFIG.maxListeners.local;
 process.setMaxListeners(maxListeners);
 
-// Configurar supresión de logs basada en environment
-const shouldSuppressLogs =
-  process.env.SUPPRESS_CI_LOGS === 'true' || process.env.CI === 'true';
+// ═══════════════════════════════════════════════════════════════════════════
+// UTILIDADES DE DETECCIÓN
+// ═══════════════════════════════════════════════════════════════════════════
 
-// Función auxiliar para detectar stack traces de análisis que deben ser suprimidos
-function isAnalysisStackTrace(message: string): boolean {
-  const stackTracePatterns = [
+/**
+ * Patrones de mensajes que deben ser suprimidos en los logs
+ * Configurables mediante variable de entorno SUPPRESS_LOG_PATTERNS (JSON array)
+ */
+const getStackTracePatterns = (): string[] => {
+  if (process.env.SUPPRESS_LOG_PATTERNS) {
+    try {
+      return JSON.parse(process.env.SUPPRESS_LOG_PATTERNS);
+    } catch {
+      console.warn('Invalid SUPPRESS_LOG_PATTERNS format, using defaults');
+    }
+  }
+  
+  return [
     'at Array.map (<anonymous>)',
     'at async Promise.all (index',
     'at saveResultsAndErrors',
@@ -37,9 +122,21 @@ function isAnalysisStackTrace(message: string): boolean {
     'at BrowserPool.getBrowser',
     'Force exiting Jest: Have you considered using `--detectOpenHandles`',
   ];
+};
 
+const stackTracePatterns = getStackTracePatterns();
+
+// Función auxiliar para detectar stack traces de análisis que deben ser suprimidos
+function isAnalysisStackTrace(message: string): boolean {
   return stackTracePatterns.some(pattern => message.includes(pattern));
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INTERCEPTORES DE CONSOLA
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Configurar supresión de logs basada en environment
+const shouldSuppressLogs = TEST_CONFIG.logs.suppress;
 
 // Interceptar console.log para CI optimizado
 if (shouldSuppressLogs) {
@@ -144,43 +241,63 @@ console.error = (...args: any[]) => {
   originalConsoleError.apply(console, args);
 };
 
+// ═══════════════════════════════════════════════════════════════════════════
+// CONFIGURACIÓN DE VARIABLES DE ENTORNO
+// ═══════════════════════════════════════════════════════════════════════════
+
 // Variables de entorno por defecto para tests
 if (!process.env.ANALYSIS_API_URL) {
-  process.env.ANALYSIS_API_URL = 'http://localhost:3002';
+  process.env.ANALYSIS_API_URL = TEST_CONFIG.apis.analysis;
 }
+
+if (!process.env.REPORTS_API_URL) {
+  process.env.REPORTS_API_URL = TEST_CONFIG.apis.reports;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONFIGURACIONES ESPECÍFICAS POR AMBIENTE
+// ═══════════════════════════════════════════════════════════════════════════
 
 // Configuraciones adicionales para CI optimizadas
 if (process.env.CI) {
   // Timeout más largo para CI
-  jest.setTimeout(parseInt(process.env.JEST_TIMEOUT || '60000'));
+  jest.setTimeout(TEST_CONFIG.timeout.ci);
 
   // Variables de entorno para CI optimizadas
-  process.env.PUPPETEER_ARGS =
-    '--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-renderer-backgrounding';
-  process.env.BYPASS_SSRF_VALIDATION_IN_DEV = 'false'; // Stricter validation in CI
+  process.env.PUPPETEER_ARGS = TEST_CONFIG.puppeteer.args;
+  
+  // Stricter validation in CI
+  process.env.BYPASS_SSRF_VALIDATION_IN_DEV = TEST_CONFIG.security.bypassSsrfValidation ? 'true' : 'false';
 
   // Configuraciones específicas para Playwright en CI
-  process.env.PLAYWRIGHT_BROWSERS_PATH = '/home/runner/.cache/ms-playwright';
+  process.env.PLAYWRIGHT_BROWSERS_PATH = TEST_CONFIG.playwright.browsersPath.ci;
 
   // Disable coverage instrumentation for browser evaluation context to avoid conflicts
-  process.env.DISABLE_BROWSER_COVERAGE = 'true';
+  process.env.DISABLE_BROWSER_COVERAGE = TEST_CONFIG.coverage.disableBrowserCoverage ? 'true' : 'false';
 
   // Configuraciones adicionales para optimizar CI
   process.env.NODE_OPTIONS = `${
     process.env.NODE_OPTIONS || ''
-  } --max-old-space-size=4096 --max-listeners=${maxListeners}`;
+  } --max-old-space-size=${TEST_CONFIG.memory.maxOldSpaceSize} --max-listeners=${maxListeners}`;
 
   // Configurar directorio de cache para achecker
-  process.env.ACHECKER_CACHE_DIR = '/tmp/.achecker_cache';
+  process.env.ACHECKER_CACHE_DIR = TEST_CONFIG.cache.achecker;
 } else {
   // Configuraciones para desarrollo local
-  process.env.PLAYWRIGHT_BROWSERS_PATH = '0';
-  jest.setTimeout(30000);
+  process.env.PLAYWRIGHT_BROWSERS_PATH = TEST_CONFIG.playwright.browsersPath.local;
+  jest.setTimeout(TEST_CONFIG.timeout.local);
+  
+  // Configurar directorio de cache para achecker
+  process.env.ACHECKER_CACHE_DIR = TEST_CONFIG.cache.achecker;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MOCK GLOBAL PARA PERMISOS EN CI
+// ═══════════════════════════════════════════════════════════════════════════
 
 // Mock global para evitar problemas de permisos en CI
 if (process.env.CI) {
-  const fs = require('fs');
+  const fs = require('node:fs');
   const originalMkdirSync = fs.mkdirSync;
 
   fs.mkdirSync = function (path: string, options?: any) {
@@ -197,6 +314,10 @@ if (process.env.CI) {
     }
   };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INTERCEPTOR DE STACK TRACES
+// ═══════════════════════════════════════════════════════════════════════════
 
 // Interceptar console.trace también para suprimir stack traces verbosos
 if (shouldSuppressLogs) {

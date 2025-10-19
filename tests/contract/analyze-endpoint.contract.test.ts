@@ -1,3 +1,17 @@
+/**
+ * Tests de CONTRATO para el endpoint /api/analyze
+ *
+ * ⚠️ IMPORTANTE: Usa endpoint MOCK - NO llama a servicios reales
+ *
+ * Propósito:
+ * - Validar comportamiento del endpoint sin dependencias externas
+ * - Verificar manejo de diferentes inputs y edge cases
+ * - Tests rápidos sin requerir docker ni microservicios
+ *
+ * Para tests de integración REALES ver:
+ * - tests/integration/analyze-real.integration.test.ts
+ */
+
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
@@ -6,7 +20,7 @@ import { TestServer } from '../helpers/testServer';
 // Importar las rutas de la aplicación
 let app: express.Express;
 
-describe('POST /api/analyze', () => {
+describe('POST /api/analyze - Endpoint Contract Tests', () => {
   let testServer: TestServer;
 
   beforeAll(async () => {

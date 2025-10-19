@@ -1,4 +1,4 @@
-name: 🚀 CI/CD Pipeline - Build, Test & Deploy
+name: CI/CD Pipeline
 
 on:
   push:
@@ -6,20 +6,17 @@ on:
   pull_request:
     branches: [master, main]
   schedule:
-    # Ejecutar semanalmente para verificar dependencias
     - cron: "0 6 * * 1"
 
 env:
   NODE_VERSION: "20"
-  # Reducir console.log en tests
   NODE_ENV: "test"
   CI: "true"
-  # Configurar límites de memoria (reducido de 4GB a 2GB para detección temprana de leaks)
   NODE_OPTIONS: "--max-old-space-size=2048"
 
 jobs:
   build-and-quality:
-    name: "📦 Build & Code Quality"
+    name: Build & Quality
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -46,7 +43,7 @@ jobs:
         run: npm run type-check
 
   test-unit:
-    name: "🧪 Unit Tests"
+    name: Unit Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: build-and-quality
@@ -69,7 +66,6 @@ jobs:
 
       - name: Run unit tests with optimizations
         run: |
-          # Configurar Jest para CI con optimizaciones
           npx jest tests/unit \
             --testTimeout=30000 \
             --coverage \
@@ -82,7 +78,6 @@ jobs:
           CI: true
           ANALYSIS_API_URL: http://localhost:8082
           REPORTS_API_URL: http://reports.internal:8080
-          # Configurar timeouts para evitar memory leaks
           JEST_TIMEOUT: 30000
 
       - name: Upload coverage reports
@@ -94,7 +89,7 @@ jobs:
           fail_ci_if_error: false
 
   test-integration:
-    name: "🔄 Integration Tests"
+    name: Integration Tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: build-and-quality
@@ -112,17 +107,14 @@ jobs:
 
       - name: Start supporting services
         run: |
-          echo "🚀 Starting MS Analysis and MS Reports services..."
           docker compose -f docker-compose.ci.yml up -d mysql-analysis mysql-reports ms-analysis ms-reports
 
-          echo "⏳ Waiting for services to be healthy..."
           timeout 120 bash -c 'until docker compose -f docker-compose.ci.yml ps | grep -q "healthy"; do sleep 2; done' || {
-            echo "❌ Services failed to start. Checking logs..."
+            echo "Services failed to start. Logs:"
             docker compose -f docker-compose.ci.yml logs
             exit 1
           }
 
-          echo "✅ All services are healthy"
           docker compose -f docker-compose.ci.yml ps
 
       - name: Setup Node.js
@@ -143,9 +135,7 @@ jobs:
 
       - name: Setup Playwright browsers
         run: |
-          # Instalar solo chromium para CI optimizado
           npx playwright install chromium
-          # Verificar instalación
           npx playwright --version
         if: steps.playwright-cache.outputs.cache-hit != 'true'
 
@@ -162,22 +152,19 @@ jobs:
         env:
           NODE_ENV: test
           CI: true
-          # URLs reales de microservicios (ya no mockeadas)
           ANALYSIS_API_URL: http://localhost:8082
           REPORTS_API_URL: http://localhost:8080
           JEST_TIMEOUT: 60000
-          # Configurar Playwright para CI
           PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
 
       - name: Cleanup services
         if: always()
         run: |
-          echo "🧹 Stopping services..."
           docker compose -f docker-compose.ci.yml logs ms-analysis ms-reports
           docker compose -f docker-compose.ci.yml down -v
 
   docker-build-test:
-    name: "🐳 Docker Build & Test"
+    name: Docker Build & Test
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [build-and-quality, test-unit]
@@ -193,49 +180,40 @@ jobs:
 
       - name: Test Docker image
         run: |
-          # Trap para capturar logs en caso de error
-          trap 'echo "❌ Docker test failed. Capturing container logs..."; docker logs test-container || echo "No logs available"; docker stop test-container 2>/dev/null || true' ERR
+          trap 'echo "Docker test failed. Capturing logs..."; docker logs test-container || echo "No logs available"; docker stop test-container 2>/dev/null || true' ERR
 
-          # Iniciar contenedor en background
           docker run --rm -d --name test-container \
             -p 3001:3001 \
             -e NODE_ENV=production \
             accessibility-mw:${{ github.sha }}
 
-          # Esperar que el servicio esté listo
           HEALTH_CHECK_PASSED=false
           for i in {1..30}; do
             if curl -f http://localhost:3001/health 2>/dev/null; then
-              echo "✅ Health check passed"
+              echo "Health check passed"
               HEALTH_CHECK_PASSED=true
               break
             fi
-            echo "⏳ Waiting for service... ($i/30)"
+            echo "Waiting for service... ($i/30)"
             sleep 2
           done
 
-          # Si el health check falló, capturar logs y salir
           if [ "$HEALTH_CHECK_PASSED" = "false" ]; then
-            echo "❌ Health check timeout after 60 seconds"
-            echo "📋 Container logs:"
+            echo "Health check timeout after 60 seconds"
             docker logs test-container
             docker stop test-container
             exit 1
           fi
 
-          # Ejecutar tests básicos del endpoint
-          echo "🧪 Running smoke tests..."
+          echo "Running smoke tests..."
           if ! curl -f http://localhost:3001/health; then
-            echo "❌ Smoke test failed"
-            echo "📋 Container logs:"
+            echo "Smoke test failed"
             docker logs test-container
             docker stop test-container
             exit 1
           fi
 
-          echo "✅ All smoke tests passed"
-
-          # Cleanup
+          echo "All smoke tests passed"
           docker stop test-container
 
   ci-summary:
@@ -246,7 +224,7 @@ jobs:
     steps:
       - name: Generate CI Summary
         run: |
-          echo "## 🚀 CI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## CI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- Build & Code Quality: ${{ needs.build-and-quality.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- Unit Tests: ${{ needs.test-unit.result }}" >> $GITHUB_STEP_SUMMARY

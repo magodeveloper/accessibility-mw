@@ -27,11 +27,11 @@ interface AlertConfig {
 }
 
 class HealthMonitor extends EventEmitter {
-  private checks: Map<string, HealthCheckConfig> = new Map();
-  private results: Map<string, HealthCheckResult> = new Map();
-  private timers: Map<string, NodeJS.Timeout> = new Map();
-  private alertCooldowns: Map<string, number> = new Map();
-  private alertConfig: AlertConfig;
+  private readonly checks: Map<string, HealthCheckConfig> = new Map();
+  private readonly results: Map<string, HealthCheckResult> = new Map();
+  private readonly timers: Map<string, NodeJS.Timeout> = new Map();
+  private readonly alertCooldowns: Map<string, number> = new Map();
+  private readonly alertConfig: AlertConfig;
 
   constructor(alertConfig?: Partial<AlertConfig>) {
     super();

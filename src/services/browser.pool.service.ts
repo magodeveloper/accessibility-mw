@@ -1,4 +1,11 @@
 import { Browser, BrowserContext, chromium, Page } from 'playwright';
+import {
+  createErrorContext,
+  ErrorFactory,
+  handleError,
+} from '../utils/error-handler';
+import type { LogContext } from './logging.service';
+import { advancedLogger as logger } from './logging.service';
 
 interface PooledBrowser {
   browser: Browser;
@@ -194,8 +201,10 @@ class BrowserPool {
     }
   }
 
-  private async cleanupIdleBrowsers() {
+  private async cleanupIdleBrowsers(): Promise<void> {
     const now = Date.now();
+    const context = createErrorContext().operation('browser.cleanup').build();
+
     for (let i = this.pool.length - 1; i >= 0; i--) {
       const pooledBrowser = this.pool[i];
       if (
@@ -204,27 +213,61 @@ class BrowserPool {
       ) {
         try {
           await pooledBrowser.browser.close();
+          logger.debug('Closed idle browser', {
+            ...context,
+            idleTime: now - pooledBrowser.lastUsed,
+            poolIndex: i,
+          });
         } catch (error) {
-          console.warn('Error closing idle browser:', error);
+          // Log but continue cleanup - non-critical error
+          handleError(error, context, {
+            logLevel: 'warn',
+            defaultMessage: 'Failed to close idle browser',
+            rethrow: false,
+          });
         }
         this.pool.splice(i, 1);
       }
     }
   }
 
-  async shutdown() {
+  async shutdown(): Promise<void> {
+    const context = createErrorContext().operation('browser.shutdown').build();
+
+    logger.info('Shutting down browser pool', {
+      ...context,
+      poolSize: this.pool.length,
+    });
+
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
     }
 
-    for (const pooledBrowser of this.pool) {
+    const closePromises = this.pool.map(async (pooledBrowser, index) => {
       try {
         await pooledBrowser.browser.close();
+        logger.debug('Browser closed successfully', {
+          ...context,
+          poolIndex: index,
+        });
       } catch (error) {
-        console.warn('Error closing browser during shutdown:', error);
+        // Log but continue shutdown - non-critical error
+        handleError(
+          error,
+          { ...context, poolIndex: index },
+          {
+            logLevel: 'warn',
+            defaultMessage: 'Failed to close browser during shutdown',
+            rethrow: false,
+          }
+        );
       }
-    }
+    });
+
+    await Promise.allSettled(closePromises);
     this.pool = [];
+
+    logger.info('Browser pool shutdown complete', context);
   }
 
   getPoolStats() {
@@ -280,6 +323,7 @@ export async function withPooledPage<T>(
     overallTimeoutMs?: number;
     navTimeoutMs?: number;
     idleWaitMs?: number;
+    requestId?: string;
   }
 ): Promise<T> {
   const overallTimeoutMs =
@@ -289,8 +333,15 @@ export async function withPooledPage<T>(
   const idleWaitMs =
     opts?.idleWaitMs ?? Number(process.env.IDLE_WAIT_MS ?? 2000);
 
+  const context: LogContext = {
+    requestId: opts?.requestId,
+    operation: 'browser.withPooledPage',
+    inputType,
+    url: inputType === 'url' ? value : undefined,
+  };
+
   let browser: Browser | null = null;
-  let context: BrowserContext | null = null;
+  let browserContext: BrowserContext | null = null;
   let page: Page | null = null;
   let timeoutHit = false;
 
@@ -300,18 +351,22 @@ export async function withPooledPage<T>(
 
   try {
     browser = await browserPool.getBrowser();
+    logger.debug('Browser acquired from pool', context);
 
-    context = await browser.newContext({
+    browserContext = await browser.newContext({
       javaScriptEnabled: true,
       ignoreHTTPSErrors: true,
       viewport: { width: 1280, height: 720 },
     });
 
-    page = await context.newPage();
+    page = await browserContext.newPage();
     page.setDefaultNavigationTimeout(navTimeoutMs);
 
     if (timeoutHit) {
-      throw new Error('Timeout: overall timeout exceeded before page setup');
+      throw ErrorFactory.timeout(
+        'Overall timeout exceeded before page setup',
+        context
+      );
     }
 
     if (inputType === 'url') {
@@ -319,36 +374,65 @@ export async function withPooledPage<T>(
       if (idleWaitMs > 0) {
         await page.waitForTimeout(idleWaitMs);
       }
+      logger.debug('Page navigated successfully', { ...context, url: value });
     } else {
       await page.setContent(value);
       await page.waitForTimeout(500); // Breve espera para que se renderice
+      logger.debug('HTML content set successfully', context);
     }
 
     if (timeoutHit) {
-      throw new Error('Timeout: overall timeout exceeded during navigation');
+      throw ErrorFactory.timeout(
+        'Overall timeout exceeded during navigation',
+        context
+      );
     }
 
     const result = await fn(page);
 
     if (timeoutHit) {
-      throw new Error('Timeout: overall timeout exceeded during analysis');
+      throw ErrorFactory.timeout(
+        'Overall timeout exceeded during analysis',
+        context
+      );
     }
 
+    logger.debug('Page function executed successfully', context);
     return result;
+  } catch (error) {
+    // Wrap and rethrow with context
+    handleError(error, context, {
+      logLevel: 'error',
+      defaultMessage: 'Browser page execution failed',
+      rethrow: true,
+    });
+    throw error; // TypeScript flow analysis
   } finally {
     clearTimeout(timer);
 
-    // Limpiar recursos
+    // Cleanup page and context
     try {
-      if (page) await page.close();
-      if (context) await context.close();
+      if (page) {
+        await page.close();
+        logger.debug('Page closed', context);
+      }
+      if (browserContext) {
+        await browserContext.close();
+        logger.debug('Browser context closed', context);
+      }
     } catch (error) {
-      console.warn('Error cleaning up page/context:', error);
+      // Non-critical cleanup error
+      handleError(error, context, {
+        logLevel: 'warn',
+        defaultMessage: 'Error cleaning up page/context',
+        rethrow: false,
+      });
     }
 
-    // Devolver browser al pool
+    // Release browser back to pool
     if (browser) {
       browserPool.releaseBrowser(browser);
+      logger.debug('Browser released to pool', context);
     }
   }
 }

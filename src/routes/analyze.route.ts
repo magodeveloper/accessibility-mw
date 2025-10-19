@@ -5,6 +5,9 @@ import { advancedLogger } from '../services/logging.service';
 import { ENV } from '../utils/environment';
 import { error, success } from '../utils/response';
 import {
+  ErrorFactory,
+} from '../utils/error-handler';
+import {
   getWcagCriterionId,
   getWcagMapping,
   WcagLevel,
@@ -138,14 +141,19 @@ const createOptimizedLogger = (
       const logEntry = `[${timestamp}] [${level}] [${requestId}] ${message}${dataStr}\n`;
       fs.appendFileSync('debug_log.txt', logEntry);
     } catch (err) {
-      if (isDev)
-        console.warn('Failed to write to debug log:', (err as Error).message);
+      if (isDev) {
+        advancedLogger.warn('Failed to write to debug log', {
+          requestId,
+          operation: 'analyze.logToFile',
+          error: (err as Error).message,
+        });
+      }
     }
   };
 
   return {
     info: (message: string, data?: LogData) => {
-      if (isDev) console.log(`ℹ️ [${requestId}] ${message}`, data || '');
+      advancedLogger.info(message, { requestId, operation: 'analyze', ...data });
       (
         req as express.Request & {
           log?: { info: (data: LogData, message: string) => void };
@@ -154,7 +162,7 @@ const createOptimizedLogger = (
       logToFile('INFO', message, data);
     },
     warn: (message: string, data?: LogData) => {
-      if (isDev) console.warn(`⚠️ [${requestId}] ${message}`, data || '');
+      advancedLogger.warn(message, { requestId, operation: 'analyze', ...data });
       (
         req as express.Request & {
           log?: { warn: (data: LogData, message: string) => void };
@@ -163,7 +171,7 @@ const createOptimizedLogger = (
       logToFile('WARN', message, data);
     },
     error: (message: string, data?: LogData) => {
-      if (isDev) console.error(`❌ [${requestId}] ${message}`, data || '');
+      advancedLogger.error(message, { requestId, operation: 'analyze', ...data });
       (
         req as express.Request & {
           log?: { error: (data: LogData, message: string) => void };
@@ -172,7 +180,7 @@ const createOptimizedLogger = (
       logToFile('ERROR', message, data);
     },
     debug: (message: string, data?: LogData) => {
-      if (isDev) console.log(`🔍 [${requestId}] ${message}`, data || '');
+      advancedLogger.debug(message, { requestId, operation: 'analyze', ...data });
       logToFile('DEBUG', message, data);
     },
   };
@@ -268,7 +276,10 @@ const resolveAcceptLanguage = (req?: express.Request): string => {
 // Helper para logs verbosos controlados por variable de entorno
 const debugVerbose = (message: string, data?: unknown) => {
   if (process.env.DEBUG_VERBOSE === 'true') {
-    console.log(`🐞 ${message}`, data || '');
+    advancedLogger.debug(message, {
+      operation: 'analyze.debug',
+      ...( typeof data === 'object' && data !== null ? data as Record<string, unknown> : { data }),
+    });
   }
 };
 
@@ -462,7 +473,11 @@ async function saveAnalysis(
         status: saveResp.status,
         error: errorText,
       });
-      throw new Error(`Microservice error (${saveResp.status}): ${errorText}`);
+      throw ErrorFactory.externalApi(
+        `Microservice error (${saveResp.status}): ${errorText}`,
+        saveResp.status,
+        { requestId, operation: 'saveAnalysis' }
+      );
     }
 
     const result = await saveResp.json();
@@ -525,7 +540,11 @@ async function saveHistory(
         status: saveResp.status,
         error: errorText,
       });
-      throw new Error(`Reports API error (${saveResp.status}): ${errorText}`);
+      throw ErrorFactory.externalApi(
+        `Reports API error (${saveResp.status}): ${errorText}`,
+        saveResp.status,
+        { requestId, operation: 'saveHistory' }
+      );
     }
 
     const result = await saveResp.json();
@@ -585,7 +604,11 @@ async function saveResult(
         status: resp.status,
         error: errorText,
       });
-      throw new Error(`SaveResult error (${resp.status}): ${errorText}`);
+      throw ErrorFactory.externalApi(
+        `SaveResult error (${resp.status}): ${errorText}`,
+        resp.status,
+        { requestId, operation: 'saveResult' }
+      );
     }
 
     const responseData = await resp.json();
@@ -642,7 +665,11 @@ async function saveError(
         status: errorResp.status,
         error: errorText,
       });
-      throw new Error(`SaveError error (${errorResp.status}): ${errorText}`);
+      throw ErrorFactory.externalApi(
+        `SaveError error (${errorResp.status}): ${errorText}`,
+        errorResp.status,
+        { requestId, operation: 'saveError' }
+      );
     }
 
     const responseData = await errorResp.json();
@@ -669,11 +696,12 @@ async function saveResultsAndErrors(
   const failedErrors: Array<{ errorPayload: ErrorPayload; error: string }> = [];
 
   // DEBUG: Log inicial MUY específico
-  console.log('🚨 SAVE_RESULTS_AND_ERRORS_START:', {
+  advancedLogger.debug('SAVE_RESULTS_AND_ERRORS_START', {
+    requestId,
+    operation: 'saveResultsAndErrors',
     resultCount: resultsPayload.length,
     itemsCount: itemsList.length,
     analysisId,
-    requestId,
     firstItemType: itemsList[0]?.type,
     firstItemId: itemsList[0]?.id,
   });
@@ -701,7 +729,9 @@ async function saveResultsAndErrors(
       const item = batchItems[batchIndex];
       let resultId: number | null = null;
 
-      console.log('🚨 ABOUT_TO_SAVE_RESULT:', {
+      advancedLogger.debug('ABOUT_TO_SAVE_RESULT', {
+        requestId,
+        operation: 'saveResultsAndErrors.batch',
         batchIndex,
         itemId: item?.id,
         itemType: item.type,
@@ -710,15 +740,23 @@ async function saveResultsAndErrors(
 
       // Guardar resultado y capturar el ID
       try {
-        console.log('🚨 CALLING_SAVE_RESULT for item:', item?.id);
+        advancedLogger.debug('CALLING_SAVE_RESULT', {
+          requestId,
+          operation: 'saveResultsAndErrors.saveResult',
+          itemId: item?.id,
+        });
         resultId = await saveResult(result, requestId);
-        console.log('🚨 SAVE_RESULT_RETURNED:', {
+        advancedLogger.debug('SAVE_RESULT_RETURNED', {
+          requestId,
+          operation: 'saveResultsAndErrors.saveResult',
           itemId: item?.id,
           resultId,
         });
         logger.info(`Result saved with ID: ${resultId}`, { requestId });
       } catch (err) {
-        console.log('🚨 SAVE_RESULT_FAILED:', {
+        advancedLogger.error('SAVE_RESULT_FAILED', {
+          requestId,
+          operation: 'saveResultsAndErrors.saveResult',
           itemId: item?.id,
           error: String(err),
         });
@@ -729,7 +767,9 @@ async function saveResultsAndErrors(
       // Procesar errores si aplica (solo si el resultado se guardó exitosamente)
       const errorTypes = ['violation', 'needsreview', 'recommendation'];
 
-      console.log('🚨 ERROR_PROCESSING_CHECK:', {
+      advancedLogger.debug('ERROR_PROCESSING_CHECK', {
+        requestId,
+        operation: 'saveResultsAndErrors.errorCheck',
         itemId: item.id,
         itemType: item.type,
         resultId,
@@ -749,7 +789,9 @@ async function saveResultsAndErrors(
         const node = item.nodes?.[0] ?? {};
         const errorMessage = node.failureSummary || item.help || null;
 
-        console.log('🚨 ERROR_CONDITIONS_MET:', {
+        advancedLogger.debug('ERROR_CONDITIONS_MET', {
+          requestId,
+          operation: 'saveResultsAndErrors.errorConditions',
           itemId: item.id,
           itemType: item.type,
           resultId,
@@ -768,7 +810,9 @@ async function saveResultsAndErrors(
         );
 
         if (errorMessage) {
-          console.log('🚨 ABOUT_TO_SAVE_ERROR:', {
+          advancedLogger.debug('ABOUT_TO_SAVE_ERROR', {
+            requestId,
+            operation: 'saveResultsAndErrors.saveError',
             itemId: item.id,
             resultId,
             errorMessageLength: errorMessage.length,
@@ -788,7 +832,9 @@ async function saveResultsAndErrors(
             requestId,
           });
 
-          console.log('🚨 CREATED_ERROR_PAYLOAD:', {
+          advancedLogger.debug('CREATED_ERROR_PAYLOAD', {
+            requestId,
+            operation: 'saveResultsAndErrors.errorPayload',
             itemId: item.id,
             resultId,
             hasErrorPayload: !!errorPayload,
@@ -797,12 +843,16 @@ async function saveResultsAndErrors(
           });
 
           try {
-            console.log('🚨 CALLING_SAVE_ERROR:', {
+            advancedLogger.debug('CALLING_SAVE_ERROR', {
+              requestId,
+              operation: 'saveResultsAndErrors.saveError.call',
               itemId: item.id,
               resultId,
             });
             await saveError(errorPayload, requestId);
-            console.log('🚨 SAVE_ERROR_COMPLETED:', {
+            advancedLogger.debug('SAVE_ERROR_COMPLETED', {
+              requestId,
+              operation: 'saveResultsAndErrors.saveError.completed',
               itemId: item.id,
               resultId,
             });

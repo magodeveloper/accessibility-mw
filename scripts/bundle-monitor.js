@@ -318,17 +318,21 @@ class BundleMonitor {
       const difference = currentSize - previousSize;
       const percentageChange = ((difference / previousSize) * 100).toFixed(2);
 
+      let trend;
+      if (difference > 0) {
+        trend = 'increased';
+      } else if (difference < 0) {
+        trend = 'decreased';
+      } else {
+        trend = 'unchanged';
+      }
+
       return {
         previousSize: this.formatBytes(previousSize),
         currentSize: this.formatBytes(currentSize),
         difference: this.formatBytes(Math.abs(difference)),
         percentageChange,
-        trend:
-          difference > 0
-            ? 'increased'
-            : difference < 0
-            ? 'decreased'
-            : 'unchanged',
+        trend: trend,
         significant: Math.abs(difference) > 1024 * 10, // Más de 10KB es significativo
       };
     } catch (error) {
@@ -459,9 +463,8 @@ class BundleMonitor {
     markdown += `|------|-------|------|------------|\n`;
 
     report.bundle.summary.typeBreakdown.forEach(type => {
-      markdown += `| ${type.type || 'other'} | ${type.count} | ${type.size} | ${
-        type.percentage
-      }% |\n`;
+      markdown += `| ${type.type || 'other'} | ${type.count} | ${type.size} | ${type.percentage
+        }% |\n`;
     });
     markdown += `\n`;
 
@@ -514,8 +517,14 @@ class BundleMonitor {
     if (report.recommendations.length > 0) {
       markdown += `## 💡 Recommendations\n\n`;
       report.recommendations.forEach(rec => {
-        const emoji =
-          rec.type === 'warning' ? '⚠️' : rec.type === 'error' ? '❌' : 'ℹ️';
+        let emoji;
+        if (rec.type === 'warning') {
+          emoji = '⚠️';
+        } else if (rec.type === 'error') {
+          emoji = '❌';
+        } else {
+          emoji = 'ℹ️';
+        }
         markdown += `${emoji} **${rec.message}**\n`;
         markdown += `   *Action:* ${rec.action}\n\n`;
       });

@@ -8,8 +8,8 @@
  * Solo se mantienen los endpoints básicos de health check
  */
 export function setupHealthChecks(): void {
-  console.log('[HealthSetup] 🚫 Health checks automáticos DESHABILITADOS');
-  console.log('[HealthSetup] ℹ️  Solo endpoints básicos disponibles:');
+  console.log('[HealthSetup] [DISABLED] Health checks automáticos DESHABILITADOS');
+  console.log('[HealthSetup] [INFO] Solo endpoints básicos disponibles:');
   console.log('[HealthSetup]     - GET /health (health check básico)');
   console.log(
     '[HealthSetup]     - GET /health/shallow (health check superficial)'
@@ -18,9 +18,9 @@ export function setupHealthChecks(): void {
   console.log('[HealthSetup]     - GET /health/ready (readiness check)');
   console.log('[HealthSetup]     - GET /health/live (liveness check)');
   console.log(
-    '[HealthSetup] 💡 Esto mejora la estabilidad y reduce la complejidad del sistema'
+    '[HealthSetup] [TIP] Esto mejora la estabilidad y reduce la complejidad del sistema'
   );
-  console.log('[HealthSetup] ✅ Configuración simplificada completada');
+  console.log('[HealthSetup] [OK] Configuración simplificada completada');
 }
 
 /**
@@ -55,7 +55,7 @@ export function getServicesStatus(): Record<string, unknown>[] {
     {
       name: 'middleware-core',
       status: 'healthy',
-      statusIcon: '✅',
+      statusIcon: '[OK]',
       description: 'Servicio principal funcionando',
       responseTime: 0,
       lastCheck: new Date().toISOString(),
@@ -68,6 +68,6 @@ export function getServicesStatus(): Record<string, unknown>[] {
  * Función simplificada para detener monitoring (no hace nada)
  */
 export function stopHealthMonitoring(): void {
-  console.log('[HealthSetup] 🛑 Health monitoring ya estaba deshabilitado');
-  console.log('[HealthSetup] ✅ No hay procesos que detener');
+  console.log('[HealthSetup] [STOP] Health monitoring ya estaba deshabilitado');
+  console.log('[HealthSetup] [OK] No hay procesos que detener');
 }

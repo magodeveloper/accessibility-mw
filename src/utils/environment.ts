@@ -52,7 +52,7 @@ export function getEnvironmentConfig(): EnvironmentConfig {
   return {
     // Server Configuration
     PORT: parseInt(process.env.PORT ?? '3001', 10),
-    HOST: process.env.HOST ?? (isDev ? 'localhost' : '0.0.0.0'),
+    HOST: process.env.HOST ?? (isDev ? '127.0.0.1' : '0.0.0.0'),
     NODE_ENV: process.env.NODE_ENV ?? 'development',
 
     // Performance & Timeouts - Optimized values

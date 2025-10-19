@@ -218,9 +218,9 @@ router.get('/analysis', (req: Request, res: Response) => {
         totalSizeFormatted: formatBytes(
           files.reduce((sum, f) => sum + f.size, 0)
         ),
-        largestFile: files.sort((a, b) => b.size - a.size)[0] || null,
+        largestFile: [...files].sort((a, b) => b.size - a.size)[0] || null,
       })),
-      largestFiles: report.bundle.files
+      largestFiles: [...report.bundle.files]
         .sort((a, b) => b.size - a.size)
         .slice(0, 10),
       sizeLimit: report.sizeLimit || null,

@@ -1,6 +1,6 @@
 [
   {
-    "name": "� Server Bundle",
+    "name": "Server Bundle",
     "path": "dist/server.js",
     "limit": "5 MB",
     "webpack": false,

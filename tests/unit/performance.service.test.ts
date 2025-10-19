@@ -9,6 +9,21 @@ jest.mock('../../src/utils/environment', () => ({
     enableMetrics: jest.fn(() => true), // Por defecto habilitado
     enableLogging: jest.fn(() => true),
     enableDebug: jest.fn(() => false),
+    isDevelopment: jest.fn(() => false),
+    isProduction: jest.fn(() => false),
+    isTest: jest.fn(() => true),
+    verboseLogging: jest.fn(() => false),
+  },
+}));
+
+// Mock del módulo logging ANTES de importar el service
+jest.mock('../../src/services/logging.service', () => ({
+  advancedLogger: {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    fatal: jest.fn(),
+    debug: jest.fn(),
   },
 }));
 
@@ -22,9 +37,10 @@ import {
 } from '@jest/globals';
 import { performanceMonitor } from '../../src/services/performance.service';
 import * as EnvironmentModule from '../../src/utils/environment';
+import { advancedLogger } from '../../src/services/logging.service';
 
 describe('Performance Service', () => {
-  let consoleSpy: any;
+  let loggerWarnSpy: jest.Mock;
 
   beforeEach(() => {
     // Reset todos los mocks
@@ -38,12 +54,11 @@ describe('Performance Service', () => {
     // Reset la instancia singleton para cada test
     performanceMonitor.reset();
 
-    // Spy en console.warn (no console.log) para verificar alertas
-    consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    // Spy en advancedLogger.warn para verificar alertas
+    loggerWarnSpy = advancedLogger.warn as jest.Mock;
   });
 
   afterEach(() => {
-    consoleSpy.mockRestore();
     performanceMonitor.reset();
   });
 
@@ -165,9 +180,9 @@ describe('Performance Service', () => {
 
     test('debe manejar valores ordenados y desordenados', () => {
       const times = [300, 100, 500, 200, 400];
-      times.forEach(time => {
+      for (const time of times) {
         performanceMonitor.recordRequest(time, true);
-      });
+      }
 
       const metrics = performanceMonitor.getMetrics();
       expect(metrics.avgResponseTime).toBe(300);
@@ -180,16 +195,18 @@ describe('Performance Service', () => {
     test('debe crear alerta por tiempo de respuesta alto', () => {
       performanceMonitor.recordRequest(6000, true); // > 5000ms
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[PERFORMANCE ALERT] ERROR')
+      expect(loggerWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[PERFORMANCE ALERT] ERROR'),
+        expect.any(Object)
       );
     });
 
     test('debe crear alerta de warning por tiempo moderadamente alto', () => {
       performanceMonitor.recordRequest(3000, true); // > 2000ms but < 5000ms
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[PERFORMANCE ALERT] WARNING')
+      expect(loggerWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[PERFORMANCE ALERT] WARNING'),
+        expect.any(Object)
       );
     });
 
@@ -292,7 +309,9 @@ describe('Performance Service', () => {
       );
 
     const executeOperations = (operations: (() => void)[]) => {
-      operations.forEach(op => op());
+      for (const op of operations) {
+        op();
+      }
     };
 
     test('debe manejar múltiples operaciones concurrentes', () => {

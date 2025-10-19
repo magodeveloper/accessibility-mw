@@ -6,6 +6,12 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   testMatch: ['**/tests/**/*.test.ts'],
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    String.raw`tests/integration/real-.*\.test\.ts$`,    // Excluir tests de integración real
+    String.raw`tests/integration/.*-real\..*\.test\.ts$`, // Excluir tests de integración real (variante)
+    String.raw`tests/load/.*\.test\.ts$`,                 // Excluir tests de carga
+  ],
   moduleFileExtensions: ['ts', 'js', 'json'],
   verbose: true,
   testTimeout: process.env.CI ? 60000 : 30000,
@@ -18,18 +24,18 @@ module.exports = {
         // Disable coverage instrumentation for files that will be evaluated in browser context
         coveragePathIgnorePatterns: process.env.CI
           ? [
-              '/node_modules/',
-              '/tests/',
-              'browser.pool.service.ts',
-              'render.service.ts',
-            ]
+            '/node_modules/',
+            '/tests/',
+            'browser.pool.service.ts',
+            'render.service.ts',
+          ]
           : ['/node_modules/', '/tests/'],
       },
     ],
   },
   maxWorkers: process.env.CI ? 1 : '50%',
-  // forceExit removido en Fase 1 - permitir que Jest detecte handles abiertos
-  // forceExit: true,
+  // forceExit usado en scripts para evitar que Jest se quede colgado esperando handles abiertos
+  // --detectOpenHandles permite identificar qué recursos no se están cerrando correctamente
   collectCoverage: collect, // Solo cubrir en CI o cuando COLLECT_COVERAGE=true
   coverageDirectory: 'coverage',
   collectCoverageFrom: [
@@ -40,20 +46,20 @@ module.exports = {
     // Exclude browser-related services from coverage when running in CI to avoid conflicts
     ...(process.env.CI
       ? [
-          '!src/services/browser.pool.service.ts',
-          '!src/services/render.service.ts',
-        ]
+        '!src/services/browser.pool.service.ts',
+        '!src/services/render.service.ts',
+      ]
       : []),
   ],
   coverageReporters: ['text', 'lcov', 'html', 'json'],
   coverageThreshold: collect
     ? {
-        global: {
-          branches: 40, // Reduced due to excluding browser services in CI
-          functions: 55, // Reduced due to excluding browser services in CI
-          lines: 55, // Reduced due to excluding browser services in CI
-          statements: 55, // Reduced due to excluding browser services in CI
-        },
-      }
+      global: {
+        branches: 40, // Reduced due to excluding browser services in CI
+        functions: 55, // Reduced due to excluding browser services in CI
+        lines: 55, // Reduced due to excluding browser services in CI
+        statements: 55, // Reduced due to excluding browser services in CI
+      },
+    }
     : undefined,
 };

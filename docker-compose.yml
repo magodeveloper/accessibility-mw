@@ -4,9 +4,10 @@ services:
       context: .
       dockerfile: Dockerfile
       target: accessibility-mw
-    image: accessibility-mw:${NODE_ENV:-production}
-    container_name: accessibility-mw-${NODE_ENV:-production}
+    image: accessibility-mw:latest
+    container_name: accessibility-mw
     environment:
+      - DOCKER_ENV=true
       - NODE_OPTIONS=--enable-source-maps --max-old-space-size=${NODE_HEAP_SIZE:-2048}
       - NODE_ENV=${NODE_ENV:-production}
       - HOST=${HOST:-0.0.0.0}
@@ -75,8 +76,8 @@ networks:
     ipam:
       driver: default
       config:
-        - subnet: 172.18.0.0/16
-          gateway: 172.18.0.1
+        - subnet: 172.22.0.0/16
+          gateway: 172.22.0.1
 
   accessibility-shared:
     external: true

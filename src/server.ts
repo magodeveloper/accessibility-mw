@@ -1,15 +1,17 @@
+// Cargar configuración de entorno ANTES de cualquier otra importación
+import { loadEnvironmentConfig } from './config/env.config';
+loadEnvironmentConfig();
+
 import cors from 'cors';
-import 'dotenv/config';
 import express, { Request } from 'express';
 import helmet from 'helmet';
-import http from 'http';
-import { AddressInfo } from 'net';
+import http from 'node:http';
+import { AddressInfo } from 'node:net';
 import pinoHttp from 'pino-http';
 import swaggerUi from 'swagger-ui-express';
 import { isGatewayValidationEnabled } from './config/gateway.config';
 import { setupHealthChecks } from './config/health.config';
 import { isJwtEnabled } from './config/jwt.config';
-import { authenticateJWT } from './middlewares/auth.middleware';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 import { validateGatewaySecret } from './middlewares/gateway.middleware';
 import { analyzeLimiter, generalLimiter } from './middlewares/rateLimit';
@@ -29,6 +31,12 @@ import {
 import { performanceMonitor } from './services/performance.service';
 import { swaggerSpec } from './swagger';
 import { ENV, FeatureFlags } from './utils/environment';
+
+// Log de configuración de seguridad después de cargar el entorno
+console.log(`[Server] [JWT] JWT configurado: ${isJwtEnabled()}`);
+console.log(
+  `[Server] [GATEWAY] Gateway Validation habilitado: ${isGatewayValidationEnabled()}`
+);
 
 // Aumentar el límite de listeners para evitar warnings en tests
 // Esto es necesario porque pino-http y otros middlewares pueden registrar listeners automáticamente
@@ -196,56 +204,44 @@ app.get('/api/auth/status', (_req, res) => {
   });
 });
 
-// Rutas de análisis - PROTEGIDAS CON GATEWAY SECRET + JWT
-// ORDEN CRÍTICO DE MIDDLEWARES:
-// 1. validateGatewaySecret - Valida origen (Gateway)
-// 2. authenticateJWT - Valida usuario
-// 3. extractUserContext - Extrae contexto de usuario (X-User-* headers)
-// 4. analyzeLimiter - Rate limiting
-// 5. analyzeRouter - Lógica de negocio
+// Rutas de análisis - PÚBLICAS pero protegidas por Gateway Secret
+// ESTRATEGIA:
+// - Gateway Secret: REQUERIDO (valida que peticiones vienen del Gateway)
+// - JWT: NO REQUERIDO (rutas públicas, usuario no necesita estar autenticado)
+// - User Context: Extraído si está disponible (opcional)
+//
+// ORDEN DE MIDDLEWARES:
+// 1. validateGatewaySecret - Valida origen (Gateway) - OBLIGATORIO si está habilitado
+// 2. extractUserContext - Extrae contexto de usuario (X-User-* headers) - OPCIONAL
+// 3. analyzeLimiter - Rate limiting
+// 4. analyzeRouter - Lógica de negocio
 
 const gatewayEnabled = isGatewayValidationEnabled();
 const jwtEnabled = isJwtEnabled();
 
-if (gatewayEnabled && jwtEnabled) {
+if (gatewayEnabled) {
   advancedLogger.info(
-    'Gateway Secret + JWT authentication + User Context enabled - fully protecting /api/analyze routes'
+    '[SECURITY] Gateway Secret enabled - /api/analyze routes are PUBLIC but requests must come from Gateway (User Context extracted if available)'
   );
   app.use(
     '/api/analyze',
     validateGatewaySecret,
-    authenticateJWT,
-    extractUserContext,
-    analyzeLimiter,
-    analyzeRouter
-  );
-} else if (gatewayEnabled) {
-  advancedLogger.warn(
-    'Gateway Secret enabled but JWT disabled - /api/analyze routes protected by Gateway only (User Context extracted)'
-  );
-  app.use(
-    '/api/analyze',
-    validateGatewaySecret,
-    extractUserContext,
-    analyzeLimiter,
-    analyzeRouter
-  );
-} else if (jwtEnabled) {
-  advancedLogger.warn(
-    'JWT enabled but Gateway Secret disabled - /api/analyze routes protected by JWT only (User Context extracted)'
-  );
-  app.use(
-    '/api/analyze',
-    authenticateJWT,
     extractUserContext,
     analyzeLimiter,
     analyzeRouter
   );
 } else {
   advancedLogger.warn(
-    '⚠️  SECURITY WARNING: Both Gateway Secret and JWT disabled - /api/analyze routes are COMPLETELY UNPROTECTED (User Context extracted if available)'
+    '[WARNING] SECURITY WARNING: Gateway Secret disabled - /api/analyze routes are COMPLETELY UNPROTECTED and accessible from anywhere (User Context extracted if available)'
   );
   app.use('/api/analyze', extractUserContext, analyzeLimiter, analyzeRouter);
+}
+
+// JWT Configuration Status (informativo, no se usa para /api/analyze)
+if (jwtEnabled) {
+  advancedLogger.info(
+    '[INFO] JWT is configured and available for other protected routes (not used for /api/analyze)'
+  );
 }
 
 // Bundle monitoring routes - NO requieren autenticación (métricas internas)
@@ -267,9 +263,18 @@ app.use(errorHandler);
 // to avoid Node.js resolving 'localhost' to IPv6 ::1 on Windows. Allow
 // overriding with HOST env if necessary.
 const server = http.createServer(app);
-const forceHost =
-  process.env.HOST ??
-  (ENV.NODE_ENV === 'development' ? '127.0.0.1' : '0.0.0.0');
+
+// Force IPv4 binding in development to avoid IPv6 issues on Windows
+// EXCEPTION: En Docker (DOCKER_ENV=true), siempre usar 0.0.0.0
+const isDockerMode = process.env.DOCKER_ENV === 'true';
+let forceHost: string;
+if (isDockerMode) {
+  forceHost = '0.0.0.0';
+} else if (ENV.NODE_ENV === 'production') {
+  forceHost = '0.0.0.0';
+} else {
+  forceHost = '127.0.0.1';
+}
 
 // Only start server if not in test environment
 if (ENV.NODE_ENV !== 'test') {
@@ -302,11 +307,11 @@ if (ENV.NODE_ENV !== 'test') {
     );
 
     // Mostrar dirección real del servidor para depuración de binding
-    console.log(`🚀 Server bound to: ${addrStr}`);
+    console.log(`[SERVER] Server bound to: ${addrStr}`);
     advancedLogger.info('Server address info', { address: addr });
 
     // Configurar health checks automáticos después del startup
-    console.log('🏥 Configurando health monitoring...');
+    console.log('[HEALTH] Configurando health monitoring...');
     setupHealthChecks();
     advancedLogger.info('Health monitoring configurado correctamente');
   });
@@ -348,25 +353,47 @@ const gracefulShutdown = async (signal: string) => {
 // Errores de proceso con logging mejorado
 if (ENV.NODE_ENV !== 'test') {
   process.on('unhandledRejection', (reason: unknown) => {
-    const error = reason as Error;
+    const error = reason instanceof Error ? reason : new Error(String(reason));
     advancedLogger.fatal(
-      'UNHANDLED_REJECTION',
+      'Unhandled Promise Rejection',
       {
-        reason: error?.message || String(reason),
-        stack: error?.stack,
+        operation: 'process.unhandledRejection',
+        error: {
+          message: error.message,
+          name: error.name,
+          stack: error.stack,
+        },
       },
-      reason instanceof Error ? reason : new Error(String(reason))
+      error
     );
+
     // En producción, considerar graceful shutdown
     if (FeatureFlags.isProduction()) {
       gracefulShutdown('UNHANDLED_REJECTION');
     }
   });
 
-  process.on('uncaughtException', err => {
-    advancedLogger.fatal('UNCAUGHT_EXCEPTION', {}, err);
-    // Salida inmediata para excepciones no capturadas
-    process.exit(1);
+  process.on('uncaughtException', (err: Error) => {
+    advancedLogger.fatal(
+      'Uncaught Exception',
+      {
+        operation: 'process.uncaughtException',
+        error: {
+          message: err.message,
+          name: err.name,
+          stack: err.stack,
+        },
+      },
+      err
+    );
+
+    // Flush logs and exit immediately for uncaught exceptions
+    advancedLogger.flush();
+
+    // Exit after allowing time for log flush
+    setTimeout(() => {
+      process.exit(1);
+    }, 1000);
   });
 }
 

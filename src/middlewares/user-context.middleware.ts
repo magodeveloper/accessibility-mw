@@ -141,7 +141,7 @@ export function requireUserContext(
   );
   const context = userContextService.getContext();
 
-  if (!context || !context.userId) {
+  if (!context?.userId) {
     advancedLogger.warn('User context required but not found', {
       requestId,
       path: req.path,
@@ -180,7 +180,7 @@ export function requireUserRole(...allowedRoles: string[]) {
     );
     const context = userContextService.getContext();
 
-    if (!context || !context.role) {
+    if (!context?.role) {
       advancedLogger.warn('User role required but not found in context', {
         requestId,
         path: req.path,
@@ -253,7 +253,7 @@ export function enrichLogsWithUserContext(
 ): void {
   const context = userContextService.getContext();
 
-  if (context && context.userId) {
+  if (context?.userId) {
     // Crear child logger con contexto de usuario
     const contextLogger = userContextService.createContextLogger();
 
