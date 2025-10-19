@@ -73,7 +73,7 @@ jobs:
           CI: true
           ANALYSIS_API_URL: http://localhost:8082
           REPORTS_API_URL: http://localhost:8083
-          COLLECT_COVERAGE: true
+          COLLECT_COVERAGE: true # Habilitado: todos los tests tienen aislamiento correcto de módulos
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v4
@@ -132,9 +132,15 @@ jobs:
       - name: Setup test environment
         run: |
           echo "Creating test directories..."
+          # Crear directorios en ubicaciones que accessibility-checker pueda necesitar
           mkdir -p .achecker_cache/engine
+          mkdir -p /tmp/.achecker_cache/engine
           mkdir -p tmp/test-data
-          chmod -R 755 .achecker_cache tmp 2>/dev/null || true
+          chmod -R 777 .achecker_cache /tmp/.achecker_cache tmp 2>/dev/null || true
+
+          # Verificar que se crearon correctamente
+          ls -la .achecker_cache/
+          ls -la /tmp/.achecker_cache/ 2>/dev/null || echo "/tmp/.achecker_cache not accessible"
           echo "Test directories created"
 
       - name: Run integration tests
@@ -143,7 +149,6 @@ jobs:
           npx jest tests/integration \
             --testTimeout=60000 \
             --maxWorkers=1 \
-            --detectOpenHandles \
             --forceExit \
             --verbose \
             --config=jest.ci.config.js
@@ -154,6 +159,7 @@ jobs:
           REPORTS_API_URL: http://localhost:8083
           JEST_TIMEOUT: 60000
           PLAYWRIGHT_BROWSERS_PATH: /home/runner/.cache/ms-playwright
+          ACHECKER_CACHE_DIR: /tmp/.achecker_cache
 
       - name: Debug on failure
         if: failure()

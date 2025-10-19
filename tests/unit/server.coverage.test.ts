@@ -239,34 +239,56 @@ describe('Server Coverage Improvements', () => {
   });
 
   describe('Trust proxy configuration', () => {
-    it('should not set trust proxy when ENV.TRUST_PROXY is false', () => {
-      const testApp = express();
+    it('should not set trust proxy when ENV.TRUST_PROXY is false', async () => {
+      const savedTrustProxy = process.env.TRUST_PROXY;
+      
+      try {
+        process.env.TRUST_PROXY = 'false';
+        jest.resetModules();
+        
+        const testApp = express();
 
-      // Mock ENV.TRUST_PROXY as false
-      process.env.TRUST_PROXY = 'false';
+        // Simulate the conditional trust proxy setup
+        if (process.env.TRUST_PROXY === 'true') {
+          testApp.set('trust proxy', 1);
+        }
 
-      // Simulate the conditional trust proxy setup
-      if (process.env.TRUST_PROXY === 'true') {
-        testApp.set('trust proxy', 1);
+        // Verify trust proxy is not set
+        expect(testApp.get('trust proxy')).toBeFalsy();
+      } finally {
+        if (savedTrustProxy === undefined) {
+          delete process.env.TRUST_PROXY;
+        } else {
+          process.env.TRUST_PROXY = savedTrustProxy;
+        }
+        jest.resetModules();
       }
-
-      // Verify trust proxy is not set
-      expect(testApp.get('trust proxy')).toBeFalsy();
     });
 
-    it('should set trust proxy when ENV.TRUST_PROXY is true', () => {
-      const testApp = express();
+    it('should set trust proxy when ENV.TRUST_PROXY is true', async () => {
+      const savedTrustProxy = process.env.TRUST_PROXY;
+      
+      try {
+        process.env.TRUST_PROXY = 'true';
+        jest.resetModules();
+        
+        const testApp = express();
 
-      // Mock ENV.TRUST_PROXY as true
-      process.env.TRUST_PROXY = 'true';
+        // Simulate the conditional trust proxy setup
+        if (process.env.TRUST_PROXY === 'true') {
+          testApp.set('trust proxy', 1);
+        }
 
-      // Simulate the conditional trust proxy setup
-      if (process.env.TRUST_PROXY === 'true') {
-        testApp.set('trust proxy', 1);
+        // Verify trust proxy is set
+        expect(testApp.get('trust proxy')).toBe(1);
+      } finally {
+        if (savedTrustProxy === undefined) {
+          delete process.env.TRUST_PROXY;
+        } else {
+          process.env.TRUST_PROXY = savedTrustProxy;
+        }
+        jest.resetModules();
       }
-
-      // Verify trust proxy is set
-      expect(testApp.get('trust proxy')).toBe(1);
     });
   });
 

@@ -55,6 +55,8 @@ describe('Security Utils - URL Validation', () => {
       
       try {
         process.env.NODE_ENV = 'production';
+        delete process.env.APP_ENV;
+        delete process.env.BYPASS_SSRF_VALIDATION_IN_DEV;
         jest.resetModules();
         const { validatePublicHttpUrl: validate } = await import('../../src/utils/security');
         
@@ -63,7 +65,11 @@ describe('Security Utils - URL Validation', () => {
         expect(result.ok).toBe(false);
         expect(result.reason).toBe('No se permiten credenciales en la URL');
       } finally {
-        process.env.NODE_ENV = savedNodeEnv;
+        if (savedNodeEnv === undefined) {
+          delete process.env.NODE_ENV;
+        } else {
+          process.env.NODE_ENV = savedNodeEnv;
+        }
         jest.resetModules();
       }
     });
@@ -76,8 +82,10 @@ describe('Security Utils - URL Validation', () => {
       try {
         process.env.NODE_ENV = 'development';
         process.env.BYPASS_SSRF_VALIDATION_IN_DEV = 'true';
+        jest.resetModules();
+        const { validatePublicHttpUrl: validate } = await import('../../src/utils/security');
 
-        const result = await validatePublicHttpUrl(
+        const result = await validate(
           'http://user:pass@localhost:3000'
         );
 
@@ -91,6 +99,7 @@ describe('Security Utils - URL Validation', () => {
         } else {
           process.env.BYPASS_SSRF_VALIDATION_IN_DEV = savedBypass;
         }
+        jest.resetModules();
       }
     });
   });
@@ -186,38 +195,81 @@ describe('Security Utils - URL Validation', () => {
 
   describe('Environment-based Configuration', () => {
     it('should use environment variables for configuration', async () => {
-      process.env.URL_LENGTH_LIMIT = '100';
-      process.env.REDIRECT_LIMIT = '5';
-      process.env.RESPONSE_BYTES_LIMIT = '1000000';
-      process.env.REQUEST_TIMEOUT_MS = '10000';
-      process.env.SOCKET_TIMEOUT_MS = '15000';
+      const savedUrlLength = process.env.URL_LENGTH_LIMIT;
+      const savedRedirect = process.env.REDIRECT_LIMIT;
+      const savedBytes = process.env.RESPONSE_BYTES_LIMIT;
+      const savedTimeout = process.env.REQUEST_TIMEOUT_MS;
+      const savedSocket = process.env.SOCKET_TIMEOUT_MS;
+      
+      try {
+        process.env.URL_LENGTH_LIMIT = '100';
+        process.env.REDIRECT_LIMIT = '5';
+        process.env.RESPONSE_BYTES_LIMIT = '1000000';
+        process.env.REQUEST_TIMEOUT_MS = '10000';
+        process.env.SOCKET_TIMEOUT_MS = '15000';
+        jest.resetModules();
+        const { validatePublicHttpUrl: validate } = await import('../../src/utils/security');
 
-      const longUrl = 'http://example.com/' + 'a'.repeat(150);
-      const result = await validatePublicHttpUrl(longUrl);
+        const longUrl = 'http://example.com/' + 'a'.repeat(150);
+        const result = await validate(longUrl);
 
-      expect(result.ok).toBe(false);
-      expect(result.reason).toBe('URL vacía o demasiado larga');
+        expect(result.ok).toBe(false);
+        expect(result.reason).toBe('URL vacía o demasiado larga');
+      } finally {
+        if (savedUrlLength === undefined) delete process.env.URL_LENGTH_LIMIT; else process.env.URL_LENGTH_LIMIT = savedUrlLength;
+        if (savedRedirect === undefined) delete process.env.REDIRECT_LIMIT; else process.env.REDIRECT_LIMIT = savedRedirect;
+        if (savedBytes === undefined) delete process.env.RESPONSE_BYTES_LIMIT; else process.env.RESPONSE_BYTES_LIMIT = savedBytes;
+        if (savedTimeout === undefined) delete process.env.REQUEST_TIMEOUT_MS; else process.env.REQUEST_TIMEOUT_MS = savedTimeout;
+        if (savedSocket === undefined) delete process.env.SOCKET_TIMEOUT_MS; else process.env.SOCKET_TIMEOUT_MS = savedSocket;
+        jest.resetModules();
+      }
     });
 
     it('should handle different allowed ports configuration', async () => {
-      process.env.ALLOWED_PORTS = '80,443,8080';
+      const savedAllowedPorts = process.env.ALLOWED_PORTS;
+      
+      try {
+        process.env.ALLOWED_PORTS = '80,443,8080';
+        jest.resetModules();
+        const { validatePublicHttpUrl: validate } = await import('../../src/utils/security');
 
-      // Mock para evitar conexión real en CI
-      const result = await validatePublicHttpUrl('http://localhost:8080');
+        // Mock para evitar conexión real en CI
+        const result = await validate('http://localhost:8080');
 
-      // Should pass port validation (will fail on connection but that's expected)
-      expect(typeof result).toBe('object');
-      expect('ok' in result).toBe(true);
+        // Should pass port validation (will fail on connection but that's expected)
+        expect(typeof result).toBe('object');
+        expect('ok' in result).toBe(true);
+      } finally {
+        if (savedAllowedPorts === undefined) {
+          delete process.env.ALLOWED_PORTS;
+        } else {
+          process.env.ALLOWED_PORTS = savedAllowedPorts;
+        }
+        jest.resetModules();
+      }
     }, 15000); // Increased timeout
 
     it('should handle port ranges in configuration', async () => {
-      process.env.ALLOWED_PORTS = '8000-9000';
+      const savedAllowedPorts = process.env.ALLOWED_PORTS;
+      
+      try {
+        process.env.ALLOWED_PORTS = '8000-9000';
+        jest.resetModules();
+        const { validatePublicHttpUrl: validate } = await import('../../src/utils/security');
 
-      // Mock para evitar conexión real en CI
-      const result = await validatePublicHttpUrl('http://localhost:8500');
+        // Mock para evitar conexión real en CI
+        const result = await validate('http://localhost:8500');
 
-      expect(typeof result).toBe('object');
-      expect('ok' in result).toBe(true);
+        expect(typeof result).toBe('object');
+        expect('ok' in result).toBe(true);
+      } finally {
+        if (savedAllowedPorts === undefined) {
+          delete process.env.ALLOWED_PORTS;
+        } else {
+          process.env.ALLOWED_PORTS = savedAllowedPorts;
+        }
+        jest.resetModules();
+      }
     }, 15000); // Increased timeout
 
     it('should behave differently in development vs production', async () => {
@@ -226,6 +278,8 @@ describe('Security Utils - URL Validation', () => {
       try {
         // Test development mode
         process.env.NODE_ENV = 'development';
+        delete process.env.APP_ENV;
+        delete process.env.BYPASS_SSRF_VALIDATION_IN_DEV;
         jest.resetModules();
         const { validatePublicHttpUrl: validateDev } = await import('../../src/utils/security');
 
@@ -234,6 +288,8 @@ describe('Security Utils - URL Validation', () => {
 
         // Test production mode
         process.env.NODE_ENV = 'production';
+        delete process.env.APP_ENV;
+        delete process.env.BYPASS_SSRF_VALIDATION_IN_DEV;
         jest.resetModules();
         const { validatePublicHttpUrl: validateProd } = await import('../../src/utils/security');
 
@@ -241,7 +297,11 @@ describe('Security Utils - URL Validation', () => {
         expect(prodResult.ok).toBe(false);
         expect(prodResult.reason).toBe('No se permiten credenciales en la URL');
       } finally {
-        process.env.NODE_ENV = savedNodeEnv;
+        if (savedNodeEnv === undefined) {
+          delete process.env.NODE_ENV;
+        } else {
+          process.env.NODE_ENV = savedNodeEnv;
+        }
         jest.resetModules();
       }
     });
@@ -327,12 +387,25 @@ describe('Security Utils - URL Validation', () => {
     });
 
     it('should handle debug mode environment variable', async () => {
-      process.env.DEBUG_URL_VALIDATOR = 'true';
+      const savedDebug = process.env.DEBUG_URL_VALIDATOR;
+      
+      try {
+        process.env.DEBUG_URL_VALIDATOR = 'true';
+        jest.resetModules();
+        const { validatePublicHttpUrl: validate } = await import('../../src/utils/security');
 
-      const result = await validatePublicHttpUrl('http://httpbin.org');
+        const result = await validate('http://httpbin.org');
 
-      expect(typeof result).toBe('object');
-      expect('ok' in result).toBe(true);
+        expect(typeof result).toBe('object');
+        expect('ok' in result).toBe(true);
+      } finally {
+        if (savedDebug === undefined) {
+          delete process.env.DEBUG_URL_VALIDATOR;
+        } else {
+          process.env.DEBUG_URL_VALIDATOR = savedDebug;
+        }
+        jest.resetModules();
+      }
     });
   });
 });
