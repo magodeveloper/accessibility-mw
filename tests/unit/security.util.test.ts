@@ -77,10 +77,12 @@ describe('Security Utils - URL Validation', () => {
     it('should allow URLs with credentials in development', async () => {
       // Store current values
       const savedNodeEnv = process.env.NODE_ENV;
+      const savedAppEnv = process.env.APP_ENV;
       const savedBypass = process.env.BYPASS_SSRF_VALIDATION_IN_DEV;
       
       try {
         process.env.NODE_ENV = 'development';
+        delete process.env.APP_ENV;
         process.env.BYPASS_SSRF_VALIDATION_IN_DEV = 'true';
         jest.resetModules();
         const { validatePublicHttpUrl: validate } = await import('../../src/utils/security');
@@ -93,7 +95,16 @@ describe('Security Utils - URL Validation', () => {
         expect(result.ok).toBe(false); // Fallará conexión pero pasará validación inicial
       } finally {
         // Always restore
-        process.env.NODE_ENV = savedNodeEnv;
+        if (savedNodeEnv === undefined) {
+          delete process.env.NODE_ENV;
+        } else {
+          process.env.NODE_ENV = savedNodeEnv;
+        }
+        if (savedAppEnv === undefined) {
+          delete process.env.APP_ENV;
+        } else {
+          process.env.APP_ENV = savedAppEnv;
+        }
         if (savedBypass === undefined) {
           delete process.env.BYPASS_SSRF_VALIDATION_IN_DEV;
         } else {
