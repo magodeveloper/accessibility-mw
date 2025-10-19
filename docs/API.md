@@ -177,7 +177,7 @@ Content-Type: application/json
         "wcagCriteria": ["1.4.3"],
         "description": "Elementos deben tener suficiente contraste de color",
         "help": "Asegúrate de que el contraste sea de al menos 4.5:1",
-        "helpUrl": "https://dequeuniversity.com/rules/axe/4.10/color-contrast",
+        "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/color-contrast",
         "nodes": [
           {
             "html": "<button class=\"btn-primary\">Submit</button>",
@@ -196,13 +196,13 @@ Content-Type: application/json
         "wcagCriteria": ["2.4.1"],
         "description": "Documento debe tener un landmark main",
         "help": "Agrega un elemento <main> a tu página",
-        "helpUrl": "https://dequeuniversity.com/rules/axe/4.10/landmark-one-main",
+        "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/landmark-one-main",
         "nodes": []
       }
     ],
     "metadata": {
       "engine": "axe-core",
-      "engineVersion": "4.10.3",
+      "engineVersion": "4.11.0",
       "testRunner": "accessibility-mw",
       "testRunnerVersion": "1.0.0",
       "pageTitle": "Example Domain",

@@ -143,10 +143,10 @@ El **Accessibility Middleware** es un servicio Node.js/TypeScript que actúa com
 - **Response Formatters** - Formateo de respuestas
 
 **Tecnologías:**
-- Express 4.x
-- express-validator
-- cors
-- helmet
+- Express 5.1.0
+- Zod 4.1.12 (validation)
+- cors 2.8.5
+- helmet 8.1.0
 
 ### 2. Business Logic Layer (Lógica de Negocio)
 

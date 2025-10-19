@@ -2,8 +2,8 @@
 
 [![Node.js](https://img.shields.io/badge/Node.js-20.19.2-339933?logo=node.js)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/tests-1106%20passed-brightgreen)](test-dashboard.html)
-[![Coverage](https://img.shields.io/badge/coverage-85%25-green)](test-dashboard.html)
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](#-testing)
+[![Coverage](https://img.shields.io/badge/coverage-81%25-green)](#-testing)
 [![License](https://img.shields.io/badge/license-Proprietary-red)](LICENSE)
 
 > **Middleware avanzado de análisis de accesibilidad web con integración dual de herramientas (axe-core e IBM Equal Access) y persistencia automática en microservicios .NET.**
@@ -34,14 +34,14 @@
 
 ## ✨ Características Principales
 
-- ✅ **Análisis dual** - axe-core 4.10.3 + IBM Equal Access 4.0.8
-- ✅ **Pool de navegadores optimizado** - Playwright con reducción del 70% en overhead
+- ✅ **Análisis dual** - axe-core 4.11.0 + IBM Equal Access 4.0.9
+- ✅ **Pool de navegadores optimizado** - Playwright 1.56.1 con reducción del 70% en overhead
 - ✅ **Cache inteligente** - Sistema LRU con TTL configurable
 - ✅ **Integración microservicios** - Comunicación transparente con .NET vía Docker
 - ✅ **Mapeo WCAG automático** - 138+ reglas mapeadas a WCAG 2.1/2.2
 - ✅ **Monitoreo completo** - Health checks profundos + métricas Prometheus
 - ✅ **Alto rendimiento** - Análisis promedio en 2.8s
-- ✅ **Calidad asegurada** - 1106+ tests, 85% cobertura
+- ✅ **Calidad asegurada** - Suite completa de tests (unit, integration, e2e, contract), 81%+ cobertura
 - ✅ **Seguridad robusta** - JWT + validación de Gateway
 - ✅ **Resiliencia** - Circuit breaker pattern integrado
 
@@ -93,9 +93,9 @@
 
 | Componente | Responsabilidad | Tecnología |
 |------------|----------------|------------|
-| **Express Server** | API REST + middleware chain | Express 4.x |
+| **Express Server** | API REST + middleware chain | Express 5.1 |
 | **Analysis Service** | Orquestación de análisis dual | TypeScript |
-| **Browser Pool** | Pool reutilizable de navegadores | Playwright |
+| **Browser Pool** | Pool reutilizable de navegadores | Playwright 1.56 |
 | **Cache Service** | Almacenamiento temporal de resultados | node-cache (LRU) |
 | **WCAG Mappers** | Mapeo automático de reglas → WCAG | Mappers personalizados |
 | **Health Monitor** | Monitoreo de servicios externos | Health checks |
@@ -780,15 +780,15 @@ cors({
 ### Core
 
 - **Runtime:** Node.js 20.19.2 LTS
-- **Language:** TypeScript 5.x
-- **Framework:** Express 4.x
-- **Testing:** Jest 29.x + Supertest
+- **Language:** TypeScript 5.9.3
+- **Framework:** Express 5.1.0
+- **Testing:** Jest 30.2.0 + Supertest 7.1.4
 
 ### Análisis de Accesibilidad
 
-- **axe-core:** 4.10.3 (Deque Systems)
-- **IBM Equal Access:** 4.0.8 (IBM Accessibility)
-- **Playwright:** 1.48.2 (Browser automation)
+- **axe-core:** 4.11.0 (Deque Systems)
+- **IBM Equal Access:** 4.0.9 (IBM Accessibility)
+- **Playwright:** 1.56.1 (Browser automation)
 
 ### Persistencia y Cache
 
@@ -798,22 +798,20 @@ cors({
 
 ### Logging y Monitoreo
 
-- **Logger:** Pino (structured logging)
-- **Metrics:** prom-client (Prometheus)
+- **Logger:** Pino 10.1.0 (structured logging)
+- **Metrics:** Prometheus compatible
 - **Health Checks:** Custom implementation
 
 ### Desarrollo
 
-- **Linter:** ESLint 9.x
-- **Formatter:** Prettier 3.x
-- **Type Checking:** TypeScript compiler
-- **Git Hooks:** Husky + lint-staged
+- **Linter:** ESLint 9.38.0
+- **Type Checking:** TypeScript 5.9.3 compiler
+- **Package Manager:** npm 10+
 
 ### DevOps
 
 - **Containerización:** Docker + Docker Compose
 - **CI/CD:** GitHub Actions
-- **Load Testing:** k6, Artillery
 - **Documentation:** Swagger/OpenAPI 3.0
 
 ---
@@ -885,13 +883,12 @@ npm run build:prod    # Build optimizado para prod
 - [Guía de Desarrollo](docs/DEVELOPMENT.md)
 - [API Completa](docs/API.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
-- [Changelog](CHANGELOG.md)
 
 ---
 
 ## 👥 Contribución
 
-Ver [CONTRIBUTING.md](CONTRIBUTING.md) para guías de contribución.
+Para contribuir al proyecto, contacta al autor directamente.
 
 ---
 
@@ -945,4 +942,4 @@ Email: fgiocl@outlook.com
 ---
 
 **Author:** Geovanny Camacho (fgiocl@outlook.com)  
-**Last Update:** 15/10/2025
+**Last Updated:** 19 de octubre de 2025
