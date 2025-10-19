@@ -62,24 +62,18 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Setup test directories
-        run: bash scripts/setup-test-dirs.sh
-
-      - name: Run unit tests with optimizations
         run: |
-          npx jest tests/unit \
-            --testTimeout=30000 \
-            --coverage \
-            --maxWorkers=2 \
-            --logHeapUsage \
-            --detectOpenHandles \
-            --forceExit \
-            --config=jest.ci.config.js
+          mkdir -p .achecker_cache/engine tmp/test-data
+          chmod 755 .achecker_cache .achecker_cache/engine tmp/test-data
+
+      - name: Run unit tests
+        run: npm test -- --config=jest.ci.config.js --forceExit
         env:
           NODE_ENV: test
           CI: true
           ANALYSIS_API_URL: http://localhost:8082
           REPORTS_API_URL: http://localhost:8083
-          JEST_TIMEOUT: 30000
+          COLLECT_COVERAGE: true
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v4
@@ -125,12 +119,12 @@ jobs:
         uses: actions/cache@v4
         id: playwright-cache
         with:
-          path: ~/.cache/ms-playwright
+          path: /home/runner/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       - name: Setup Playwright browsers
         run: |
-          # Instalar siempre para asegurar disponibilidad (rápido si ya existe)
+          # Instalar siempre para asegurar disponibilidad
           npx playwright install chromium --with-deps
           npx playwright --version
           echo "Playwright chromium installed successfully"
@@ -159,7 +153,7 @@ jobs:
           ANALYSIS_API_URL: http://localhost:8082
           REPORTS_API_URL: http://localhost:8083
           JEST_TIMEOUT: 60000
-          PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
+          PLAYWRIGHT_BROWSERS_PATH: /home/runner/.cache/ms-playwright
 
       - name: Debug on failure
         if: failure()

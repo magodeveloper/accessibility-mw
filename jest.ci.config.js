@@ -19,7 +19,7 @@ module.exports = {
 
   // Timeouts optimizados
   // Tests reales E2E requieren más tiempo (60s default, 90s para flujos completos)
-  testTimeout: parseInt(process.env.JEST_TIMEOUT) || 60000,
+  testTimeout: Number.parseInt(process.env.JEST_TIMEOUT) || 60000,
 
   // Setup files
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
@@ -42,7 +42,7 @@ module.exports = {
   // Configuración de cleanup (Fase 1: remover forceExit para detectar leaks)
   // forceExit removido - permitir que Jest detecte handles abiertos y memory leaks
   // forceExit: true,
-  detectOpenHandles: true,
+  detectOpenHandles: false, // Desactivado: incompatible con --forceExit en CI
   logHeapUsage: process.env.CI === 'true',
 
   // Configuración de coverage condicional

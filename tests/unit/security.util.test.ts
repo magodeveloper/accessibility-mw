@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import {
   validatePublicHttpUrl,
   type UrlValidationOptions,
@@ -16,7 +16,8 @@ describe('Security Utils - URL Validation', () => {
   });
 
   afterEach(() => {
-    process.env = originalEnv;
+    // Restore to original environment (use spread to avoid reference issues)
+    process.env = { ...originalEnv };
   });
 
   describe('Basic Input Validation', () => {
@@ -50,25 +51,47 @@ describe('Security Utils - URL Validation', () => {
     });
 
     it('should reject URLs with credentials in production', async () => {
-      process.env.NODE_ENV = 'production';
-      const result = await validatePublicHttpUrl(
-        'http://user:pass@example.com'
-      );
+      const savedNodeEnv = process.env.NODE_ENV;
+      
+      try {
+        process.env.NODE_ENV = 'production';
+        jest.resetModules();
+        const { validatePublicHttpUrl: validate } = await import('../../src/utils/security');
+        
+        const result = await validate('http://user:pass@example.com');
 
-      expect(result.ok).toBe(false);
-      expect(result.reason).toBe('No se permiten credenciales en la URL');
+        expect(result.ok).toBe(false);
+        expect(result.reason).toBe('No se permiten credenciales en la URL');
+      } finally {
+        process.env.NODE_ENV = savedNodeEnv;
+        jest.resetModules();
+      }
     });
 
     it('should allow URLs with credentials in development', async () => {
-      process.env.NODE_ENV = 'development';
-      process.env.BYPASS_SSRF_VALIDATION_IN_DEV = 'true';
+      // Store current values
+      const savedNodeEnv = process.env.NODE_ENV;
+      const savedBypass = process.env.BYPASS_SSRF_VALIDATION_IN_DEV;
+      
+      try {
+        process.env.NODE_ENV = 'development';
+        process.env.BYPASS_SSRF_VALIDATION_IN_DEV = 'true';
 
-      const result = await validatePublicHttpUrl(
-        'http://user:pass@localhost:3000'
-      );
+        const result = await validatePublicHttpUrl(
+          'http://user:pass@localhost:3000'
+        );
 
-      // En desarrollo con bypass, debería intentar la conexión
-      expect(result.ok).toBe(false); // Fallará conexión pero pasará validación inicial
+        // En desarrollo con bypass, debería intentar la conexión
+        expect(result.ok).toBe(false); // Fallará conexión pero pasará validación inicial
+      } finally {
+        // Always restore
+        process.env.NODE_ENV = savedNodeEnv;
+        if (savedBypass === undefined) {
+          delete process.env.BYPASS_SSRF_VALIDATION_IN_DEV;
+        } else {
+          process.env.BYPASS_SSRF_VALIDATION_IN_DEV = savedBypass;
+        }
+      }
     });
   });
 
@@ -198,22 +221,29 @@ describe('Security Utils - URL Validation', () => {
     }, 15000); // Increased timeout
 
     it('should behave differently in development vs production', async () => {
-      // Test development mode
-      process.env.NODE_ENV = 'development';
+      const savedNodeEnv = process.env.NODE_ENV;
+      
+      try {
+        // Test development mode
+        process.env.NODE_ENV = 'development';
+        jest.resetModules();
+        const { validatePublicHttpUrl: validateDev } = await import('../../src/utils/security');
 
-      const devResult = await validatePublicHttpUrl(
-        'http://user:pass@example.com'
-      );
-      expect(typeof devResult).toBe('object');
+        const devResult = await validateDev('http://user:pass@example.com');
+        expect(typeof devResult).toBe('object');
 
-      // Test production mode
-      process.env.NODE_ENV = 'production';
+        // Test production mode
+        process.env.NODE_ENV = 'production';
+        jest.resetModules();
+        const { validatePublicHttpUrl: validateProd } = await import('../../src/utils/security');
 
-      const prodResult = await validatePublicHttpUrl(
-        'http://user:pass@example.com'
-      );
-      expect(prodResult.ok).toBe(false);
-      expect(prodResult.reason).toBe('No se permiten credenciales en la URL');
+        const prodResult = await validateProd('http://user:pass@example.com');
+        expect(prodResult.ok).toBe(false);
+        expect(prodResult.reason).toBe('No se permiten credenciales en la URL');
+      } finally {
+        process.env.NODE_ENV = savedNodeEnv;
+        jest.resetModules();
+      }
     });
   });
 
@@ -270,19 +300,30 @@ describe('Security Utils - URL Validation', () => {
     });
 
     it('should validate port restrictions correctly', async () => {
-      process.env.NODE_ENV = 'production';
-      process.env.ALLOWED_PORTS = '80,443';
+      const savedNodeEnv = process.env.NODE_ENV;
+      const savedAllowedPorts = process.env.ALLOWED_PORTS;
+      
+      try {
+        process.env.NODE_ENV = 'production';
+        process.env.ALLOWED_PORTS = '80,443';
+        jest.resetModules();
+        const { validatePublicHttpUrl: validate } = await import('../../src/utils/security');
 
-      const disallowedResult = await validatePublicHttpUrl(
-        'http://example.com:22'
-      );
-      expect(disallowedResult.ok).toBe(false);
-      expect(disallowedResult.reason).toBe('Port 22 not allowed');
+        const disallowedResult = await validate('http://example.com:22');
+        expect(disallowedResult.ok).toBe(false);
+        expect(disallowedResult.reason).toBe('Port 22 not allowed');
 
-      const allowedResult = await validatePublicHttpUrl(
-        'http://example.com:80'
-      );
-      expect(typeof allowedResult).toBe('object'); // Will fail on connection but port is allowed
+        const allowedResult = await validate('http://example.com:80');
+        expect(typeof allowedResult).toBe('object'); // Will fail on connection but port is allowed
+      } finally {
+        process.env.NODE_ENV = savedNodeEnv;
+        if (savedAllowedPorts === undefined) {
+          delete process.env.ALLOWED_PORTS;
+        } else {
+          process.env.ALLOWED_PORTS = savedAllowedPorts;
+        }
+        jest.resetModules();
+      }
     });
 
     it('should handle debug mode environment variable', async () => {
