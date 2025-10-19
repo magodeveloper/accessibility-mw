@@ -80,12 +80,14 @@ describe('Browser Pool Service - Coverage Improvements', () => {
 
   describe('Browser Pool Resource Management', () => {
     it('should handle browser acquisition failure gracefully', async () => {
-      // Mock Playwright failure
+      // Mock Playwright failure - need to fail ALL attempts (Playwright + all Chrome paths)
+      // The service tries: 1x Playwright + multiple Chrome fallback paths
+      // Windows: 3 paths, macOS: 2 paths, Linux: ~4 paths
+      // Mock to always reject to ensure it fails
       (mockChromium.launch as jest.MockedFunction<typeof chromium.launch>)
-        .mockRejectedValueOnce(new Error('Failed to launch browser'))
-        .mockRejectedValueOnce(new Error('Chrome fallback also failed'));
+        .mockRejectedValue(new Error('Failed to launch browser'));
 
-      await expect(browserPool.getBrowser()).rejects.toThrow();
+      await expect(browserPool.getBrowser()).rejects.toThrow('Failed to launch browser');
     });
 
     it('should use Chrome fallback when Playwright fails on Windows', async () => {
@@ -95,9 +97,18 @@ describe('Browser Pool Service - Coverage Improvements', () => {
         value: 'win32',
       });
 
+      // Mock fs.existsSync to simulate Chrome being found at first path
+      const fs = require('node:fs');
+      const originalExistsSync = fs.existsSync;
+      fs.existsSync = jest.fn((path: string) => {
+        // Return true only for the first Chrome path to simulate finding Chrome
+        return path.includes(String.raw`Google\Chrome\Application\chrome.exe`) && 
+               path.includes('Program Files');
+      });
+
       (mockChromium.launch as jest.MockedFunction<typeof chromium.launch>)
         .mockRejectedValueOnce(new Error('Playwright browsers not found'))
-        .mockResolvedValueOnce(mockBrowser);
+        .mockResolvedValueOnce(mockBrowser); // Second call (with Chrome path) succeeds
 
       try {
         const browser = await browserPool.getBrowser();
@@ -108,11 +119,13 @@ describe('Browser Pool Service - Coverage Improvements', () => {
         const secondCall = (mockChromium.launch as jest.MockedFunction<any>)
           .mock.calls[1];
         expect(secondCall[0]).toHaveProperty('executablePath');
+        expect(secondCall[0].executablePath).toContain('chrome.exe');
       } finally {
-        // Restore original platform
+        // Restore original platform and fs
         Object.defineProperty(process, 'platform', {
           value: originalPlatform,
         });
+        fs.existsSync = originalExistsSync;
       }
     });
 
