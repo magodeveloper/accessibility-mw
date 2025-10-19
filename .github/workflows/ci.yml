@@ -105,9 +105,9 @@ jobs:
           # Los microservicios .NET no son necesarios para los tests actuales
           docker compose -f docker-compose.ci.yml up -d mysql-analysis mysql-reports
 
-          echo "Waiting for MySQL services to be healthy..."
-          timeout 60 bash -c 'until docker compose -f docker-compose.ci.yml ps mysql-analysis | grep -q "healthy"; do echo "Waiting for mysql-analysis..."; sleep 2; done'
-          timeout 60 bash -c 'until docker compose -f docker-compose.ci.yml ps mysql-reports | grep -q "healthy"; do echo "Waiting for mysql-reports..."; sleep 2; done'
+          echo "Waiting for MySQL services to be healthy (max 120s)..."
+          timeout 120 bash -c 'until docker compose -f docker-compose.ci.yml ps mysql-analysis | grep -q "healthy"; do echo "Waiting for mysql-analysis..."; sleep 2; done'
+          timeout 120 bash -c 'until docker compose -f docker-compose.ci.yml ps mysql-reports | grep -q "healthy"; do echo "Waiting for mysql-reports..."; sleep 2; done'
 
           echo "MySQL services are ready"
           docker compose -f docker-compose.ci.yml ps
@@ -130,20 +130,28 @@ jobs:
 
       - name: Setup Playwright browsers
         run: |
-          npx playwright install chromium
+          # Instalar siempre para asegurar disponibilidad (rápido si ya existe)
+          npx playwright install chromium --with-deps
           npx playwright --version
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
+          echo "Playwright chromium installed successfully"
 
       - name: Setup test environment
-        run: bash scripts/setup-test-dirs.sh
+        run: |
+          echo "Creating test directories..."
+          mkdir -p .achecker_cache/engine
+          mkdir -p tmp/test-data
+          chmod -R 755 .achecker_cache tmp 2>/dev/null || true
+          echo "Test directories created"
 
       - name: Run integration tests
         run: |
+          echo "Starting integration tests..."
           npx jest tests/integration \
             --testTimeout=60000 \
             --maxWorkers=1 \
             --detectOpenHandles \
             --forceExit \
+            --verbose \
             --config=jest.ci.config.js
         env:
           NODE_ENV: test
@@ -152,6 +160,17 @@ jobs:
           REPORTS_API_URL: http://localhost:8083
           JEST_TIMEOUT: 60000
           PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
+
+      - name: Debug on failure
+        if: failure()
+        run: |
+          echo "=== Playwright Status ==="
+          npx playwright --version || echo "Playwright not found"
+          echo "=== MySQL Status ==="
+          docker compose -f docker-compose.ci.yml ps
+          echo "=== MySQL Logs (last 30 lines) ==="
+          docker compose -f docker-compose.ci.yml logs mysql-analysis --tail=30
+          docker compose -f docker-compose.ci.yml logs mysql-reports --tail=30
 
       - name: Cleanup services
         if: always()
