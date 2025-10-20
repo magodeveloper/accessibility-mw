@@ -40,11 +40,14 @@ module.exports = {
   maxWorkers: process.env.CI ? 2 : 1,
   maxConcurrency: 2,
 
-  // Configuración de cleanup (Fase 1: remover forceExit para detectar leaks)
-  // forceExit removido - permitir que Jest detecte handles abiertos y memory leaks
-  // forceExit: true,
-  detectOpenHandles: false, // Desactivado: incompatible con --forceExit en CI
+  // Configuración de cleanup optimizada para CI
+  // forceExit: true habilitado en comando CLI (npm test -- --forceExit)
+  // No configurar aquí para mantener flexibilidad
+  detectOpenHandles: false, // Desactivado en CI para evitar falsos positivos
   logHeapUsage: process.env.CI === 'true',
+  clearMocks: true,
+  restoreMocks: true,
+  resetMocks: true,
 
   // Configuración de coverage condicional
   collectCoverage: process.env.COLLECT_COVERAGE === 'true',
@@ -56,7 +59,7 @@ module.exports = {
     '!src/types/**',
   ],
   coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov', 'html'],
+  coverageReporters: process.env.CI ? ['text', 'lcov'] : ['text', 'lcov', 'html'],
   coverageThreshold: {
     global: {
       branches: 69, // ✅ Alcanzado 69.06% (1029/1490) - Mejora de +4.34% desde 64.72%

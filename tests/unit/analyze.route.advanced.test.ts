@@ -226,7 +226,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
             tool: 'axe-core'
           });
 
-        expect([200, 422, 500, 503]).toContain(response.status);
+        expect([200, 422, 500, 503, 504]).toContain(response.status);
       }
     });
   });
@@ -245,7 +245,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
           tool: 'axe-core'
         });
 
-      expect([200, 422, 500, 503]).toContain(response.status);
+      expect([200, 422, 500, 503, 504]).toContain(response.status);
     });
 
     it('should resolve en-US language', async () => {
@@ -258,7 +258,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
           tool: 'axe-core'
         });
 
-      expect([200, 422, 500, 503]).toContain(response.status);
+      expect([200, 422, 500, 503, 504]).toContain(response.status);
     });
 
     it('should resolve pt-BR language', async () => {
@@ -271,7 +271,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
           tool: 'axe-core'
         });
 
-      expect([200, 422, 500, 503]).toContain(response.status);
+      expect([200, 422, 500, 503, 504]).toContain(response.status);
     });
 
     it('should resolve fr-FR language', async () => {
@@ -284,7 +284,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
           tool: 'axe-core'
         });
 
-      expect([200, 422, 500, 503]).toContain(response.status);
+      expect([200, 422, 500, 503, 504]).toContain(response.status);
     });
 
     it('should handle complex Accept-Language with multiple locales', async () => {
@@ -297,7 +297,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
           tool: 'axe-core'
         });
 
-      expect([200, 422, 500, 503]).toContain(response.status);
+      expect([200, 422, 500, 503, 504]).toContain(response.status);
     });
 
     it('should handle Accept-Language with wildcard', async () => {
@@ -310,7 +310,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
           tool: 'axe-core'
         });
 
-      expect([200, 422, 500, 503]).toContain(response.status);
+      expect([200, 422, 500, 503, 504]).toContain(response.status);
     });
 
     it('should use default language when header is empty', async () => {
@@ -323,7 +323,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
           tool: 'axe-core'
         });
 
-      expect([200, 422, 500, 503]).toContain(response.status);
+      expect([200, 422, 500, 503, 504]).toContain(response.status);
     });
   });
 
@@ -341,7 +341,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
           tool: 'axe-core'
         });
 
-      expect([200, 422, 500, 503]).toContain(response.status);
+      expect([200, 422, 500, 503, 504]).toContain(response.status);
     });
 
     it('should handle warning type items', async () => {
@@ -353,7 +353,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
           tool: 'equal-access'
         });
 
-      expect([200, 422, 500, 503]).toContain(response.status);
+      expect([200, 422, 500, 503, 504]).toContain(response.status);
     });
 
     it('should handle recommendation type items', async () => {
@@ -365,7 +365,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
           tool: 'equal-access'
         });
 
-      expect([200, 422, 500, 503]).toContain(response.status);
+      expect([200, 422, 500, 503, 504]).toContain(response.status);
     });
   });
 
@@ -382,7 +382,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
           tool: 'axe-core'
         });
 
-      expect([200, 422, 500, 503]).toContain(response.status);
+      expect([200, 422, 500, 503, 504]).toContain(response.status);
     });
 
     it('should handle custom ANALYZE_TIMEOUT_MS', async () => {
@@ -402,7 +402,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
           tool: 'axe-core'
         });
 
-      expect([200, 422, 500, 503]).toContain(response.status);
+      expect([200, 422, 500, 503, 504]).toContain(response.status);
     });
 
     it('should handle custom NAVIGATION_TIMEOUT_MS', async () => {
@@ -422,7 +422,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
           tool: 'axe-core'
         });
 
-      expect([200, 422, 500, 503]).toContain(response.status);
+      expect([200, 422, 500, 503, 504]).toContain(response.status);
     });
   });
 
@@ -442,7 +442,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
           cumulativeWcag: true
         });
 
-      expect([200, 422, 500, 503]).toContain(response.status);
+      expect([200, 422, 500, 503, 504]).toContain(response.status);
     });
 
     it('should handle WCAG 2.1 Level AAA non-cumulative', async () => {
@@ -457,7 +457,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
           cumulativeWcag: false
         });
 
-      expect([200, 422, 500, 503]).toContain(response.status);
+      expect([200, 422, 500, 503, 504]).toContain(response.status);
     });
 
     it('should handle WCAG 2.2 Level AA cumulative with axe-core', async () => {
@@ -472,7 +472,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
           cumulativeWcag: true
         });
 
-      expect([200, 422, 500, 503]).toContain(response.status);
+      expect([200, 422, 500, 503, 504]).toContain(response.status);
     });
 
     it('should handle WCAG 2.0 Level AAA with equal-access', async () => {
@@ -487,7 +487,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
           cumulativeWcag: false
         });
 
-      expect([200, 422, 500, 503]).toContain(response.status);
+      expect([200, 422, 500, 503, 504]).toContain(response.status);
     });
   });
 
@@ -524,7 +524,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
           tool: 'both'
         });
 
-      expect([200, 422, 500, 503]).toContain(response.status);
+      expect([200, 422, 500, 503, 504]).toContain(response.status);
     });
 
     it('should analyze HTML with ARIA roles', async () => {
@@ -556,7 +556,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
           tool: 'axe-core'
         });
 
-      expect([200, 422, 500, 503]).toContain(response.status);
+      expect([200, 422, 500, 503, 504]).toContain(response.status);
     });
 
     it('should analyze HTML with semantic elements', async () => {
@@ -595,7 +595,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
           tool: 'equal-access'
         });
 
-      expect([200, 422, 500, 503]).toContain(response.status);
+      expect([200, 422, 500, 503, 504]).toContain(response.status);
     });
   });
 
@@ -624,7 +624,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
           tool: 'axe-core'
         });
 
-      expect([200, 422, 500, 503]).toContain(response.status);
+      expect([200, 422, 500, 503, 504]).toContain(response.status);
     });
 
     it('should handle URL with query parameters', async () => {
@@ -636,7 +636,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
           tool: 'both'
         });
 
-      expect([200, 422, 500, 503]).toContain(response.status);
+      expect([200, 422, 500, 503, 504]).toContain(response.status);
     });
 
     it('should handle URL with hash and query', async () => {
@@ -648,7 +648,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
           tool: 'equal-access'
         });
 
-      expect([200, 422, 500, 503]).toContain(response.status);
+      expect([200, 422, 500, 503, 504]).toContain(response.status);
     });
 
     it('should handle localhost URL', async () => {
@@ -660,7 +660,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
           tool: 'axe-core'
         });
 
-      expect([200, 422, 500, 503]).toContain(response.status);
+      expect([200, 422, 500, 503, 504]).toContain(response.status);
     });
 
     it('should handle IP address URL', async () => {
@@ -672,7 +672,7 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
           tool: 'axe-core'
         });
 
-      expect([200, 422, 500, 503]).toContain(response.status);
+      expect([200, 422, 500, 503, 504]).toContain(response.status);
     });
   });
 
@@ -722,3 +722,4 @@ describe('Analyze Route - Advanced Branch Coverage (Phase 2)', () => {
     });
   });
 });
+

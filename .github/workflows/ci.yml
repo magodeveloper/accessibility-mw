@@ -67,13 +67,14 @@ jobs:
           chmod 755 .achecker_cache .achecker_cache/engine tmp/test-data
 
       - name: Run unit tests
-        run: npm test -- --config=jest.ci.config.js --forceExit
+        run: npm run test:ci
         env:
           NODE_ENV: test
           CI: true
           ANALYSIS_API_URL: http://localhost:8082
           REPORTS_API_URL: http://localhost:8083
-          COLLECT_COVERAGE: true # Habilitado: todos los tests tienen aislamiento correcto de módulos
+          COLLECT_COVERAGE: true
+          JEST_TIMEOUT: 60000
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v4
@@ -144,14 +145,7 @@ jobs:
           echo "Test directories created"
 
       - name: Run integration tests
-        run: |
-          echo "Starting integration tests..."
-          npx jest tests/integration \
-            --testTimeout=60000 \
-            --maxWorkers=1 \
-            --forceExit \
-            --verbose \
-            --config=jest.ci.config.js
+        run: npm run test:integration
         env:
           NODE_ENV: test
           CI: true

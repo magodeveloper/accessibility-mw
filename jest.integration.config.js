@@ -48,10 +48,10 @@ module.exports = {
 
   // Run tests serially to avoid service conflicts
   maxWorkers: 1,
+  maxConcurrency: 1,
 
-  // Test environment options
-  forceExit: true,
-  detectOpenHandles: true,
+  // Test environment options - configurado en CLI
+  // forceExit y detectOpenHandles se pasan desde npm scripts
   verbose: true,
 
   // No coverage for integration tests (covered by unit tests)
