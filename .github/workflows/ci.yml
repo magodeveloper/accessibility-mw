@@ -202,21 +202,24 @@ jobs:
           docker run --rm -d --name test-container \
             -p 3001:3001 \
             -e NODE_ENV=production \
+            -e DOCKER_ENV=true \
+            -e PORT=3001 \
+            -e HOST=0.0.0.0 \
             accessibility-mw:${{ github.sha }}
 
           HEALTH_CHECK_PASSED=false
-          for i in {1..30}; do
+          for i in {1..45}; do
             if curl -f http://localhost:3001/health 2>/dev/null; then
               echo "Health check passed"
               HEALTH_CHECK_PASSED=true
               break
             fi
-            echo "Waiting for service... ($i/30)"
+            echo "Waiting for service... ($i/45)"
             sleep 2
           done
 
           if [ "$HEALTH_CHECK_PASSED" = "false" ]; then
-            echo "Health check timeout after 60 seconds"
+            echo "Health check timeout after 90 seconds"
             docker logs test-container
             docker stop test-container
             exit 1

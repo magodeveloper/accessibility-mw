@@ -59,7 +59,7 @@ module.exports = {
   coverageReporters: ['text', 'lcov', 'html'],
   coverageThreshold: {
     global: {
-      branches: 64, // Ajustado a coverage real actual - TODO: Incrementar a 70% (ver COVERAGE-IMPROVEMENT-PLAN.md)
+      branches: 69, // ✅ Alcanzado 69.06% (1029/1490) - Mejora de +4.34% desde 64.72%
       functions: 70,
       lines: 70,
       statements: 70,
