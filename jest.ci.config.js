@@ -4,11 +4,11 @@ module.exports = {
   testEnvironment: 'node',
 
   // Configuración de test patterns
-  // Incluye tests unitarios, de contrato y de integración
+  // SOLO tests unitarios y de contrato (rápidos, sin servicios externos)
+  // Tests de integración se corren por separado con jest.integration.config.js
   testMatch: [
     '**/tests/unit/**/*.test.ts',
     '**/tests/contract/**/*.test.ts',
-    '**/tests/integration/**/*.test.ts',
   ],
 
   moduleFileExtensions: ['ts', 'js', 'json'],
@@ -37,13 +37,13 @@ module.exports = {
   },
 
   // Configuración de workers optimizada para CI
-  maxWorkers: process.env.CI ? 2 : 1,
-  maxConcurrency: 2,
+  // CRÍTICO: Usar 1 worker para evitar race conditions con mocks de Playwright y timers
+  maxWorkers: 1,
+  maxConcurrency: 1,
 
   // Configuración de cleanup optimizada para CI
-  // forceExit: true habilitado en comando CLI (npm test -- --forceExit)
-  // No configurar aquí para mantener flexibilidad
-  detectOpenHandles: false, // Desactivado en CI para evitar falsos positivos
+  // forceExit habilitado en CLI para evitar hangs
+  // No usar detectOpenHandles en CI - causa timeouts
   logHeapUsage: process.env.CI === 'true',
   clearMocks: true,
   restoreMocks: true,

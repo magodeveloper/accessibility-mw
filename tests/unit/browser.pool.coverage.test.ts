@@ -46,11 +46,17 @@ describe('Browser Pool Service - Coverage Improvements', () => {
   });
 
   afterEach(async () => {
+    // Asegurar que los timers reales están activos
+    jest.useRealTimers();
+    
     try {
       await browserPool.shutdown();
     } catch {
       // Ignore cleanup errors in tests
     }
+    
+    // Restaurar todos los mocks
+    jest.restoreAllMocks();
   });
 
   describe('Browser Pool Statistics', () => {

@@ -17,10 +17,10 @@ process.env.NODE_ENV = 'test';
  * Todos los valores pueden ser sobrescritos mediante variables de entorno
  */
 const TEST_CONFIG = {
-  // Listeners
+  // Listeners - Incrementado significativamente para evitar memory leak warnings
   maxListeners: {
-    ci: Number.parseInt(process.env.MAX_LISTENERS_CI || '30'),
-    local: Number.parseInt(process.env.MAX_LISTENERS_LOCAL || '20'),
+    ci: Number.parseInt(process.env.MAX_LISTENERS_CI || '100'), // Incrementado de 30 a 100
+    local: Number.parseInt(process.env.MAX_LISTENERS_LOCAL || '50'), // Incrementado de 20 a 50
   },
   
   // Timeouts (en milisegundos)
