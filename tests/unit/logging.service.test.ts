@@ -13,27 +13,31 @@ import {
 } from '@jest/globals';
 
 // Mock de pino ANTES de cualquier import
-jest.mock('pino', () => {
-  const mockLogger = {
-    trace: jest.fn(),
-    debug: jest.fn(),
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    fatal: jest.fn(),
-    child: jest.fn(),
-    flush: jest.fn(),
-  };
+const mockLogger = {
+  trace: jest.fn(),
+  debug: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  fatal: jest.fn(),
+  child: jest.fn(),
+  flush: jest.fn(),
+};
 
-  const mockPino: any = jest.fn(() => mockLogger);
+// Asegurar que child retorne el mockLogger
+mockLogger.child = jest.fn(() => mockLogger);
 
-  // Mock de stdTimeFunctions para evitar el error de isoTime
-  mockPino.stdTimeFunctions = {
-    isoTime: jest.fn(() => `,"timestamp":"${new Date().toISOString()}"`),
-  };
+// Crear función mockPino que retorna el mockLogger
+function mockPino() {
+  return mockLogger;
+}
 
-  return mockPino;
-});
+// Mock de stdTimeFunctions para evitar el error de isoTime
+(mockPino as any).stdTimeFunctions = {
+  isoTime: () => `,"timestamp":"${new Date().toISOString()}"`,
+};
+
+jest.mock('pino', () => mockPino);
 
 // Mock FeatureFlags
 jest.mock('../../src/utils/environment', () => ({
@@ -45,8 +49,6 @@ jest.mock('../../src/utils/environment', () => ({
 }));
 
 describe('Logging Service', () => {
-  let mockLogger: any;
-
   beforeAll(() => {
     // Importar después de los mocks
     require('pino');
@@ -97,9 +99,9 @@ describe('Logging Service', () => {
         'fatal',
       ];
 
-      requiredMethods.forEach(method => {
+      for (const method of requiredMethods) {
         expect(typeof advancedLogger[method]).toBe('function');
-      });
+      }
     });
 
     test('should be able to call info method without errors', () => {

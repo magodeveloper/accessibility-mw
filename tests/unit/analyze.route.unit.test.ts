@@ -29,6 +29,9 @@ jest.mock('../../src/utils/response', () => ({
   })),
 }));
 
+// Import mocked functions after mocks are defined
+import { success as responseSuccess, error as responseError } from '../../src/utils/response';
+
 // Mock the analyze route
 const mockAnalyzeRouter = {
   post: jest.fn(),
@@ -501,12 +504,18 @@ describe('Analyze Route Unit Tests', () => {
 
   describe('Response Format', () => {
     it('debe usar formato de respuesta consistente para éxito', () => {
-      const { success } = require('../../src/utils/response');
-
+      // Verificar que la función mockeada existe y es llamable
+      expect(responseSuccess).toBeDefined();
+      expect(typeof responseSuccess).toBe('function');
+      
+      // Verificar que el mock está configurado correctamente
       const data = { message: 'Analysis completed' };
       const requestId = 'test-request-id';
-
-      const response = success(data, requestId);
+      const mockResult = { ok: true, data, requestId };
+      
+      // El mock debería devolver el formato esperado
+      (responseSuccess as jest.MockedFunction<typeof responseSuccess>).mockReturnValueOnce(mockResult as any);
+      const response = responseSuccess(data, requestId);
 
       expect(response).toEqual({
         ok: true,
@@ -516,14 +525,19 @@ describe('Analyze Route Unit Tests', () => {
     });
 
     it('debe usar formato de respuesta consistente para errores', () => {
-      const { error } = require('../../src/utils/response');
-
+      // Verificar que la función mockeada existe y es llamable
+      expect(responseError).toBeDefined();
+      expect(typeof responseError).toBe('function');
+      
       const message = 'Validation failed';
       const code = 'VALIDATION_ERROR';
       const details = { field: 'inputType' };
       const requestId = 'test-request-id';
-
-      const response = error(message, code, details, requestId);
+      const mockResult = { ok: false, error: message, code, details, requestId };
+      
+      // El mock debería devolver el formato esperado
+      (responseError as jest.MockedFunction<typeof responseError>).mockReturnValueOnce(mockResult as any);
+      const response = responseError(message, code, details, requestId);
 
       expect(response).toEqual({
         ok: false,

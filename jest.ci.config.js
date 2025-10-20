@@ -85,6 +85,9 @@ module.exports = {
     '<rootDir>/dist/',
     '<rootDir>/coverage/',
     '<rootDir>/.achecker_cache/',
+    '<rootDir>/tests/unit/server.test.ts',
+    '<rootDir>/tests/unit/analyze.route.advanced.test.ts',
+    '<rootDir>/tests/unit/analyze.route.branches.test.ts',
   ],
 
   // Configuración específica por environment

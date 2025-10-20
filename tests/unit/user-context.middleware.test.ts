@@ -12,6 +12,13 @@
  * Target: 100% branch coverage
  */
 
+import {
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
 import { NextFunction, Request, Response } from 'express';
 import {
   enrichLogsWithUserContext,
@@ -32,11 +39,11 @@ import {
 // Mock dependencies
 jest.mock('../../src/services/logging.service');
 jest.mock('../../src/services/user-context.service', () => {
-  const actual = jest.requireActual('../../src/services/user-context.service');
+  const actual = jest.requireActual<typeof import('../../src/services/user-context.service')>('../../src/services/user-context.service');
   return {
     ...actual,
     userContextService: {
-      run: jest.fn((context, callback) => callback()),
+      run: jest.fn((context: any, callback: () => void) => callback()),
       getContext: jest.fn(),
       hasAnyRole: jest.fn(),
       createContextLogger: jest.fn(),
@@ -58,11 +65,11 @@ describe('user-context.middleware', () => {
     jest.clearAllMocks();
 
     // Setup get mock for headers
-    getMock = jest.fn();
+    getMock = jest.fn() as jest.Mock;
 
     // Setup request mock
     mockRequest = {
-      get: getMock,
+      get: getMock as any,
       path: '/api/test',
       method: 'GET',
       id: 'test-request-id',
@@ -70,21 +77,26 @@ describe('user-context.middleware', () => {
     };
 
     // Setup response mock
-    jsonMock = jest.fn();
-    statusMock = jest.fn().mockReturnValue({ json: jsonMock });
+    jsonMock = jest.fn() as jest.Mock;
+    statusMock = jest.fn().mockReturnValue({ json: jsonMock }) as jest.Mock;
     mockResponse = {
-      status: statusMock,
-      json: jsonMock,
+      status: statusMock as any,
+      json: jsonMock as any,
     };
 
     // Setup next mock
     mockNext = jest.fn();
+
+    // Configure userContextService.run to execute the callback
+    (userContextService.run as jest.Mock).mockImplementation(
+      (_context: any, callback: any) => callback()
+    );
   });
 
   describe('extractUserContext', () => {
     describe('when all user headers are present', () => {
       it('should extract full user context and call next', () => {
-        getMock.mockImplementation((header: string) => {
+        getMock.mockImplementation((header: any) => {
           if (header === USER_CONTEXT_HEADERS.userId) return 'user-123';
           if (header === USER_CONTEXT_HEADERS.email) return 'test@example.com';
           if (header === USER_CONTEXT_HEADERS.role) return 'Admin';
@@ -141,7 +153,7 @@ describe('user-context.middleware', () => {
 
     describe('when only userId is present', () => {
       it('should extract partial context with userId', () => {
-        getMock.mockImplementation((header: string) => {
+        getMock.mockImplementation((header: any) => {
           if (header === USER_CONTEXT_HEADERS.userId) return 'user-456';
           return undefined;
         });
@@ -178,7 +190,7 @@ describe('user-context.middleware', () => {
 
     describe('when only email is present', () => {
       it('should extract partial context with email', () => {
-        getMock.mockImplementation((header: string) => {
+        getMock.mockImplementation((header: any) => {
           if (header === USER_CONTEXT_HEADERS.email) return 'only@email.com';
           return undefined;
         });
@@ -205,7 +217,7 @@ describe('user-context.middleware', () => {
 
     describe('when only role is present', () => {
       it('should extract partial context with role', () => {
-        getMock.mockImplementation((header: string) => {
+        getMock.mockImplementation((header: any) => {
           if (header === USER_CONTEXT_HEADERS.role) return 'User';
           return undefined;
         });
@@ -232,7 +244,7 @@ describe('user-context.middleware', () => {
 
     describe('when only name is present', () => {
       it('should extract partial context with name', () => {
-        getMock.mockImplementation((header: string) => {
+        getMock.mockImplementation((header: any) => {
           if (header === USER_CONTEXT_HEADERS.name) return 'John Doe';
           return undefined;
         });
@@ -286,7 +298,7 @@ describe('user-context.middleware', () => {
     describe('when request has no id', () => {
       it('should use "unknown" as requestId', () => {
         delete mockRequest.id;
-        getMock.mockImplementation((header: string) => {
+        getMock.mockImplementation((header: any) => {
           if (header === USER_CONTEXT_HEADERS.userId) return 'user-789';
           return undefined;
         });
@@ -309,7 +321,7 @@ describe('user-context.middleware', () => {
     describe('when request has numeric id', () => {
       it('should convert id to string', () => {
         mockRequest.id = 12345 as any;
-        getMock.mockImplementation((header: string) => {
+        getMock.mockImplementation((header: any) => {
           if (header === USER_CONTEXT_HEADERS.userId) return 'user-999';
           return undefined;
         });
@@ -715,7 +727,6 @@ describe('user-context.middleware', () => {
         email: 'test@example.com',
         role: 'Admin',
         name: 'Test User',
-        requestId: 'req-456',
         hasContext: true,
       };
       (userContextService.getContextSummary as jest.Mock).mockReturnValue(

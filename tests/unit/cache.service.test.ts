@@ -24,10 +24,14 @@ jest.mock('../../src/services/logging.service', () => ({
 
 import { advancedLogger } from '../../src/services/logging.service';
 
-// Mock para TextEncoder
-globalThis.TextEncoder = jest.fn(() => ({
-  encode: jest.fn((str: string) => new Uint8Array(str.length)),
-})) as any;
+// Mock para TextEncoder que simula correctamente el tamaño en bytes
+globalThis.TextEncoder = class {
+  encode(str: string): Uint8Array {
+    // Simular el tamaño real en bytes (UTF-8)
+    // Para simplificar, cada carácter = 1 byte (suficiente para ASCII)
+    return new Uint8Array(str.length);
+  }
+} as any;
 
 describe('Cache Service', () => {
   let cache: LRUCache<any>;
@@ -222,9 +226,14 @@ describe('Cache Service', () => {
 
   describe('Memory Management', () => {
     it('debe rechazar entradas muy grandes', () => {
-      const largeData = { content: 'x'.repeat(300 * 1024) }; // ~300KB
+      // Crear cache con límite específico para el test
+      const testCache = new LRUCache<any>(10, 1); // 1MB max
+      
+      // cache maxMemoryMB = 1MB, límite = 1MB / 4 = 256KB = 262144 bytes
+      // Crear dato de ~400KB para asegurar que excede el límite
+      const largeData = { content: 'x'.repeat(400 * 1024) }; // ~400KB
 
-      cache.set('html', '<div>large</div>', largeData);
+      testCache.set('html', '<div>large</div>', largeData);
 
       expect(advancedLogger.warn).toHaveBeenCalledWith(
         '[Cache] Entry too large, skipping cache',
@@ -233,7 +242,7 @@ describe('Cache Service', () => {
           maxMemoryMB: expect.any(Number),
         })
       );
-      expect(cache.get('html', '<div>large</div>')).toBeNull();
+      expect(testCache.get('html', '<div>large</div>')).toBeNull();
     });
 
     it('debe evitar entradas cuando se alcanza límite de memoria', () => {
