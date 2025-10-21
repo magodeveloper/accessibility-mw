@@ -1,5 +1,5 @@
 import * as express from 'express';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 import { UnifiedResponse } from '../mappers/unifyResults';
 import { advancedLogger } from '../services/logging.service';
 import { ENV } from '../utils/environment';
@@ -1031,7 +1031,7 @@ analyzeRouter.post('/', async (req: express.Request, res: express.Response) => {
           details: (err as Record<string, unknown>)?.details,
           code: (err as Record<string, unknown>)?.code,
           stack:
-            process.env.NODE_ENV !== 'production' ? errorObj.stack : undefined,
+            process.env.NODE_ENV === 'production' ? undefined : errorObj.stack,
         },
         requestId
       )
@@ -1128,7 +1128,7 @@ analyzeRouter.post(
             details: (err as Record<string, unknown>)?.details,
             code: (err as Record<string, unknown>)?.code,
             stack:
-              process.env.NODE_ENV !== 'production'
+              process.env.NODE_ENV === 'development'
                 ? errorObj.stack
                 : undefined,
           },
@@ -1358,8 +1358,8 @@ async function saveAndFormatResults({
   });
 
   const resultsPayload: Record<string, unknown>[] = [];
-  unified.results.forEach(toolResult => {
-    toolResult.items.forEach(item => {
+  for (const toolResult of unified.results) {
+    for (const item of toolResult.items) {
       const analysisItem = item as AnalysisItem;
       const mapping = getWcagMapping(analysisItem);
       const criterion = mapping.criterion ?? 'unknown';
@@ -1376,8 +1376,8 @@ async function saveAndFormatResults({
       });
       // Mantener lista de items para posteriores errores
       itemsList.push(analysisItem);
-    });
-  });
+    }
+  }
 
   // Debug logging del payload
   if (resultsPayload.length > 0) {
@@ -1418,9 +1418,9 @@ async function saveAndFormatResults({
         acceptLanguage
       );
       logger.info('History record saved', { historyId });
-    } catch (histErr) {
+    } catch (error_) {
       logger.error('Error saving history record', {
-        error: (histErr as Error).message,
+        error: (error_ as Error).message,
         userId,
         analysisId,
       });

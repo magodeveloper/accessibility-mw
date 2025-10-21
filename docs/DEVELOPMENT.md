@@ -20,11 +20,16 @@
 
 ```bash
 # Verificar versiones
-node --version  # v20.19.2 o superior
+node --version  # v20.19.5 LTS o superior
 npm --version   # v10.0.0 o superior
 git --version   # v2.40 o superior
 docker --version # v24.0 o superior
 ```
+
+**Recursos recomendados:**
+- **RAM:** 8GB+ (4GB para contenedor de desarrollo)
+- **CPU:** 4 cores (2 cores para contenedor)
+- **Disco:** 5GB+ libres
 
 ### Instalación Completa
 

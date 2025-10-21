@@ -673,13 +673,14 @@ class MicroserviceClient {
 
 ### 1. ¿Por qué Node.js y no .NET?
 
-**Decisión:** Node.js + TypeScript
+**Decisión:** Node.js 20.19.5 LTS + TypeScript 5.x
 
 **Razones:**
 - ✅ Ecosistema JavaScript para análisis web (axe-core, Playwright)
 - ✅ Mejor integración con herramientas de análisis
 - ✅ Event-driven, ideal para I/O intensivo
 - ✅ NPM packages maduros para accesibilidad
+- ✅ LTS estable con soporte a largo plazo
 
 **Trade-offs:**
 - ❌ Tipo menos seguro que .NET (mitigado con TypeScript)
@@ -771,8 +772,12 @@ class MicroserviceClient {
 **Configuración recomendada:**
 - **Instancias:** 3-5 (según carga)
 - **CPU:** 2 cores por instancia
-- **Memoria:** 2GB por instancia (browser pool + cache)
+- **Memoria:** 3-4GB por instancia (Playwright + browser pool + cache)
 - **Load Balancer:** Round-robin con health checks
+
+**Configuración actual optimizada:**
+- **Desarrollo:** 4GB MEMORY_LIMIT, 2048MB heap, 1GB SHM (uso: ~2.20%)
+- **Producción:** 3GB MEMORY_LIMIT, 2048MB heap, 2GB SHM
 
 ### Vertical Scaling
 

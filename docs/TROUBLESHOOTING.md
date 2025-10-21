@@ -26,17 +26,17 @@ Expected version ">=20.0.0". Got "18.17.0"
 **Solución:**
 
 ```bash
-# Instalar Node.js 20.x
+# Instalar Node.js 20.19.5 LTS
 # Windows (usando nvm-windows):
-nvm install 20.19.2
-nvm use 20.19.2
+nvm install 20.19.5
+nvm use 20.19.5
 
 # macOS/Linux (usando nvm):
-nvm install 20.19.2
-nvm use 20.19.2
+nvm install 20.19.5
+nvm use 20.19.5
 
 # Verificar
-node --version  # Debe mostrar v20.19.2 o superior
+node --version  # Debe mostrar v20.19.5 o superior
 ```
 
 ---
@@ -287,6 +287,11 @@ node --inspect src/server.ts
 ---
 
 ### 💾 Memory leak
+
+**Configuración actual optimizada:**
+- **Desarrollo:** `MEMORY_LIMIT=4G`, `NODE_HEAP_SIZE=2048`, `SHM_SIZE=1g`
+- **Producción:** `MEMORY_LIMIT=3G`, `NODE_HEAP_SIZE=2048`, `SHM_SIZE=2g`
+- **Uso típico:** ~2.20% del límite (65.9MiB / 2.933GiB)
 
 **Síntomas:**
 

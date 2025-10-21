@@ -1,5 +1,12 @@
 # Etapa 1: Compilación completa
-FROM node:20.19.2-alpine3.20 AS builder
+FROM node:20.19.5-alpine3.22 AS builder
+
+# Build arguments para metadata
+ARG NODE_ENV=development
+ARG BUILD_DATE
+ARG VERSION=1.0.0
+ARG VCS_REF
+
 WORKDIR /app
 
 # Instalar dependencias del sistema y actualizaciones de seguridad
@@ -24,7 +31,24 @@ RUN rm -rf node_modules && \
   npm cache clean --force
 
 # Etapa 2: Imagen de producción liviana (SIN reinstalar npm)
-FROM mcr.microsoft.com/playwright:v1.55.0-jammy AS accessibility-mw
+FROM mcr.microsoft.com/playwright:v1.56.1-jammy AS accessibility-mw
+
+# Build arguments para metadata
+ARG BUILD_DATE
+ARG VERSION=1.0.0
+ARG VCS_REF
+
+# Labels estándar OCI
+LABEL org.opencontainers.image.title="Accessibility Middleware" \
+  org.opencontainers.image.description="Advanced web accessibility analysis middleware with dual engine support (axe-core + IBM Equal Access)" \
+  org.opencontainers.image.version="${VERSION}" \
+  org.opencontainers.image.created="${BUILD_DATE}" \
+  org.opencontainers.image.revision="${VCS_REF}" \
+  org.opencontainers.image.vendor="magodeveloper" \
+  org.opencontainers.image.authors="magodeveloper" \
+  org.opencontainers.image.licenses="Proprietary" \
+  maintainer="magodeveloper"
+
 WORKDIR /app
 
 # Variables de entorno optimizadas para producción
@@ -45,12 +69,7 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
 COPY .achecker.yml ./
 
-# ¡NO MÁS npm install! Todo viene del builder
-# SOLUCIÓN DEFINITIVA PARA EQUAL-ACCESS:
-# 1. Actualizar sistema y limpiar cache
-# 2. Crear directorios necesarios
 # Optimización del sistema y creación de directorios
-# Limpiar cache y crear estructura de directorios con permisos optimizados
 RUN apt-get update && apt-get upgrade -y && \
   apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/cache/* && \
   mkdir -p /app/results /app/logs /app/.achecker_cache/engine /app/temp && \

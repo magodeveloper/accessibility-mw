@@ -1,0 +1,298 @@
+# =============================================================================
+# Docker Compose - PRODUCTION Configuration
+# =============================================================================
+# Este archivo está optimizado para despliegues en producción con:
+# - Seguridad reforzada
+# - Límites de recursos apropiados
+# - Health checks robustos
+# - Logging estructurado
+# - Restart policies
+#
+# USO:
+#   docker compose --env-file .env.production -f docker-compose.production.yml up -d
+#
+# O usando npm scripts:
+#   npm run docker:up:prod
+# =============================================================================
+
+services:
+  accessibility-mw:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: accessibility-mw
+      args:
+        NODE_ENV: production
+        BUILD_DATE: ${BUILD_DATE:-}
+        VERSION: ${VERSION:-1.0.0}
+        VCS_REF: ${VCS_REF:-}
+    image: accessibility-mw:${VERSION:-latest}
+    container_name: accessibility-mw-prod
+    
+    # =============================================================================
+    # VARIABLES DE ENTORNO
+    # =============================================================================
+    environment:
+      # Docker mode
+      - DOCKER_ENV=true
+      
+      # Node.js optimizations
+      - NODE_OPTIONS=--enable-source-maps --max-old-space-size=${NODE_HEAP_SIZE:-2048}
+      - NODE_ENV=${NODE_ENV:-production}
+      - APP_ENV=PROD
+      
+      # Server configuration
+      - HOST=${HOST:-0.0.0.0}
+      - PORT=${PORT:-3001}
+      - TRUST_PROXY=${TRUST_PROXY:-true}
+      
+      # Security & Authentication (CRÍTICO: configurar en .env.production)
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_ISSUER=${JWT_ISSUER:-https://api.accessibility.company.com/middleware}
+      - JWT_AUDIENCE=${JWT_AUDIENCE:-https://accessibility.company.com}
+      - JWT_EXPIRY_HOURS=${JWT_EXPIRY_HOURS:-24}
+      - JWT_CLOCK_TOLERANCE=${JWT_CLOCK_TOLERANCE:-0}
+      
+      # Gateway validation (DEBE estar habilitado en producción)
+      - GATEWAY_SECRET=${GATEWAY_SECRET}
+      - GATEWAY_VALIDATION_ENABLED=${GATEWAY_VALIDATION_ENABLED:-true}
+      
+      # CORS configuration
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      
+      # External services
+      - ANALYSIS_API_URL=${ANALYSIS_API_URL}
+      
+      # Playwright configuration
+      - PLAYWRIGHT_HEADLESS=true
+      - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+      - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+      
+      # Security flags (TODOS deben estar en false en producción)
+      - BYPASS_SSRF_VALIDATION_IN_DEV=false
+      - ALLOW_PRIVATE_IPS_IN_DEV=false
+      - ALLOW_LOOPBACK_IN_DEV=false
+      - RELAX_TLS_IN_DEV=false
+      
+      # Performance & Limits
+      - UV_THREADPOOL_SIZE=16
+      - CACHE_MAX_ENTRIES=${CACHE_MAX_ENTRIES:-200}
+      - CACHE_MAX_MEMORY_MB=${CACHE_MAX_MEMORY_MB:-100}
+      - BROWSER_POOL_MAX_SIZE=${BROWSER_POOL_MAX_SIZE:-5}
+      - BROWSER_POOL_MAX_IDLE_MS=${BROWSER_POOL_MAX_IDLE_MS:-600000}
+    
+    # =============================================================================
+    # NETWORKING
+    # =============================================================================
+    ports:
+      - "${MW_HOST_PORT:-3001}:3001"
+    
+    networks:
+      - accessibility_network
+      - accessibility-shared
+    
+    # =============================================================================
+    # RESOURCE LIMITS
+    # =============================================================================
+    deploy:
+      resources:
+        limits:
+          cpus: '${CPU_LIMIT:-2.0}'
+          memory: ${MEMORY_LIMIT:-3G}
+        reservations:
+          cpus: '${CPU_RESERVATION:-1.0}'
+          memory: ${MEMORY_RESERVATION:-2G}
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    
+    # Restart policy para docker compose (no swarm)
+    restart: unless-stopped
+    
+    # Shared memory para Playwright
+    shm_size: ${SHM_SIZE:-2g}
+    
+    # Memory swap limit (swappiness se configura a nivel de host)
+    memswap_limit: ${MEMORY_LIMIT:-3G}
+    
+    # File descriptor limits
+    ulimits:
+      nofile:
+        soft: ${ULIMIT_NOFILE:-32768}
+        hard: ${ULIMIT_NOFILE:-65536}
+      nproc:
+        soft: 4096
+        hard: 8192
+    
+    # =============================================================================
+    # HEALTH CHECKS
+    # =============================================================================
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:3001/health/live', r => process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: ${HEALTH_INTERVAL:-30s}
+      timeout: ${HEALTH_TIMEOUT:-10s}
+      retries: ${HEALTH_RETRIES:-3}
+      start_period: ${HEALTH_START_PERIOD:-30s}
+    
+    # =============================================================================
+    # LABELS (Para monitoring, service discovery)
+    # =============================================================================
+    labels:
+      # Prometheus scraping
+      - "prometheus.scrape=true"
+      - "prometheus.port=3001"
+      - "prometheus.path=/metrics"
+      
+      # Service metadata
+      - "service.name=accessibility-middleware"
+      - "service.version=${VERSION:-1.0.0}"
+      - "service.type=analysis-engine"
+      - "service.environment=production"
+      - "service.tier=backend"
+      
+      # OCI standard labels
+      - "org.opencontainers.image.title=Accessibility Middleware"
+      - "org.opencontainers.image.description=Advanced web accessibility analysis middleware"
+      - "org.opencontainers.image.version=${VERSION:-1.0.0}"
+      - "org.opencontainers.image.created=${BUILD_DATE:-}"
+      - "org.opencontainers.image.revision=${VCS_REF:-}"
+      - "org.opencontainers.image.vendor=magodeveloper"
+      - "org.opencontainers.image.authors=magodeveloper"
+      
+      # Application labels
+      - "app.component=middleware"
+      - "app.managed-by=docker-compose"
+    
+    # =============================================================================
+    # LOGGING
+    # =============================================================================
+    logging:
+      driver: "json-file"
+      options:
+        max-size: ${LOG_MAX_SIZE:-10m}
+        max-file: "${LOG_MAX_FILES:-5}"
+        compress: "true"
+        labels: "service.name,service.version,service.environment"
+        tag: "{{.Name}}/{{.ID}}"
+    
+    # =============================================================================
+    # VOLUMES & TMPFS
+    # =============================================================================
+    # Volúmenes persistentes para logs (opcional)
+    volumes:
+      - accessibility-mw-logs:/app/logs:rw
+      - accessibility-mw-cache:/app/.achecker_cache:rw
+    
+    # Tmpfs para archivos temporales (RAM disk para mejor performance)
+    tmpfs:
+      - /tmp:size=${TMPFS_TMP_SIZE:-512m},mode=1777,noexec,nosuid,nodev
+      - /app/temp:size=${TMPFS_TEMP_SIZE:-256m},mode=1777,noexec,nosuid
+    
+    # =============================================================================
+    # SECURITY
+    # =============================================================================
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Read-only root filesystem (excepto directorios específicos)
+    # NOTA: Comentado porque algunos módulos de Node.js requieren escritura
+    # read_only: true
+    
+    # Privilegios mínimos
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - CHOWN
+      - SETGID
+      - SETUID
+    
+    # Usuario no-root (ya configurado en Dockerfile)
+    # user: "pwuser"
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  # Red interna para comunicación entre servicios del mismo stack
+  accessibility_network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: ${NETWORK_MTU:-1500}
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+      com.docker.network.bridge.enable_icc: "true"
+    ipam:
+      driver: default
+      config:
+        - subnet: ${SUBNET:-172.22.0.0/16}
+          gateway: ${GATEWAY:-172.22.0.1}
+    labels:
+      - "environment=production"
+      - "project=accessibility"
+
+  # Red compartida con otros microservicios (debe crearse externamente)
+  # Crear con: docker network create accessibility-shared
+  accessibility-shared:
+    external: true
+    name: accessibility-shared
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  accessibility-mw-logs:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${LOGS_PATH:-./logs}
+      o: bind
+    labels:
+      - "environment=production"
+      - "backup=true"
+  
+  accessibility-mw-cache:
+    driver: local
+    labels:
+      - "environment=production"
+      - "backup=false"
+
+# =============================================================================
+# NOTAS DE DESPLIEGUE EN PRODUCCIÓN
+# =============================================================================
+# 
+# 1. PREREQUISITOS:
+#    - Crear red compartida: docker network create accessibility-shared
+#    - Configurar .env.production con valores seguros
+#    - Asegurar que ANALYSIS_API_URL apunte al servicio correcto
+# 
+# 2. DESPLIEGUE:
+#    npm run docker:build:prod
+#    npm run docker:up:prod
+# 
+# 3. VERIFICACIÓN:
+#    npm run docker:status:prod
+#    npm run docker:logs:prod
+#    curl http://localhost:3001/health
+# 
+# 4. MONITOREO:
+#    - Health: http://localhost:3001/health
+#    - Metrics: http://localhost:3001/metrics (Prometheus)
+#    - Logs: docker compose -f docker-compose.production.yml logs -f
+# 
+# 5. ESCALAMIENTO (con Docker Swarm):
+#    docker stack deploy -c docker-compose.production.yml accessibility
+# 
+# 6. BACKUP:
+#    - Logs: volumen accessibility-mw-logs
+#    - Variables de entorno: .env.production (NO commitear)
+# 
+# =============================================================================

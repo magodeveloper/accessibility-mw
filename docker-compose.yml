@@ -64,7 +64,6 @@ services:
       - /tmp:size=${TMPFS_TMP_SIZE:-512m},mode=1777
     networks:
       - accessibility_network
-      - accessibility-shared
 
 networks:
   accessibility_network:
@@ -79,9 +78,13 @@ networks:
         - subnet: 172.22.0.0/16
           gateway: 172.22.0.1
 
-  accessibility-shared:
-    external: true
-    name: accessibility-shared
+# Red compartida (opcional - solo si necesitas conectar con otros microservicios)
+# Para crearla: docker network create accessibility-shared
+# Luego descomenta las siguientes líneas:
+#  accessibility-shared:
+#    external: true
+#    name: accessibility-shared
+
 # Para usar un archivo de entorno específico:
 #   docker compose --env-file .env.development up
 #   docker compose --env-file .env.production up

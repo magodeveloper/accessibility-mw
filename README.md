@@ -1,9 +1,11 @@
 # 🚀 Accessibility Middleware
 
-[![Node.js](https://img.shields.io/badge/Node.js-20.19.2-339933?logo=node.js)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-20.19.5-339933?logo=node.js)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript)](https://www.typescriptlang.org/)
+[![Docker](https://img.shields.io/badge/Docker-Alpine%203.22-2496ED?logo=docker)](https://www.docker.com/)
 [![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](#-testing)
 [![Coverage](https://img.shields.io/badge/coverage-81%25-green)](#-testing)
+[![Security](https://img.shields.io/badge/vulnerabilities-0%20prod-success)](#-seguridad)
 [![License](https://img.shields.io/badge/license-Proprietary-red)](LICENSE)
 
 > **Middleware avanzado de análisis de accesibilidad web con integración dual de herramientas (axe-core e IBM Equal Access) y persistencia automática en microservicios .NET.**
@@ -123,10 +125,11 @@ Para información técnica detallada, consulta la documentación especializada:
 
 ### Requisitos
 
-- **Node.js 20.19.2+** (con npm 10+)
+- **Node.js 20.19.5+** (LTS con npm 10+)
 - **Docker & Docker Compose** (para microservicios y Playwright)
 - **MySQL 8.4+** (opcional, Docker lo provee)
 - **Git**
+- **Memoria recomendada:** 4GB+ para desarrollo, 3GB+ para producción
 
 ### Instalación Local
 
@@ -633,39 +636,205 @@ npm run load:stress
 
 ## 🐳 Docker & Deployment
 
+### 🚀 Despliegue en Producción
+
+Para despliegue en producción, consulta la **[Guía Completa de Despliegue en Producción](docs/PRODUCTION-DEPLOYMENT.md)**.
+
+#### Quick Start - Producción
+
+```bash
+# 1. Validar configuración
+npm run validate:production
+
+# 2. Build imagen de producción
+npm run docker:build:prod
+
+# 3. Deploy
+npm run docker:up:prod
+
+# 4. Verificar
+npm run docker:status:prod
+curl http://localhost:3001/health
+```
+
+#### Script Helper Interactivo
+
+```powershell
+# Modo interactivo con menú
+.\deploy-production.ps1
+
+# O acciones directas
+.\deploy-production.ps1 -Action validate
+.\deploy-production.ps1 -Action build
+.\deploy-production.ps1 -Action deploy
+.\deploy-production.ps1 -Action health
+```
+
+#### NPM Scripts de Producción
+
+```bash
+# Docker Compose - Producción
+npm run docker:build:prod         # Build imagen sin cache
+npm run docker:up:prod             # Levantar en background
+npm run docker:up:prod:attached    # Levantar con logs visibles
+npm run docker:down:prod           # Detener y eliminar
+npm run docker:restart:prod        # Reiniciar servicio
+npm run docker:status:prod         # Ver estado
+npm run docker:logs:prod           # Ver logs
+npm run docker:logs:prod:follow    # Ver logs en tiempo real
+
+# Validación y despliegue
+npm run validate:production        # Validar config antes de deploy
+npm run predeploy                  # Validar + build + tests
+npm run start:prod                 # Iniciar en modo producción (local)
+```
+
+### Configuración de Entorno
+
+#### Desarrollo vs Producción
+
+```bash
+# Desarrollo (usa .env.development)
+npm run docker:up
+npm run dev
+
+# Producción (usa .env.production)
+npm run docker:up:prod
+npm run start:prod
+```
+
+#### Variables Críticas de Producción
+
+```bash
+# .env.production
+NODE_ENV=production
+APP_ENV=PROD
+HOST=0.0.0.0
+TRUST_PROXY=true
+
+# Seguridad (⚠️ CAMBIAR antes de desplegar)
+JWT_SECRET_KEY=<generar-secret-64-chars>
+GATEWAY_SECRET=<generar-secret-64-chars>
+GATEWAY_VALIDATION_ENABLED=true
+
+# CORS (configurar dominios reales)
+CORS_ORIGINS=https://app.yourdomain.com,https://admin.yourdomain.com
+
+# Servicios externos
+ANALYSIS_API_URL=http://ms-analysis-service:8082  # Kubernetes
+# o
+ANALYSIS_API_URL=http://host.docker.internal:8082  # Docker Compose
+```
+
+#### Generar Secretos Seguros
+
+```powershell
+# PowerShell
+node -e "console.log(require('crypto').randomBytes(64).toString('base64'))"
+
+# O usar el script incluido
+.\Generate-JwtSecretKey.ps1
+```
+
 ### Imágenes Docker
 
 ```bash
-# Build de imagen
-docker build -t accessibility-mw:latest .
+# Build de imagen de desarrollo
+docker build -t accessibility-mw:dev .
 
-# Build multi-stage optimizado
-docker build --target production -t accessibility-mw:prod .
+# Build de producción con metadata
+docker build -t accessibility-mw:1.0.0 \
+  --build-arg BUILD_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+  --build-arg VERSION="1.0.0" \
+  --build-arg VCS_REF="$(git rev-parse --short HEAD)" \
+  .
 
 # Verificar imagen
 docker images | grep accessibility-mw
+docker inspect accessibility-mw:1.0.0
 ```
 
-### Docker Compose
+### Docker Compose - Configuraciones
+
+#### Desarrollo (docker-compose.yml)
 
 ```yaml
-# docker-compose.yml
 services:
   accessibility-mw:
     image: accessibility-mw:latest
+    environment:
+      - NODE_ENV=development
+      - GATEWAY_VALIDATION_ENABLED=true
     ports:
       - "3001:3001"
+    shm_size: 1g                    # Memoria compartida para Playwright
+    deploy:
+      resources:
+        limits:
+          memory: 4G                # Optimizado para desarrollo
+    memswap_limit: 4G
+```
+
+#### Producción (docker-compose.production.yml)
+
+```yaml
+services:
+  accessibility-mw:
+    image: accessibility-mw:${VERSION:-latest}
     environment:
       - NODE_ENV=production
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
-    depends_on:
-      - ms-analysis
-      - ms-reports
+      - GATEWAY_VALIDATION_ENABLED=true
+      - TRUST_PROXY=true
+    ports:
+      - "${MW_HOST_PORT:-3001}:3001"
+    shm_size: 2g                    # Mayor memoria compartida en prod
+    deploy:
+      resources:
+        limits:
+          memory: 3G                # Límite de RAM
+          cpus: '2.0'               # Límite de CPU
+        reservations:
+          memory: 2G                # RAM reservada
+          cpus: '1.0'               # CPU reservada
+    memswap_limit: 3G
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 20s
+```
+
+### Health Checks
+
+```bash
+# Health endpoint
+curl http://localhost:3001/health
+
+# Liveness probe
+curl http://localhost:3001/health/live
+
+# Readiness probe
+curl http://localhost:3001/health/ready
+
+# Docker healthcheck
+docker inspect --format='{{json .State.Health}}' accessibility-mw-prod
+```
+
+### Monitoreo en Producción
+
+```bash
+# Prometheus metrics
+curl http://localhost:3001/metrics
+
+# Logs estructurados
+docker compose -f docker-compose.production.yml logs -f
+
+# Recursos del contenedor
+docker stats accessibility-mw-prod
+
+# Inspección completa
+docker inspect accessibility-mw-prod
 ```
 
 ### Deployment en Cloud
@@ -779,7 +948,7 @@ cors({
 
 ### Core
 
-- **Runtime:** Node.js 20.19.2 LTS
+- **Runtime:** Node.js 20.19.5 LTS
 - **Language:** TypeScript 5.9.3
 - **Framework:** Express 5.1.0
 - **Testing:** Jest 30.2.0 + Supertest 7.1.4
@@ -789,6 +958,13 @@ cors({
 - **axe-core:** 4.11.0 (Deque Systems)
 - **IBM Equal Access:** 4.0.9 (IBM Accessibility)
 - **Playwright:** 1.56.1 (Browser automation)
+
+### Docker & Contenedores
+
+- **Builder Image:** node:20.19.5-alpine3.22 (5MB base)
+- **Production Image:** mcr.microsoft.com/playwright:v1.56.1-jammy
+- **Memoria:** 4GB desarrollo / 3GB producción
+- **Seguridad:** 0 vulnerabilidades en dependencias de producción
 
 ### Persistencia y Cache
 
