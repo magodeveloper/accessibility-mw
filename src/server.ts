@@ -28,6 +28,13 @@ import {
   metricsCollector,
   metricsMiddleware,
 } from './services/metrics.service';
+import {
+  getPrometheusMetrics,
+  getPrometheusContentType,
+  updateBrowserPoolMetrics,
+  updateCacheMetrics,
+  updateHealthScore,
+} from './services/prometheus.metrics.service';
 import { performanceMonitor } from './services/performance.service';
 import { swaggerSpec } from './swagger';
 import { ENV, FeatureFlags } from './utils/environment';
@@ -157,30 +164,58 @@ app.use(
 app.use(generalLimiter);
 
 // Endpoint de métricas para monitoreo
-app.get('/metrics', (req, res) => {
+app.get('/metrics', async (req, res) => {
   const requestId = (req as RequestWithId).id;
   advancedLogger.debug('Metrics requested', { requestId: String(requestId) });
 
   const format = req.query.format as string;
-  if (format === 'prometheus') {
-    res.set('Content-Type', 'text/plain');
-    const prometheusMetrics =
-      metricsCollector.toPrometheusFormat() +
-      '\n' +
-      performanceMonitor.toPrometheusMetrics();
-    res.send(prometheusMetrics);
-  } else {
+  
+  // Actualizar métricas dinámicas antes de exportar
+  const cacheStats = analysisCache.getStats();
+  const poolStats = browserPool.getPoolStats();
+  const legacyMetrics = metricsCollector.getMetrics();
+  
+  updateBrowserPoolMetrics({
+    active: poolStats.inUse,
+    idle: poolStats.available,
+    total: poolStats.total,
+  });
+  
+  updateCacheMetrics({
+    size: cacheStats.size,
+    memoryBytes: cacheStats.memoryUsage,
+    hits: cacheStats.hits,
+    misses: cacheStats.misses,
+  });
+  
+  updateHealthScore(legacyMetrics.healthScore);
+  
+  // Formato Prometheus es el DEFAULT (cambio principal)
+  if (format === 'json') {
+    // Formato JSON solo cuando se solicita explícitamente
     res.json({
       ok: true,
-      metrics: metricsCollector.getMetrics(),
+      metrics: legacyMetrics,
       performance: performanceMonitor.getMetrics(),
       health: performanceMonitor.getHealthStatus(),
       alerts: performanceMonitor.getAlerts(),
-      cache: analysisCache.getStats(),
-      browserPool: browserPool.getPoolStats(),
+      cache: cacheStats,
+      browserPool: poolStats,
       timestamp: new Date().toISOString(),
       requestId,
     });
+  } else {
+    // Formato Prometheus por defecto
+    res.set('Content-Type', getPrometheusContentType());
+    const prometheusMetrics = await getPrometheusMetrics();
+    
+    // Agregar métricas legacy para compatibilidad
+    const legacyPrometheusMetrics =
+      metricsCollector.toPrometheusFormat() +
+      '\n' +
+      performanceMonitor.toPrometheusMetrics();
+    
+    res.send(prometheusMetrics + '\n\n' + legacyPrometheusMetrics);
   }
 });
 

@@ -427,35 +427,127 @@ Health check completo del middleware y dependencias.
 
 #### GET /metrics
 
-Métricas en formato Prometheus.
+**Exporta métricas de observabilidad en formato Prometheus** (por defecto) o JSON (legacy).
 
-**Response (200):**
+🆕 **Cambio Importante**: Desde v1.x, el formato por defecto es **Prometheus** para integración directa con Prometheus/Grafana.
 
+**Formatos Soportados:**
+
+```bash
+# Formato Prometheus (por defecto)
+curl http://localhost:3001/metrics
+
+# Formato JSON (legacy, retrocompatibilidad)
+curl http://localhost:3001/metrics?format=json
 ```
+
+**Categorías de Métricas:**
+
+| Categoría | Descripción | Ejemplos |
+|-----------|-------------|----------|
+| **Node.js Runtime** | CPU, memoria, GC, event loop | `nodejs_heap_size_used_bytes`, `nodejs_eventloop_lag_seconds` |
+| **HTTP Requests** | Contadores y latencias por endpoint | `http_requests_total`, `http_request_duration_seconds` |
+| **Accessibility Analysis** | Análisis ejecutados, duración, errores | `analysis_requests_total`, `analysis_duration_seconds` |
+| **Browser Pool** | Estado del pool de Playwright | `browser_pool_size`, `browser_pool_wait_time_seconds` |
+| **Cache** | Operaciones de cache, hit rate | `cache_operations_total`, `cache_hit_rate` |
+| **Health Score** | Puntuación de salud general | `accessibility_mw_health_score` |
+
+**Response Prometheus (200):**
+
+```prometheus
+# HELP process_cpu_user_seconds_total Total user CPU time
+# TYPE process_cpu_user_seconds_total counter
+process_cpu_user_seconds_total 12.5
+
+# HELP nodejs_heap_size_used_bytes Process heap size used
+# TYPE nodejs_heap_size_used_bytes gauge
+nodejs_heap_size_used_bytes 45678912
+
 # HELP http_requests_total Total HTTP requests
 # TYPE http_requests_total counter
 http_requests_total{method="POST",path="/api/analyze",status="200"} 1234
+http_requests_total{method="GET",path="/health",status="200"} 567
 
 # HELP http_request_duration_seconds HTTP request duration
 # TYPE http_request_duration_seconds histogram
-http_request_duration_seconds_bucket{le="0.5"} 890
-http_request_duration_seconds_bucket{le="1.0"} 1100
-http_request_duration_seconds_sum 2847
-http_request_duration_seconds_count 1234
+http_request_duration_seconds_bucket{method="POST",path="/api/analyze",le="0.5"} 890
+http_request_duration_seconds_bucket{method="POST",path="/api/analyze",le="1.0"} 1100
+http_request_duration_seconds_bucket{method="POST",path="/api/analyze",le="+Inf"} 1234
+http_request_duration_seconds_sum{method="POST",path="/api/analyze"} 2847.5
+http_request_duration_seconds_count{method="POST",path="/api/analyze"} 1234
+
+# HELP analysis_requests_total Total accessibility analysis requests
+# TYPE analysis_requests_total counter
+analysis_requests_total{engine="dual",status="success"} 450
+analysis_requests_total{engine="dual",status="error"} 12
 
 # HELP analysis_duration_seconds Analysis execution time
 # TYPE analysis_duration_seconds histogram
-analysis_duration_seconds_sum 5694
+analysis_duration_seconds_sum 5694.2
 analysis_duration_seconds_count 450
 
 # HELP browser_pool_size Current browser pool size
 # TYPE browser_pool_size gauge
-browser_pool_size 3
+browser_pool_size{state="total"} 3
+browser_pool_size{state="available"} 2
+browser_pool_size{state="active"} 1
 
-# HELP cache_hit_rate Cache hit rate
+# HELP cache_hit_rate Cache hit rate (0-1)
 # TYPE cache_hit_rate gauge
 cache_hit_rate 0.78
+
+# HELP accessibility_mw_health_score Overall health score (0-100)
+# TYPE accessibility_mw_health_score gauge
+accessibility_mw_health_score 95
 ```
+
+**Response JSON - Legacy (200):**
+
+```json
+{
+  "timestamp": "2025-10-15T10:30:00Z",
+  "uptime": 3600,
+  "metrics": {
+    "http": {
+      "requestsTotal": 1234,
+      "averageResponseTime": 2.3,
+      "errorRate": 0.02
+    },
+    "analysis": {
+      "total": 450,
+      "success": 438,
+      "errors": 12,
+      "averageDuration": 2.8
+    },
+    "browserPool": {
+      "size": 3,
+      "available": 2,
+      "active": 1
+    },
+    "cache": {
+      "size": 45,
+      "hitRate": 0.78
+    },
+    "resources": {
+      "memoryUsed": 256000000,
+      "memoryPercentage": 45
+    }
+  }
+}
+```
+
+**Headers:**
+
+```
+Content-Type: text/plain; version=0.0.4; charset=utf-8  # Prometheus
+Content-Type: application/json                          # JSON
+```
+
+📚 **Documentación Detallada**: Ver [docs/prometheus-metrics.md](docs/prometheus-metrics.md) para:
+- Guía completa de métricas exportadas
+- Queries Prometheus de ejemplo
+- Integración con Grafana
+- Configuración de alertas
 
 ### Headers Requeridos
 
