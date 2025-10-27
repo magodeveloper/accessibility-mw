@@ -6,7 +6,6 @@
 
 import {
   afterAll,
-  beforeAll,
   beforeEach,
   describe,
   expect,
@@ -122,6 +121,21 @@ const mockMetricsMiddleware = jest.fn(() => actualMetricsMiddleware);
 jest.mock('../../src/services/metrics.service', () => ({
   metricsCollector: mockMetricsCollector,
   metricsMiddleware: mockMetricsMiddleware,
+}));
+
+// Mock prometheus metrics service
+const mockGetPrometheusMetrics = jest.fn(() => Promise.resolve('# Prometheus metrics\ntest_metric 1'));
+const mockGetPrometheusContentType = jest.fn(() => 'text/plain; version=0.0.4; charset=utf-8');
+const mockUpdateBrowserPoolMetrics = jest.fn();
+const mockUpdateCacheMetrics = jest.fn();
+const mockUpdateHealthScore = jest.fn();
+
+jest.mock('../../src/services/prometheus.metrics.service', () => ({
+  getPrometheusMetrics: mockGetPrometheusMetrics,
+  getPrometheusContentType: mockGetPrometheusContentType,
+  updateBrowserPoolMetrics: mockUpdateBrowserPoolMetrics,
+  updateCacheMetrics: mockUpdateCacheMetrics,
+  updateHealthScore: mockUpdateHealthScore,
 }));
 
 // Mock routes
@@ -426,7 +440,7 @@ describe('Server Configuration', () => {
     });
 
     it('should serve metrics endpoint with JSON format', async () => {
-      const response = await request(app).get('/metrics');
+      const response = await request(app).get('/metrics?format=json');
       expect(response.status).toBe(200);
       expect(response.body.ok).toBe(true);
       expect(response.body.metrics).toBeDefined();
@@ -543,22 +557,28 @@ describe('Performance Monitoring', () => {
     await request(app).get('/health');
     await new Promise(resolve => setTimeout(resolve, 150));
 
+    // Verificar que se llamó al menos una vez
+    expect(mockPerformanceMonitor.recordRequest).toHaveBeenCalled();
     const calls = mockPerformanceMonitor.recordRequest.mock.calls;
-    expect(calls.length).toBeGreaterThan(0);
-    // El segundo parámetro debe ser true para respuestas exitosas
-    const lastCall = calls.at(-1);
-    expect(lastCall?.[1]).toBe(true);
+    if (calls.length > 0) {
+      // El segundo parámetro debe ser true para respuestas exitosas
+      const lastCall = calls.at(-1);
+      expect(lastCall?.[1]).toBe(true);
+    }
   });
 
   it('should record failure metric for 4xx responses', async () => {
     await request(app).get('/nonexistent-endpoint-test');
     await new Promise(resolve => setTimeout(resolve, 150));
 
+    // Verificar que se llamó al menos una vez
+    expect(mockPerformanceMonitor.recordRequest).toHaveBeenCalled();
     const calls = mockPerformanceMonitor.recordRequest.mock.calls;
-    expect(calls.length).toBeGreaterThan(0);
-    // El segundo parámetro debe ser false para respuestas 4xx
-    const lastCall = calls.at(-1);
-    expect(lastCall?.[1]).toBe(false);
+    if (calls.length > 0) {
+      // El segundo parámetro debe ser false para respuestas 4xx
+      const lastCall = calls.at(-1);
+      expect(lastCall?.[1]).toBe(false);
+    }
   });
 
   it('should set up request context for logging', async () => {
@@ -588,7 +608,7 @@ describe('Metrics Endpoint', () => {
   });
 
   it('should log debug message when metrics are requested', async () => {
-    await request(app).get('/metrics');
+    await request(app).get('/metrics?format=json');
 
     expect(mockAdvancedLogger.debug).toHaveBeenCalledWith(
       'Metrics requested',
@@ -599,7 +619,7 @@ describe('Metrics Endpoint', () => {
   });
 
   it('should include all service stats in metrics response', async () => {
-    const response = await request(app).get('/metrics');
+    const response = await request(app).get('/metrics?format=json');
 
     expect(mockMetricsCollector.getMetrics).toHaveBeenCalled();
     expect(mockPerformanceMonitor.getMetrics).toHaveBeenCalled();
@@ -658,8 +678,8 @@ describe('Request ID Handling', () => {
   });
 
   it('should attach unique request ID to each request', async () => {
-    const response1 = await request(app).get('/metrics');
-    const response2 = await request(app).get('/metrics');
+    const response1 = await request(app).get('/metrics?format=json');
+    const response2 = await request(app).get('/metrics?format=json');
 
     expect(response1.body.requestId).toBeDefined();
     expect(response2.body.requestId).toBeDefined();
@@ -677,7 +697,7 @@ describe('Request ID Handling', () => {
   });
 
   it('should include request ID in metrics response', async () => {
-    const response = await request(app).get('/metrics');
+    const response = await request(app).get('/metrics?format=json');
     expect(response.body.requestId).toMatch(/^test-request-id-\d+$/);
   });
 });
@@ -771,10 +791,44 @@ describe('Auth Status Configuration', () => {
 describe('Service Integration', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    
+    // Re-configurar los mocks después de clearAllMocks()
+    mockAnalysisCache.getStats.mockReturnValue({
+      size: 150,
+      hits: 450,
+      misses: 50,
+      hitRate: 0.9,
+      memoryUsageMB: 25.5,
+    });
+    
+    mockBrowserPool.getPoolStats.mockReturnValue({
+      active: 2,
+      idle: 1,
+      total: 3,
+      utilization: 0.67,
+    });
+    
+    mockPerformanceMonitor.getMetrics.mockReturnValue({
+      requests: 1000,
+      avgDuration: 245.5,
+      successRate: 0.95,
+    });
+    
+    mockPerformanceMonitor.getHealthStatus.mockReturnValue({
+      status: 'healthy',
+      score: 95,
+    });
+    
+    mockPerformanceMonitor.getAlerts.mockReturnValue([]);
+    
+    mockMetricsCollector.getMetrics.mockReturnValue({
+      httpRequests: 5000,
+      analysisTotal: 1200,
+    });
   });
 
   it('should return cache statistics', async () => {
-    const response = await request(app).get('/metrics');
+    const response = await request(app).get('/metrics?format=json');
 
     expect(mockAnalysisCache.getStats).toHaveBeenCalled();
     expect(response.body.cache).toEqual({
@@ -787,7 +841,7 @@ describe('Service Integration', () => {
   });
 
   it('should return browser pool statistics', async () => {
-    const response = await request(app).get('/metrics');
+    const response = await request(app).get('/metrics?format=json');
 
     expect(mockBrowserPool.getPoolStats).toHaveBeenCalled();
     expect(response.body.browserPool).toEqual({
@@ -799,7 +853,7 @@ describe('Service Integration', () => {
   });
 
   it('should return performance metrics', async () => {
-    const response = await request(app).get('/metrics');
+    const response = await request(app).get('/metrics?format=json');
 
     expect(mockPerformanceMonitor.getMetrics).toHaveBeenCalled();
     expect(response.body.performance).toEqual({
@@ -810,7 +864,7 @@ describe('Service Integration', () => {
   });
 
   it('should return health status', async () => {
-    const response = await request(app).get('/metrics');
+    const response = await request(app).get('/metrics?format=json');
 
     expect(mockPerformanceMonitor.getHealthStatus).toHaveBeenCalled();
     expect(response.body.health).toEqual({
@@ -820,7 +874,7 @@ describe('Service Integration', () => {
   });
 
   it('should return alerts array', async () => {
-    const response = await request(app).get('/metrics');
+    const response = await request(app).get('/metrics?format=json');
 
     expect(mockPerformanceMonitor.getAlerts).toHaveBeenCalled();
     expect(Array.isArray(response.body.alerts)).toBe(true);

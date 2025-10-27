@@ -456,10 +456,21 @@ async function saveAnalysis(
       payloadSize: JSON.stringify(analysisPayload).length,
     });
 
+    // Propagar headers de autenticación del Gateway
+    const authHeaders: Record<string, string> = {
+      'Accept-Language': req.headers['accept-language'] || 'es',
+    };
+    
+    // Incluir headers de usuario si existen (añadidos por el Gateway)
+    if (req.headers['x-user-id']) authHeaders['X-User-Id'] = req.headers['x-user-id'] as string;
+    if (req.headers['x-user-email']) authHeaders['X-User-Email'] = req.headers['x-user-email'] as string;
+    if (req.headers['x-user-role']) authHeaders['X-User-Role'] = req.headers['x-user-role'] as string;
+    if (req.headers['x-user-name']) authHeaders['X-User-Name'] = req.headers['x-user-name'] as string;
+
     const saveResp = await httpClient.post(
       `${ANALYSIS_API_URL}/api/analysis`,
       analysisPayload,
-      { 'Accept-Language': req.headers['accept-language'] || 'es' }
+      authHeaders
     );
 
     logger.info('Response from microservice', {
@@ -493,8 +504,8 @@ async function saveAnalysis(
 async function saveHistory(
   userId: number,
   analysisId: number,
-  requestId = 'unknown',
-  acceptLanguage = 'es'
+  req: express.Request,
+  requestId = 'unknown'
 ): Promise<number | null> {
   const logger = createOptimizedLogger(requestId);
   logger.info('saveHistory called', { userId, analysisId, REPORTS_API_URL });
@@ -523,10 +534,20 @@ async function saveHistory(
       url: `${REPORTS_API_URL}/api/History`,
     });
 
+    // Propagar headers de autenticación del Gateway
+    const authHeaders: Record<string, string> = {
+      'Accept-Language': req.headers['accept-language'] || 'es',
+    };
+    
+    if (req.headers['x-user-id']) authHeaders['X-User-Id'] = req.headers['x-user-id'] as string;
+    if (req.headers['x-user-email']) authHeaders['X-User-Email'] = req.headers['x-user-email'] as string;
+    if (req.headers['x-user-role']) authHeaders['X-User-Role'] = req.headers['x-user-role'] as string;
+    if (req.headers['x-user-name']) authHeaders['X-User-Name'] = req.headers['x-user-name'] as string;
+
     const saveResp = await httpClient.post(
       `${REPORTS_API_URL}/api/History`,
       historyPayload,
-      { 'Accept-Language': acceptLanguage || 'es' }
+      authHeaders
     );
 
     logger.info('Response from Reports API', {
@@ -561,8 +582,8 @@ async function saveHistory(
 
 async function saveResult(
   result: Record<string, unknown>,
-  requestId = 'unknown',
-  acceptLanguage = 'es'
+  req: express.Request,
+  requestId = 'unknown'
 ): Promise<number | null> {
   const logger = createOptimizedLogger(requestId);
   debugVerbose('SAVE_RESULT_START', {
@@ -586,10 +607,20 @@ async function saveResult(
       url: `${ANALYSIS_API_URL}/api/result`,
     });
 
+    // Propagar headers de autenticación del Gateway
+    const authHeaders: Record<string, string> = {
+      'Accept-Language': req.headers['accept-language'] || 'es',
+    };
+    
+    if (req.headers['x-user-id']) authHeaders['X-User-Id'] = req.headers['x-user-id'] as string;
+    if (req.headers['x-user-email']) authHeaders['X-User-Email'] = req.headers['x-user-email'] as string;
+    if (req.headers['x-user-role']) authHeaders['X-User-Role'] = req.headers['x-user-role'] as string;
+    if (req.headers['x-user-name']) authHeaders['X-User-Name'] = req.headers['x-user-name'] as string;
+
     const resp = await httpClient.post(
       `${ANALYSIS_API_URL}/api/result`,
       result,
-      { 'Accept-Language': acceptLanguage }
+      authHeaders
     );
     debugVerbose('SAVE_RESULT_RESPONSE', {
       status: resp.status,
@@ -631,8 +662,8 @@ async function saveResult(
 
 async function saveError(
   errorPayload: ErrorPayload,
-  requestId = 'unknown',
-  acceptLanguage = 'es'
+  req: express.Request,
+  requestId = 'unknown'
 ): Promise<void> {
   const logger = createOptimizedLogger(requestId);
 
@@ -648,10 +679,20 @@ async function saveError(
   });
 
   try {
+    // Propagar headers de autenticación del Gateway
+    const authHeaders: Record<string, string> = {
+      'Accept-Language': req.headers['accept-language'] || 'es',
+    };
+    
+    if (req.headers['x-user-id']) authHeaders['X-User-Id'] = req.headers['x-user-id'] as string;
+    if (req.headers['x-user-email']) authHeaders['X-User-Email'] = req.headers['x-user-email'] as string;
+    if (req.headers['x-user-role']) authHeaders['X-User-Role'] = req.headers['x-user-role'] as string;
+    if (req.headers['x-user-name']) authHeaders['X-User-Name'] = req.headers['x-user-name'] as string;
+
     const errorResp = await httpClient.post(
       `${ANALYSIS_API_URL}/api/error`,
       errorPayload,
-      { 'Accept-Language': acceptLanguage }
+      authHeaders
     );
 
     logger.info('saveError response', {
@@ -686,6 +727,7 @@ async function saveResultsAndErrors(
   resultsPayload: Record<string, unknown>[],
   itemsList: AnalysisItem[],
   analysisId: string | number,
+  req: express.Request,
   requestId = 'unknown'
 ) {
   const logger = createOptimizedLogger(requestId);
@@ -745,7 +787,7 @@ async function saveResultsAndErrors(
           operation: 'saveResultsAndErrors.saveResult',
           itemId: item?.id,
         });
-        resultId = await saveResult(result, requestId);
+        resultId = await saveResult(result, req, requestId);
         advancedLogger.debug('SAVE_RESULT_RETURNED', {
           requestId,
           operation: 'saveResultsAndErrors.saveResult',
@@ -849,7 +891,7 @@ async function saveResultsAndErrors(
               itemId: item.id,
               resultId,
             });
-            await saveError(errorPayload, requestId);
+            await saveError(errorPayload, req, requestId);
             advancedLogger.debug('SAVE_ERROR_COMPLETED', {
               requestId,
               operation: 'saveResultsAndErrors.saveError.completed',
@@ -1403,19 +1445,18 @@ async function saveAndFormatResults({
   });
 
   // Procesar y guardar resultados y errores usando la función existente
-  await saveResultsAndErrors(resultsPayload, itemsList, analysisId, requestId);
+  await saveResultsAndErrors(resultsPayload, itemsList, analysisId, req, requestId);
 
   // Guardar historial si tenemos ID de usuario y analysisId
   let historyId = null;
   if (userId && analysisId) {
     try {
       logger.info('Attempting to save history record', { userId, analysisId });
-      const acceptLanguage = resolveAcceptLanguage(req);
       historyId = await saveHistory(
         userId,
         Number(analysisId),
-        requestId,
-        acceptLanguage
+        req,
+        requestId
       );
       logger.info('History record saved', { historyId });
     } catch (error_) {

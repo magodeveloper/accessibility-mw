@@ -83,11 +83,11 @@
     "zod": "4.1.12"
   },
   "devDependencies": {
-    "@babel/preset-env": "^7.28.3",
+    "@babel/preset-env": "^7.28.5",
     "@jest/globals": "^30.2.0",
     "@jest/test-sequencer": "^30.2.0",
     "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.3",
+    "@types/express": "^5.0.4",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.9.1",
     "@types/supertest": "^6.0.3",
