@@ -352,4 +352,4 @@ export function reinitializeMetrics(): void {
 }
 
 // Exportar el registro completo por si se necesita
-export const prometheusRegister = register;
+export { register as prometheusRegister } from 'prom-client';
