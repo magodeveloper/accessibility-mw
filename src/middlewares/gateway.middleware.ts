@@ -55,6 +55,17 @@ export function validateGatewaySecret(
     (req as GatewayValidatedRequest & { id?: string | number }).id || 'unknown'
   );
 
+  // Skip validation for health check and metrics endpoints
+  // This matches the behavior of .NET microservices (Analysis, Reports, Users)
+  if (req.path.startsWith('/health') || req.path.startsWith('/metrics')) {
+    advancedLogger.debug('Gateway validation skipped for health/metrics endpoint', {
+      requestId,
+      path: req.path,
+      method: req.method,
+    });
+    return next();
+  }
+
   // Si la validación está deshabilitada (ej: desarrollo local)
   if (!isGatewayValidationEnabled()) {
     advancedLogger.debug('Gateway validation disabled - skipping validation', {
@@ -81,10 +92,7 @@ export function validateGatewaySecret(
 
     res.status(403).json({
       error: 'Forbidden',
-      message: `Missing required header: ${GATEWAY_SECRET_HEADER}. Direct access to this service is not allowed.`,
-      code: 'MISSING_GATEWAY_SECRET',
-      requestId,
-      timestamp: new Date().toISOString(),
+      message: 'Direct access to microservice is not allowed. Please use the Gateway.',
     });
     return;
   }
@@ -105,10 +113,7 @@ export function validateGatewaySecret(
 
     res.status(403).json({
       error: 'Forbidden',
-      message: 'Invalid gateway secret. Access denied.',
-      code: 'INVALID_GATEWAY_SECRET',
-      requestId,
-      timestamp: new Date().toISOString(),
+      message: 'Direct access to microservice is not allowed. Please use the Gateway.',
     });
     return;
   }
@@ -225,10 +230,7 @@ export function requireGateway(
 
     res.status(403).json({
       error: 'Forbidden',
-      message: 'This endpoint can only be accessed through the Gateway.',
-      code: 'GATEWAY_REQUIRED',
-      requestId,
-      timestamp: new Date().toISOString(),
+      message: 'Direct access to microservice is not allowed. Please use the Gateway.',
     });
     return;
   }
