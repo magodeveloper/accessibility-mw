@@ -425,6 +425,80 @@ Health check completo del middleware y dependencias.
 }
 ```
 
+#### GET /health/live
+
+**Liveness probe** para Kubernetes/Docker. Verifica que el proceso esté vivo y respondiendo.
+
+**Response (200):**
+
+```json
+{
+  "status": "alive",
+  "timestamp": "2025-10-15T10:30:00Z"
+}
+```
+
+**Uso en Kubernetes:**
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /health/live
+    port: 3001
+  initialDelaySeconds: 20
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+```
+
+#### GET /health/ready
+
+**Readiness probe** para Kubernetes/Docker. Verifica que el servicio esté listo para recibir tráfico (dependencias conectadas, recursos disponibles).
+
+**Response (200):**
+
+```json
+{
+  "status": "ready",
+  "timestamp": "2025-10-15T10:30:00Z",
+  "services": {
+    "ms-analysis": "healthy",
+    "ms-reports": "healthy"
+  },
+  "browserPool": {
+    "available": 2,
+    "ready": true
+  }
+}
+```
+
+**Response (503) - Not Ready:**
+
+```json
+{
+  "status": "not_ready",
+  "timestamp": "2025-10-15T10:30:00Z",
+  "reason": "Browser pool not ready",
+  "services": {
+    "ms-analysis": "healthy",
+    "ms-reports": "degraded"
+  }
+}
+```
+
+**Uso en Kubernetes:**
+
+```yaml
+readinessProbe:
+  httpGet:
+    path: /health/ready
+    port: 3001
+  initialDelaySeconds: 15
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 2
+```
+
 #### GET /metrics
 
 **Exporta métricas de observabilidad en formato Prometheus** (por defecto) o JSON (legacy).
@@ -551,11 +625,21 @@ Content-Type: application/json                          # JSON
 
 ### Headers Requeridos
 
-```
+**Para endpoints protegidos** (`/api/analyze`, `/api/reports`, etc.):
+
+```http
 Authorization: Bearer <JWT_TOKEN>
 Content-Type: application/json
-X-Gateway-Signature: <HMAC_SIGNATURE>  # Opcional si GATEWAY_VALIDATION_ENABLED=true
+X-Gateway-Secret: <GATEWAY_SECRET>  # Requerido si GATEWAY_VALIDATION_ENABLED=true
 ```
+
+**Para endpoints públicos** (`/health`, `/health/live`, `/health/ready`, `/metrics`):
+
+```http
+# No requieren headers de autenticación
+```
+
+> **💡 Nota**: El header `X-Gateway-Secret` solo es necesario cuando el middleware está configurado con `GATEWAY_VALIDATION_ENABLED=true` (recomendado para producción).
 
 ---
 
@@ -680,13 +764,55 @@ Time:        ~120s
 
 ### Dashboard de Tests
 
+Este proyecto incluye un **script PowerShell avanzado** (`manage-tests.ps1`) que proporciona gestión completa de testing con dashboard HTML interactivo.
+
+#### Script Helper: `manage-tests.ps1`
+
+```powershell
+# Pipeline completo: tests + cobertura + dashboard
+.\manage-tests.ps1 full
+
+# Tests con cobertura y dashboard automático
+.\manage-tests.ps1 coverage -OpenDashboard
+
+# Tests específicos
+.\manage-tests.ps1 test -Type unit
+.\manage-tests.ps1 test -Type integration
+.\manage-tests.ps1 test -Type e2e
+
+# Solo generar dashboard (con datos existentes)
+.\manage-tests.ps1 dashboard -OpenDashboard
+
+# Limpiar archivos de tests
+.\manage-tests.ps1 clean
+
+# Ver ayuda detallada
+.\manage-tests.ps1 help
+```
+
+#### Dashboard Features
+
+El dashboard HTML (`test-dashboard.html`) incluye:
+
+- ✅ **Resumen ejecutivo** - Tests ejecutados, pasados, fallidos, cobertura global
+- ✅ **Métricas por tipo** - Unit, Integration, E2E desglosados
+- ✅ **Gráficos interactivos** - Chart.js para visualización de datos
+- ✅ **Cobertura por archivo** - Statements, branches, functions, lines
+- ✅ **Histórico de ejecuciones** - Tendencias y evolución temporal
+- ✅ **Tests fallidos** - Detalles de errores y stack traces
+- ✅ **Performance** - Tiempos de ejecución y tests lentos
+- ✅ **Auto-refresh** - Actualización automática cada 30s
+
+#### Reportes Generados
+
 ```bash
 # Generar reporte HTML
 npm run test:coverage
 
-# Abrir dashboard
-open coverage/lcov-report/index.html  # macOS
-start coverage\lcov-report\index.html # Windows
+# Ubicaciones de reportes
+coverage/lcov-report/index.html    # Reporte detallado de cobertura
+test-dashboard.html                # Dashboard interactivo
+TestResults/                       # Resultados XML/JSON de Jest
 ```
 
 ---
@@ -859,13 +985,25 @@ services:
       - GATEWAY_VALIDATION_ENABLED=true
     ports:
       - "3001:3001"
-    shm_size: 1g                    # Memoria compartida para Playwright
+    volumes:
+      # Persistencia de resultados de tests y cobertura
+      - ./coverage:/app/coverage              # Cobertura de código
+      - ./TestResults:/app/TestResults        # Resultados de tests
+      - ./.nyc_output:/app/.nyc_output        # Cache de NYC coverage
+      - ./test-results:/app/test-results      # Resultados de accessibility-checker
+      - ./.achecker_cache:/app/.achecker_cache # Cache de Equal Access
+    shm_size: 1g                              # Memoria compartida para Playwright
     deploy:
       resources:
         limits:
-          memory: 4G                # Optimizado para desarrollo
+          memory: 4G                          # Optimizado para desarrollo
     memswap_limit: 4G
+    tmpfs:
+      - /app/logs:size=100m,mode=1777         # Logs temporales en memoria
+      - /tmp:size=512m,mode=1777              # Temp files en memoria
 ```
+
+> **💡 Volúmenes**: Los volúmenes Docker mapeados permiten que los archivos generados dentro del contenedor (cobertura, test results, cache) se persistan en el sistema host, facilitando el acceso y version control.
 
 #### Producción (docker-compose.production.yml)
 
@@ -986,18 +1124,31 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
 
 ### Gateway Validation
 
-Cuando `GATEWAY_VALIDATION_ENABLED=true`, valida firma HMAC:
+Cuando `GATEWAY_VALIDATION_ENABLED=true`, el middleware valida que las peticiones provengan del Gateway usando un **shared secret**:
 
 ```typescript
-// Header X-Gateway-Signature
-X-Gateway-Signature: sha256=a3f5b8c...
+// Header requerido
+X-Gateway-Secret: <GATEWAY_SECRET>
 
-// Validación
-const signature = crypto
-  .createHmac('sha256', GATEWAY_SECRET)
-  .update(JSON.stringify(requestBody))
-  .digest('hex');
+// Validación en el middleware
+if (req.get('X-Gateway-Secret') !== process.env.GATEWAY_SECRET) {
+  return res.status(403).json({
+    success: false,
+    error: {
+      code: 'INVALID_GATEWAY_SECRET',
+      message: 'Acceso no autorizado - Secret del Gateway inválido'
+    }
+  });
+}
 ```
+
+**Endpoints exceptuados** (no requieren Gateway Secret):
+- `GET /health` - Health check general
+- `GET /health/live` - Liveness probe (Kubernetes)
+- `GET /health/ready` - Readiness probe (Kubernetes)  
+- `GET /metrics` - Métricas Prometheus
+
+> **⚠️ Importante**: El `GATEWAY_SECRET` debe coincidir exactamente entre el Gateway y el Middleware. En producción, este valor **DEBE** ser único, seguro y de al menos 64 caracteres.
 
 ### Rate Limiting
 
@@ -1210,4 +1361,105 @@ Email: fgiocl@outlook.com
 ---
 
 **Author:** Geovanny Camacho (fgiocl@outlook.com)  
-**Last Updated:** 19 de octubre de 2025
+**Last Updated:** 3 de noviembre de 2025
+
+---
+
+## 🔧 Troubleshooting Rápido
+
+### Error 403: Gateway Secret Inválido
+
+**Síntoma**: `"error": { "code": "INVALID_GATEWAY_SECRET" }`
+
+**Solución**:
+
+```bash
+# 1. Verificar que el secret esté configurado en .env.development
+cat .env.development | grep GATEWAY_SECRET
+
+# 2. Verificar que la validación esté habilitada
+cat .env.development | grep GATEWAY_VALIDATION_ENABLED
+
+# 3. Reiniciar contenedor para aplicar cambios
+docker compose --env-file .env.development down
+docker compose --env-file .env.development up -d
+
+# 4. Verificar logs
+docker logs accessibility-mw | grep "Gateway Validation"
+
+# 5. Test con curl
+curl -X POST http://localhost:3001/api/analyze \
+  -H "Content-Type: application/json" \
+  -H "X-Gateway-Secret: YOUR_GATEWAY_SECRET" \
+  -d '{"url": "https://example.com"}'
+```
+
+### Test Results no se Guardan en Carpeta del Proyecto
+
+**Síntoma**: Archivos generados en `C:\app\results` en lugar de `./test-results`
+
+**Solución**:
+
+```bash
+# 1. Verificar configuración de rutas
+cat .achecker.yml | grep outputFolder
+# Debe ser: outputFolder: ./test-results
+
+# 2. Verificar volúmenes en docker-compose.yml
+docker compose config | grep "test-results"
+# Debe incluir: - ./test-results:/app/test-results
+
+# 3. Reiniciar contenedor
+docker compose down && docker compose up -d
+
+# 4. Verificar carpeta existe
+ls -la ./test-results
+```
+
+### Browser Pool Agotado
+
+**Síntoma**: `Error: No browsers available in pool`
+
+**Solución**:
+
+```bash
+# 1. Verificar estado del pool
+curl http://localhost:3001/health | jq '.resources.browserPool'
+
+# 2. Ajustar tamaño del pool en .env
+BROWSER_POOL_SIZE=5  # Aumentar de 3 a 5
+
+# 3. Aumentar memoria compartida en docker-compose.yml
+shm_size: 2g  # Aumentar de 1g a 2g
+
+# 4. Reiniciar servicio
+docker compose restart accessibility-mw
+```
+
+### Memoria Insuficiente
+
+**Síntoma**: Container killed por OOM (Out of Memory)
+
+**Solución**:
+
+```yaml
+# docker-compose.yml
+deploy:
+  resources:
+    limits:
+      memory: 4G      # Aumentar límite
+    reservations:
+      memory: 2G      # Reservar mínimo
+memswap_limit: 4G     # Swap limit
+shm_size: 2g          # Shared memory para Playwright
+```
+
+### Más Troubleshooting
+
+Para problemas más complejos, consulta **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** que incluye:
+- Problemas de instalación
+- Errores de runtime
+- Performance issues
+- Debugging avanzado
+- Problemas de microservicios
+- Docker troubleshooting

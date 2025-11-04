@@ -11,8 +11,8 @@ reportLevels:
 #  - manual
 #  - pass
 
-outputFolder: /app/results
-cacheFolder: /app/.achecker_cache
+outputFolder: ./test-results
+cacheFolder: ./.achecker_cache
 
 outputFormat:
   - json

@@ -59,9 +59,15 @@ services:
       options:
         max-size: ${LOG_MAX_SIZE:-10m}
         max-file: "${LOG_MAX_FILES:-3}"
+    volumes:
+      # Mapeo de coverage y test results para que se guarden en el host
+      - ./coverage:/app/coverage
+      - ./TestResults:/app/TestResults
+      - ./.nyc_output:/app/.nyc_output
+      - ./test-results:/app/test-results
+      - ./.achecker_cache:/app/.achecker_cache
     tmpfs:
       - /app/logs:size=${TMPFS_LOGS_SIZE:-100m},mode=1777
-      - /app/.achecker_cache:size=${TMPFS_CACHE_SIZE:-256m},mode=1777
       - /tmp:size=${TMPFS_TMP_SIZE:-512m},mode=1777
     networks:
       - accessibility_network
