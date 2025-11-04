@@ -61,7 +61,7 @@
     "test:watch": "jest --watch",
     "type-check": "tsc --noEmit",
     "validate:env": "node -e \"require('dotenv').config({path:'.env.'+process.env.NODE_ENV});console.log('✅ Environment validated')\"",
-    "validate:production": "powershell -ExecutionPolicy Bypass -File ./scripts/validate-production.ps1 || node ./scripts/validate-production.js"
+    "validate:production": "node ./scripts/validate-production.js"
   },
   "dependencies": {
     "@types/js-yaml": "^4.0.9",

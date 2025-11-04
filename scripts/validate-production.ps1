@@ -13,6 +13,10 @@
 
 .EXAMPLE
     .\scripts\validate-production.ps1
+
+.NOTES
+    Version: 1.0.1
+    Last Modified: 2025-11-03
 #>
 
 $ErrorActionPreference = "Stop"
@@ -111,15 +115,17 @@ if (Test-Path ".env.production") {
             if ($isPlaceholder) {
                 Write-Error "$var contiene un valor placeholder. Debe configurarse con un valor seguro."
             }
-            elseif ($value.Length -lt 32) {
-                Write-Error "$var debe tener al menos 32 caracteres (actual: $($value.Length))"
+            if ($value.Length -lt 32) {
+                $length = $value.Length
+                Write-Error "$var debe tener al menos 32 caracteres - actual: $length"
             }
             else {
-                Write-Success "$var configurado correctamente ($($value.Length) chars)"
+                $length = $value.Length
+                Write-Success "$var configurado correctamente - $length caracteres"
             }
         }
         else {
-            Write-Error "$var no encontrado en .env.production"
+            Write-Error "$var no se encontro en archivo .env.production"
         }
     }
     
@@ -305,27 +311,35 @@ else {
 Write-Header "Resumen de Validación"
 
 Write-Host ""
-Write-Host "  Total de checks: $ColorBlue$script:CheckCount$ColorReset"
-Write-Host "  Errores: $(if ($script:ErrorCount -gt 0) { $ColorRed } else { $ColorGreen })$script:ErrorCount$ColorReset"
-Write-Host "  Warnings: $(if ($script:WarningCount -gt 0) { $ColorYellow } else { $ColorGreen })$script:WarningCount$ColorReset"
+Write-Host "  Total de checks: ${ColorBlue}$script:CheckCount${ColorReset}"
+
+$errorColor = if ($script:ErrorCount -gt 0) { $ColorRed } else { $ColorGreen }
+Write-Host "  Errores: ${errorColor}$script:ErrorCount${ColorReset}"
+
+$warningColor = if ($script:WarningCount -gt 0) { $ColorYellow } else { $ColorGreen }
+Write-Host "  Warnings: ${warningColor}$script:WarningCount${ColorReset}"
 Write-Host ""
 
-if ($script:ErrorCount -gt 0) {
+# Mostrar resultado final
+if ($script:ErrorCount -gt 0) 
+{
     Write-Host "${ColorRed}╔═══════════════════════════════════════════════════════╗$ColorReset" -ForegroundColor Red
     Write-Host "${ColorRed}║  ❌ VALIDACIÓN FALLIDA - NO DESPLEGAR EN PRODUCCIÓN  ║$ColorReset" -ForegroundColor Red
     Write-Host "${ColorRed}╚═══════════════════════════════════════════════════════╝$ColorReset" -ForegroundColor Red
     exit 1
 }
-elseif ($script:WarningCount -gt 0) {
+
+if ($script:WarningCount -gt 0) 
+{
     Write-Host "${ColorYellow}╔═══════════════════════════════════════════════════════╗$ColorReset" -ForegroundColor Yellow
     Write-Host "${ColorYellow}║  ⚠️  VALIDACIÓN CON WARNINGS - REVISAR ANTES DE      ║$ColorReset" -ForegroundColor Yellow
     Write-Host "${ColorYellow}║     DESPLEGAR EN PRODUCCIÓN                           ║$ColorReset" -ForegroundColor Yellow
     Write-Host "${ColorYellow}╚═══════════════════════════════════════════════════════╝$ColorReset" -ForegroundColor Yellow
     exit 0
 }
-else {
-    Write-Host "${ColorGreen}╔═══════════════════════════════════════════════════════╗$ColorReset" -ForegroundColor Green
-    Write-Host "${ColorGreen}║  ✅ VALIDACIÓN EXITOSA - LISTO PARA PRODUCCIÓN       ║$ColorReset" -ForegroundColor Green
-    Write-Host "${ColorGreen}╚═══════════════════════════════════════════════════════╝$ColorReset" -ForegroundColor Green
-    exit 0
-}
+
+# Si llegamos aquí, no hay errores ni warnings
+Write-Host "${ColorGreen}╔═══════════════════════════════════════════════════════╗$ColorReset" -ForegroundColor Green
+Write-Host "${ColorGreen}║  ✅ VALIDACIÓN EXITOSA - LISTO PARA PRODUCCIÓN       ║$ColorReset" -ForegroundColor Green
+Write-Host "${ColorGreen}╚═══════════════════════════════════════════════════════╝$ColorReset" -ForegroundColor Green
+exit 0
