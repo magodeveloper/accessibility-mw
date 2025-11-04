@@ -48,7 +48,7 @@ services:
 
       # Security & Authentication (CRÍTICO: configurar en .env.production)
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
-      - JWT_ISSUER=${JWT_ISSUER:-https://api.accessibility.company.com/middleware}
+      - JWT_ISSUER=${JWT_ISSUER:-https://accessibility.company.com}
       - JWT_AUDIENCE=${JWT_AUDIENCE:-https://accessibility.company.com}
       - JWT_EXPIRY_HOURS=${JWT_EXPIRY_HOURS:-24}
       - JWT_CLOCK_TOLERANCE=${JWT_CLOCK_TOLERANCE:-0}

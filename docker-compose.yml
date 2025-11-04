@@ -14,7 +14,7 @@ services:
       - ANALYSIS_API_URL=${ANALYSIS_API_URL:-http://accessibility-gateway:8082}
       - REPORTS_API_URL=${REPORTS_API_URL:-http://accessibility-gateway:8083}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
-      - JWT_ISSUER=${JWT_ISSUER:-https://api.accessibility.company.com/middleware}
+      - JWT_ISSUER=${JWT_ISSUER:-https://accessibility.company.com}
       - JWT_AUDIENCE=${JWT_AUDIENCE:-https://accessibility.company.com}
       - JWT_EXPIRY_HOURS=${JWT_EXPIRY_HOURS:-24}
       - JWT_CLOCK_TOLERANCE=${JWT_CLOCK_TOLERANCE:-0}
