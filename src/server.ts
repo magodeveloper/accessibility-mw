@@ -163,7 +163,22 @@ app.use(
 // Rate limiting general (después de CORS y JSON para evitar 429 en preflight)
 app.use(generalLimiter);
 
-// Endpoint de métricas para monitoreo
+// ============================================================================
+// GATEWAY SECRET VALIDATION - Aplicar ANTES de registrar rutas
+// ============================================================================
+// Protege TODOS los endpoints /api/* incluyendo Swagger UI
+// Solo exceptuados: /health* y /metrics (definidos en gateway.middleware.ts)
+// Esto coincide con el comportamiento de los microservicios .NET donde
+// Swagger solo es accesible a través del Gateway
+// ============================================================================
+if (isGatewayValidationEnabled()) {
+  advancedLogger.info(
+    '[SECURITY] Gateway Secret validation enabled globally for /api/* routes (including Swagger)'
+  );
+  app.use('/api', validateGatewaySecret);
+}
+
+// Endpoint de métricas para monitoreo (público para Prometheus)
 app.get('/metrics', async (req, res) => {
   const requestId = (req as RequestWithId).id;
   advancedLogger.debug('Metrics requested', { requestId: String(requestId) });
@@ -239,53 +254,42 @@ app.get('/api/auth/status', (_req, res) => {
   });
 });
 
-// Rutas de análisis - PÚBLICAS pero protegidas por Gateway Secret
+// ============================================================================
+// RUTAS DE LA API
+// ============================================================================
+// NOTA: Todas las rutas /api/* están protegidas por el middleware global
+// validateGatewaySecret aplicado arriba, incluyendo:
+// - /api/docs (Swagger UI) - Solo accesible vía Gateway
+// - /api/docs.json (OpenAPI spec) - Solo accesible vía Gateway
+// - /api/auth/status - Solo accesible vía Gateway
+// - /api/analyze - Solo accesible vía Gateway
+// - /api/bundle - Solo accesible vía Gateway
+// - /api/monitoring - Solo accesible vía Gateway
+//
+// Endpoints públicos (NO requieren Gateway Secret):
+// - /health, /health/live, /health/ready - Health checks
+// - /metrics - Métricas Prometheus
+// ============================================================================
+
+// Rutas de análisis
 // ESTRATEGIA:
-// - Gateway Secret: REQUERIDO (valida que peticiones vienen del Gateway)
+// - Gateway Secret: REQUERIDO (ya aplicado globalmente en /api)
 // - JWT: NO REQUERIDO (rutas públicas, usuario no necesita estar autenticado)
 // - User Context: Extraído si está disponible (opcional)
 //
 // ORDEN DE MIDDLEWARES:
-// 1. validateGatewaySecret - Valida origen (Gateway) - OBLIGATORIO si está habilitado
-// 2. extractUserContext - Extrae contexto de usuario (X-User-* headers) - OPCIONAL
-// 3. analyzeLimiter - Rate limiting
-// 4. analyzeRouter - Lógica de negocio
+// 1. extractUserContext - Extrae contexto de usuario (X-User-* headers) - OPCIONAL
+// 2. analyzeLimiter - Rate limiting específico para análisis
+// 3. analyzeRouter - Lógica de negocio
+app.use('/api/analyze', extractUserContext, analyzeLimiter, analyzeRouter);
 
-const gatewayEnabled = isGatewayValidationEnabled();
-const jwtEnabled = isJwtEnabled();
-
-if (gatewayEnabled) {
-  advancedLogger.info(
-    '[SECURITY] Gateway Secret enabled - /api/analyze routes are PUBLIC but requests must come from Gateway (User Context extracted if available)'
-  );
-  app.use(
-    '/api/analyze',
-    validateGatewaySecret,
-    extractUserContext,
-    analyzeLimiter,
-    analyzeRouter
-  );
-} else {
-  advancedLogger.warn(
-    '[WARNING] SECURITY WARNING: Gateway Secret disabled - /api/analyze routes are COMPLETELY UNPROTECTED and accessible from anywhere (User Context extracted if available)'
-  );
-  app.use('/api/analyze', extractUserContext, analyzeLimiter, analyzeRouter);
-}
-
-// JWT Configuration Status (informativo, no se usa para /api/analyze)
-if (jwtEnabled) {
-  advancedLogger.info(
-    '[INFO] JWT is configured and available for other protected routes (not used for /api/analyze)'
-  );
-}
-
-// Bundle monitoring routes - NO requieren autenticación (métricas internas)
+// Bundle monitoring routes - Protegidas por Gateway (middleware global)
 app.use('/api/bundle', bundleRouter);
 
-// Health shallow/deep
+// Health checks - Públicos (exceptuados en gateway.middleware.ts)
 app.use('/health', healthRouter);
 
-// Monitoring routes (dashboard, status, metrics)
+// Monitoring routes (dashboard, status, metrics) - Protegidas por Gateway
 app.use('/api/monitoring', monitoringRouter);
 
 // 404 y manejador global de errores ANTES de escuchar

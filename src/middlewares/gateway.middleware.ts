@@ -55,10 +55,23 @@ export function validateGatewaySecret(
     (req as GatewayValidatedRequest & { id?: string | number }).id || 'unknown'
   );
 
-  // Skip validation for health check and metrics endpoints
+  // Skip validation ONLY for health checks and metrics endpoints
   // This matches the behavior of .NET microservices (Analysis, Reports, Users)
-  if (req.path.startsWith('/health') || req.path.startsWith('/metrics')) {
-    advancedLogger.debug('Gateway validation skipped for health/metrics endpoint', {
+  // Endpoints exceptuados:
+  // - /health* - Health checks y liveness/readiness probes (Kubernetes)
+  // - /metrics - Métricas para Prometheus scraping
+  //
+  // NOTA: Swagger UI (/api/docs) NO está exceptuado, igual que en microservicios .NET
+  // Debe accederse SOLO a través del Gateway
+  const publicPaths = [
+    '/health',
+    '/metrics',
+  ];
+
+  const isPublicPath = publicPaths.some(path => req.path.startsWith(path));
+
+  if (isPublicPath) {
+    advancedLogger.debug('Gateway validation skipped for public endpoint', {
       requestId,
       path: req.path,
       method: req.method,
