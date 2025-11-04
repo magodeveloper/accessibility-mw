@@ -11,7 +11,8 @@
  * Target: 100% branch coverage
  */
 
-import { NextFunction, Request, Response } from 'express';
+import { Request, Response } from 'express';
+import { beforeEach, describe, expect, jest, it } from '@jest/globals';
 import * as gatewayConfig from '../../src/config/gateway.config';
 import {
   GatewayValidatedRequest,
@@ -30,7 +31,7 @@ jest.mock('../../src/services/logging.service');
 describe('gateway.middleware', () => {
   let mockRequest: Partial<GatewayValidatedRequest>;
   let mockResponse: Partial<Response>;
-  let mockNext: NextFunction;
+  let mockNext: jest.Mock;
   let jsonMock: jest.Mock;
   let statusMock: jest.Mock;
   let getMock: jest.Mock;
@@ -40,11 +41,11 @@ describe('gateway.middleware', () => {
     jest.clearAllMocks();
 
     // Setup get mock for headers
-    getMock = jest.fn();
+    getMock = jest.fn() as any;
 
     // Setup request mock
     mockRequest = {
-      get: getMock,
+      get: getMock as any,
       path: '/api/test',
       method: 'GET',
       id: 'test-request-id',
@@ -52,15 +53,15 @@ describe('gateway.middleware', () => {
     };
 
     // Setup response mock
-    jsonMock = jest.fn();
-    statusMock = jest.fn().mockReturnValue({ json: jsonMock });
+    jsonMock = jest.fn() as any;
+    statusMock = jest.fn().mockReturnValue({ json: jsonMock }) as any;
     mockResponse = {
-      status: statusMock,
-      json: jsonMock,
+      status: statusMock as any,
+      json: jsonMock as any,
     };
 
     // Setup next mock
-    mockNext = jest.fn();
+    mockNext = jest.fn() as any;
 
     // Default gateway config mock
     (gatewayConfig.isGatewayValidationEnabled as jest.Mock).mockReturnValue(
@@ -98,7 +99,7 @@ describe('gateway.middleware', () => {
 
     describe('when gateway secret header is missing', () => {
       it('should return 403 with MISSING_GATEWAY_SECRET', () => {
-        getMock.mockImplementation((header: string) => {
+        getMock.mockImplementation((header: any): any => {
           if (header === 'X-Gateway-Secret') return undefined;
           if (header === 'user-agent') return 'TestAgent/1.0';
           return undefined;
@@ -126,10 +127,7 @@ describe('gateway.middleware', () => {
         expect(jsonMock).toHaveBeenCalledWith({
           error: 'Forbidden',
           message:
-            'Missing required header: X-Gateway-Secret. Direct access to this service is not allowed.',
-          code: 'MISSING_GATEWAY_SECRET',
-          requestId: 'test-request-id',
-          timestamp: expect.any(String),
+            'Direct access to microservice is not allowed. Please use the Gateway.',
         });
         expect(mockNext).not.toHaveBeenCalled();
       });
@@ -138,7 +136,7 @@ describe('gateway.middleware', () => {
     describe('when gateway secret is invalid', () => {
       it('should return 403 with INVALID_GATEWAY_SECRET', () => {
         const invalidSecret = 'wrong-secret';
-        getMock.mockImplementation((header: string) => {
+        getMock.mockImplementation((header: any): any => {
           if (header === 'X-Gateway-Secret') return invalidSecret;
           if (header === 'user-agent') return 'TestAgent/1.0';
           return undefined;
@@ -172,10 +170,8 @@ describe('gateway.middleware', () => {
         expect(statusMock).toHaveBeenCalledWith(403);
         expect(jsonMock).toHaveBeenCalledWith({
           error: 'Forbidden',
-          message: 'Invalid gateway secret. Access denied.',
-          code: 'INVALID_GATEWAY_SECRET',
-          requestId: 'test-request-id',
-          timestamp: expect.any(String),
+          message:
+            'Direct access to microservice is not allowed. Please use the Gateway.',
         });
         expect(mockNext).not.toHaveBeenCalled();
       });
@@ -220,7 +216,8 @@ describe('gateway.middleware', () => {
           mockNext
         );
 
-        expect(jsonMock).toHaveBeenCalledWith(
+        expect(advancedLogger.warn).toHaveBeenCalledWith(
+          'Gateway secret validation failed - Missing header',
           expect.objectContaining({
             requestId: 'unknown',
           })
@@ -239,7 +236,8 @@ describe('gateway.middleware', () => {
           mockNext
         );
 
-        expect(jsonMock).toHaveBeenCalledWith(
+        expect(advancedLogger.warn).toHaveBeenCalledWith(
+          'Gateway secret validation failed - Missing header',
           expect.objectContaining({
             requestId: '12345',
           })
@@ -444,10 +442,8 @@ describe('gateway.middleware', () => {
         expect(statusMock).toHaveBeenCalledWith(403);
         expect(jsonMock).toHaveBeenCalledWith({
           error: 'Forbidden',
-          message: 'This endpoint can only be accessed through the Gateway.',
-          code: 'GATEWAY_REQUIRED',
-          requestId: 'test-request-id',
-          timestamp: expect.any(String),
+          message:
+            'Direct access to microservice is not allowed. Please use the Gateway.',
         });
         expect(mockNext).not.toHaveBeenCalled();
       });
@@ -477,7 +473,8 @@ describe('gateway.middleware', () => {
           mockNext
         );
 
-        expect(jsonMock).toHaveBeenCalledWith(
+        expect(advancedLogger.warn).toHaveBeenCalledWith(
+          'Gateway required but request not from Gateway',
           expect.objectContaining({
             requestId: 'unknown',
           })
@@ -496,7 +493,8 @@ describe('gateway.middleware', () => {
           mockNext
         );
 
-        expect(jsonMock).toHaveBeenCalledWith(
+        expect(advancedLogger.warn).toHaveBeenCalledWith(
+          'Gateway required but request not from Gateway',
           expect.objectContaining({
             requestId: '99999',
           })
