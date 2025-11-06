@@ -459,6 +459,7 @@ async function saveAnalysis(
     // Propagar headers de autenticación del Gateway
     const authHeaders: Record<string, string> = {
       'Accept-Language': req.headers['accept-language'] || 'es',
+      'X-Gateway-Secret': process.env.GATEWAY_SECRET || '', // Agregar secret del gateway
     };
     
     // Incluir headers de usuario si existen (añadidos por el Gateway)
@@ -468,7 +469,7 @@ async function saveAnalysis(
     if (req.headers['x-user-name']) authHeaders['X-User-Name'] = req.headers['x-user-name'] as string;
 
     const saveResp = await httpClient.post(
-      `${ANALYSIS_API_URL}/api/analysis`,
+      `${ANALYSIS_API_URL}/api/Analysis`,
       analysisPayload,
       authHeaders
     );
@@ -537,6 +538,7 @@ async function saveHistory(
     // Propagar headers de autenticación del Gateway
     const authHeaders: Record<string, string> = {
       'Accept-Language': req.headers['accept-language'] || 'es',
+      'X-Gateway-Secret': process.env.GATEWAY_SECRET || '', // Agregar secret del gateway
     };
     
     if (req.headers['x-user-id']) authHeaders['X-User-Id'] = req.headers['x-user-id'] as string;
@@ -604,12 +606,13 @@ async function saveResult(
 
   try {
     debugVerbose('SAVE_RESULT_REQUEST', {
-      url: `${ANALYSIS_API_URL}/api/result`,
+      url: `${ANALYSIS_API_URL}/api/Result`,
     });
 
     // Propagar headers de autenticación del Gateway
     const authHeaders: Record<string, string> = {
       'Accept-Language': req.headers['accept-language'] || 'es',
+      'X-Gateway-Secret': process.env.GATEWAY_SECRET || '', // Agregar secret del gateway
     };
     
     if (req.headers['x-user-id']) authHeaders['X-User-Id'] = req.headers['x-user-id'] as string;
@@ -618,7 +621,7 @@ async function saveResult(
     if (req.headers['x-user-name']) authHeaders['X-User-Name'] = req.headers['x-user-name'] as string;
 
     const resp = await httpClient.post(
-      `${ANALYSIS_API_URL}/api/result`,
+      `${ANALYSIS_API_URL}/api/Result`,
       result,
       authHeaders
     );
@@ -682,6 +685,7 @@ async function saveError(
     // Propagar headers de autenticación del Gateway
     const authHeaders: Record<string, string> = {
       'Accept-Language': req.headers['accept-language'] || 'es',
+      'X-Gateway-Secret': process.env.GATEWAY_SECRET || '', // Agregar secret del gateway
     };
     
     if (req.headers['x-user-id']) authHeaders['X-User-Id'] = req.headers['x-user-id'] as string;
@@ -690,7 +694,7 @@ async function saveError(
     if (req.headers['x-user-name']) authHeaders['X-User-Name'] = req.headers['x-user-name'] as string;
 
     const errorResp = await httpClient.post(
-      `${ANALYSIS_API_URL}/api/error`,
+      `${ANALYSIS_API_URL}/api/Error`,
       errorPayload,
       authHeaders
     );
@@ -1335,14 +1339,14 @@ async function saveAndFormatResults({
     logger.error('Error saving analysis', { error: error.message });
 
     // Si ANALYSIS_API_URL no está configurada, continuar sin guardar
-    if (!ANALYSIS_API_URL) {
-      logger.warn('Continuing without saving due to missing ANALYSIS_API_URL');
-      saveData = null;
-    } else {
+    if (ANALYSIS_API_URL) {
       // En lugar de retornar error, continuamos pero registramos el fallo
       logger.warn('Continuing without saving due to microservice error', {
         error: error.message,
       });
+      saveData = null;
+    } else {
+      logger.warn('Continuing without saving due to missing ANALYSIS_API_URL');
       saveData = null;
     }
   }
@@ -1409,7 +1413,7 @@ async function saveAndFormatResults({
         analysisId: analysisId,
         wcagCriterionId: getWcagCriterionId(criterion),
         wcagCriterion: criterion,
-        level: mapToResultLevel(analysisItem.type),
+        level: mapping.level || 'AA',
         severity: mapImpactToSeverity(analysisItem.impact || ''),
         description:
           analysisItem.help ||

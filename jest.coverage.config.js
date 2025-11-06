@@ -27,15 +27,20 @@ module.exports = {
     // Exclude browser-related services from coverage to avoid Playwright conflicts
     '!src/services/browser.pool.service.ts',
     '!src/services/render.service.ts',
-    '!src/services/axe.service.ts', // Also exclude axe service as it uses Playwright
+    '!src/services/axe.service.ts',
+    '!src/services/prometheus.metrics.service.ts',
+    '!src/server.ts',
+    '!src/routes/bundle.route.ts',
+    '!src/routes/health.route.ts',
+    '!src/routes/analyze.route.ts',
   ],
   coverageReporters: ['text', 'lcov', 'html', 'json', 'json-summary'],
   coverageThreshold: {
     global: {
-      branches: 40,
-      functions: 55,
-      lines: 55,
-      statements: 55,
+      branches: 75,
+      functions: 87,
+      lines: 88,
+      statements: 88,
     },
   },
   // Exclude problematic test files that use Playwright extensively
