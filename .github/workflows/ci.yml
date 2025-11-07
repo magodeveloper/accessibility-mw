@@ -64,7 +64,9 @@ jobs:
       - name: Setup test directories
         run: |
           mkdir -p .achecker_cache/engine tmp/test-data
-          chmod 755 .achecker_cache .achecker_cache/engine tmp/test-data
+          chmod -R 755 .achecker_cache tmp 2>/dev/null || true
+          ls -la .achecker_cache/ || true
+          echo "Test directories created successfully"
 
       - name: Run unit tests
         run: npm run test:ci
@@ -75,6 +77,17 @@ jobs:
           REPORTS_API_URL: http://localhost:8083
           COLLECT_COVERAGE: true
           JEST_TIMEOUT: 60000
+
+      - name: Debug test failure
+        if: failure()
+        run: |
+          echo "=== Test execution failed. Checking environment ==="
+          node --version
+          npm --version
+          echo "=== Node modules integrity ==="
+          npm list jest ts-jest --depth=0 || true
+          echo "=== Environment variables ==="
+          env | grep -E "(NODE_|JEST_|CI)" || true
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v4

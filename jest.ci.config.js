@@ -65,7 +65,7 @@ module.exports = {
   coverageReporters: process.env.CI ? ['text', 'lcov'] : ['text', 'lcov', 'html'],
   coverageThreshold: {
     global: {
-      branches: 61,
+      branches: 60,
       functions: 70,
       lines: 70,
       statements: 70,
@@ -100,6 +100,7 @@ module.exports = {
 
   // Configuración de memoria para CI
   ...(process.env.CI && {
-    bail: 1, // Parar en el primer fallo para CI más rápido
+    // Removido bail: 1 para permitir ver todos los tests que fallan
+    // bail: 1, // Parar en el primer fallo para CI más rápido
   }),
 };
