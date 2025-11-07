@@ -205,17 +205,31 @@ npm run dev | npx pino-pretty
 # 1. Health check
 curl http://localhost:3001/health
 
-# 2. Análisis de prueba
+# 2. Análisis anónimo (sin autenticación, sin persistencia)
+curl -X POST http://localhost:3001/api/analyze/anonymous \
+  -H "Content-Type: application/json" \
+  -d '{
+    "inputType": "url",
+    "value": "https://example.com",
+    "tool": "axe-core",
+    "wcagVersion": "2.2",
+    "wcagLevel": "AA"
+  }'
+
+# 3. Análisis autenticado (con persistencia en BD)
 curl -X POST http://localhost:3001/api/analyze \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
-    "url": "https://example.com",
-    "standards": ["wcag2a", "wcag2aa"],
-    "includeScreenshots": false
+    "inputType": "url",
+    "value": "https://example.com",
+    "tool": "axe-core",
+    "wcagVersion": "2.2",
+    "wcagLevel": "AA",
+    "userId": 123
   }'
 
-# 3. Ver métricas Prometheus
+# 4. Ver métricas Prometheus
 curl http://localhost:3001/metrics
 ```
 
@@ -315,18 +329,20 @@ node -e "require('dotenv').config({ path: '.env.development' }); console.log(pro
 
 #### POST /api/analyze
 
-Analiza una URL y devuelve violaciones de accesibilidad.
+Analiza una URL con **usuario autenticado** y **persistencia en base de datos**.
+
+> 🆕 **Nuevo**: Para análisis sin autenticación, usa `/api/analyze/anonymous`
 
 **Request:**
 
 ```json
 {
-  "url": "https://example.com",
-  "standards": ["wcag2a", "wcag2aa", "wcag21aa"],
-  "includeScreenshots": false,
-  "userId": 123,
-  "analysisTitle": "Homepage Audit",
-  "saveResults": true
+  "inputType": "url",
+  "value": "https://example.com",
+  "tool": "axe-core",
+  "wcagVersion": "2.2",
+  "wcagLevel": "AA",
+  "userId": 123
 }
 ```
 
@@ -334,49 +350,79 @@ Analiza una URL y devuelve violaciones de accesibilidad.
 
 ```json
 {
-  "success": true,
+  "ok": true,
   "data": {
-    "analysisId": 12345,
-    "url": "https://example.com",
-    "timestamp": "2025-10-15T10:30:00Z",
-    "summary": {
-      "totalViolations": 15,
-      "critical": 3,
-      "serious": 5,
-      "moderate": 5,
-      "minor": 2
+    "ok": true,
+    "meta": {
+      "axe-core": {
+        "violations": 2,
+        "needsReview": 0,
+        "passes": 13
+      },
+      "tool": "axe-core",
+      "duration": 3311
     },
-    "results": [
-      {
-        "id": "document-title",
-        "impact": "serious",
-        "description": "Documents must have <title> element",
-        "wcagCriteria": ["2.4.2"],
-        "wcagLevel": "A",
-        "help": "Ensure every HTML document has a title",
-        "helpUrl": "https://dequeuniversity.com/rules/axe/4.10/document-title",
-        "nodes": [
-          {
-            "html": "<html lang=\"en\">",
-            "target": ["html"],
-            "failureSummary": "Fix: Insert a <title> element"
-          }
-        ]
-      }
-    ],
-    "performance": {
-      "totalDuration": 2847,
-      "analysisTime": 2100,
-      "saveTime": 145
-    }
+    "results": [...],
+    "total": 2,
+    "analysisSaved": true,
+    "analysisId": 1,
+    "persistence": {
+      "analysis": { "success": 1, "error": 0, "message": "..." },
+      "results": { "success": 2, "error": 0, "message": "..." }
+    },
+    "isAnonymous": false
   }
 }
 ```
 
+#### POST /api/analyze/anonymous
+
+🆕 **Nuevo**: Análisis **sin autenticación** y **sin persistencia**.
+
+**Request (sin token):**
+
+```json
+{
+  "inputType": "url",
+  "value": "https://example.com",
+  "tool": "axe-core",
+  "wcagVersion": "2.2",
+  "wcagLevel": "AA"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "ok": true,
+  "data": {
+    "ok": true,
+    "meta": { "axe-core": {...}, "duration": 3539 },
+    "results": [...],
+    "total": 2,
+    "analysisSaved": false,
+    "analysisId": null,
+    "persistence": null,
+    "isAnonymous": true
+  }
+}
+```
+
+**Diferencias clave:**
+
+| Campo | Autenticado | Anónimo |
+|-------|-------------|---------|
+| **JWT** | ✅ Requerido | ❌ No |
+| **`analysisSaved`** | `true` | `false` |
+| **`analysisId`** | número | `null` |
+| **`persistence`** | objeto | `null` |
+| **`isAnonymous`** | `false` | `true` |
+
 **Errores:**
 
 - `400` - URL inválida o parámetros incorrectos
-- `401` - Token JWT inválido o expirado
+- `401` - Token JWT inválido o expirado (solo `/api/analyze`)
 - `403` - No autorizado (Gateway validation failed)
 - `422` - Error en análisis (sitio no accesible)
 - `500` - Error interno del servidor

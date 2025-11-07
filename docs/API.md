@@ -96,7 +96,9 @@ GATEWAY_VALIDATION_ENABLED=true
 
 ### 1. POST /api/analyze
 
-Realiza análisis de accesibilidad en una URL.
+Realiza análisis de accesibilidad en una URL con usuario **autenticado** y **persistencia en base de datos**.
+
+> ⚡ **Nuevo**: Para análisis sin autenticación, usa `/api/analyze/anonymous` (sin persistencia).
 
 #### Request
 
@@ -108,16 +110,13 @@ Content-Type: application/json
 
 ```json
 {
-  "url": "https://example.com",
-  "standards": ["wcag2a", "wcag2aa", "wcag2aaa", "wcag21aa", "wcag22aa"],
-  "includeScreenshots": false,
-  "waitForSelector": null,
-  "userId": 123,
-  "analysisName": "Homepage Accessibility Check",
-  "viewport": {
-    "width": 1920,
-    "height": 1080
-  }
+  "inputType": "url",
+  "value": "https://example.com",
+  "tool": "axe-core",
+  "wcagVersion": "2.2",
+  "wcagLevel": "AA",
+  "cumulativeWcag": false,
+  "userId": 123
 }
 ```
 
@@ -125,130 +124,268 @@ Content-Type: application/json
 
 | Campo | Tipo | Requerido | Default | Descripción |
 |-------|------|-----------|---------|-------------|
-| `url` | string | ✅ | - | URL a analizar (http/https) |
-| `standards` | string[] | ❌ | `["wcag2aa"]` | Estándares WCAG a aplicar |
-| `includeScreenshots` | boolean | ❌ | `false` | Capturar screenshots |
-| `waitForSelector` | string \| null | ❌ | `null` | Selector CSS para esperar |
-| `userId` | number | ✅ | - | ID del usuario solicitante |
-| `analysisName` | string | ❌ | - | Nombre descriptivo del análisis |
-| `viewport` | object | ❌ | `{width: 1920, height: 1080}` | Tamaño del viewport |
+| `inputType` | `"url"` \| `"html"` | ✅ | - | Tipo de entrada a analizar |
+| `value` | string | ✅ | - | URL (http/https) o código HTML |
+| `tool` | `"axe-core"` \| `"equal-access"` \| `"both"` | ❌ | `"axe-core"` | Herramienta(s) de análisis |
+| `wcagVersion` | `"2.0"` \| `"2.1"` \| `"2.2"` | ❌ | `"2.2"` | Versión WCAG |
+| `wcagLevel` | `"A"` \| `"AA"` \| `"AAA"` | ❌ | `"AA"` | Nivel WCAG |
+| `cumulativeWcag` | boolean | ❌ | `false` | Incluir niveles inferiores |
+| `userId` | number | ✅ | - | ID del usuario (para persistencia) |
 
 **Validaciones:**
 
-- `url`: Debe ser válida y accesible (http/https)
-- `standards`: Debe ser array no vacío con valores válidos
-- `userId`: Debe ser número positivo
+- `value`: Debe ser URL válida (http/https) o HTML válido según `inputType`
+- `tool`: Debe ser uno de los valores permitidos
+- `userId`: Requerido para guardar en base de datos
 
 #### Response - Success (200)
 
 ```json
 {
-  "success": true,
-  "message": "Análisis completado exitosamente",
+  "ok": true,
   "data": {
-    "analysisId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    "url": "https://example.com",
-    "timestamp": "2024-10-15T10:30:00.000Z",
-    "duration": 2847,
-    "standards": ["wcag2aa"],
-    "summary": {
-      "totalIssues": 23,
-      "violations": 15,
-      "warnings": 8,
-      "passed": 147,
-      "incomplete": 3,
-      "bySeverity": {
-        "critical": 2,
-        "serious": 8,
-        "moderate": 10,
-        "minor": 3
+    "ok": true,
+    "meta": {
+      "axe-core": {
+        "violations": 2,
+        "needsReview": 0,
+        "recommendations": 0,
+        "passes": 13,
+        "incomplete": 0,
+        "inapplicable": 75
       },
-      "byLevel": {
-        "A": 10,
-        "AA": 13,
-        "AAA": 0
-      }
+      "inputType": "url",
+      "value": "https://example.com",
+      "tool": "axe-core",
+      "duration": 3311
     },
-    "violations": [
+    "results": [
       {
-        "id": "color-contrast",
-        "impact": "serious",
-        "wcagLevel": "AA",
-        "wcagCriteria": ["1.4.3"],
-        "description": "Elementos deben tener suficiente contraste de color",
-        "help": "Asegúrate de que el contraste sea de al menos 4.5:1",
-        "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/color-contrast",
-        "nodes": [
+        "tool": "axe-core",
+        "stats": {
+          "violations": 2,
+          "needsReview": 0,
+          "recommendations": 0,
+          "passes": 13,
+          "incomplete": 0,
+          "inapplicable": 75
+        },
+        "items": [
           {
-            "html": "<button class=\"btn-primary\">Submit</button>",
-            "target": ["button.btn-primary"],
-            "failureSummary": "Contraste de 3.2:1 (mínimo requerido: 4.5:1)",
-            "snippet": "<button class=\"btn-primary\">Submit</button>"
+            "id": "landmark-one-main",
+            "tool": "axe-core",
+            "type": "violation",
+            "impact": "moderate",
+            "help": "Document should have one main landmark",
+            "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/landmark-one-main",
+            "nodes": [
+              {
+                "target": ["html"],
+                "html": "<html lang=\"en\">",
+                "failureSummary": "Fix all of the following:\n  Document does not have a main landmark"
+              }
+            ],
+            "wcag": {
+              "version": "2.2",
+              "level": "AA",
+              "criterion": "2.4.1"
+            }
           }
         ]
       }
     ],
-    "warnings": [
-      {
-        "id": "landmark-one-main",
-        "impact": "moderate",
-        "wcagLevel": "A",
-        "wcagCriteria": ["2.4.1"],
-        "description": "Documento debe tener un landmark main",
-        "help": "Agrega un elemento <main> a tu página",
-        "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/landmark-one-main",
-        "nodes": []
-      }
-    ],
-    "metadata": {
-      "engine": "axe-core",
-      "engineVersion": "4.11.0",
-      "testRunner": "accessibility-mw",
-      "testRunnerVersion": "1.0.0",
-      "pageTitle": "Example Domain",
-      "viewport": {
-        "width": 1920,
-        "height": 1080
+    "total": 2,
+    "analysisSaved": true,
+    "message": "Análisis completado con detalles de persistencia",
+    "analysisId": 1,
+    "persistence": {
+      "analysis": {
+        "success": 1,
+        "error": 0,
+        "message": "Análisis guardado correctamente"
+      },
+      "results": {
+        "success": 2,
+        "error": 0,
+        "message": "2 resultados procesados"
+      },
+      "errors": {
+        "success": 2,
+        "error": 0,
+        "message": "Errores procesados correctamente"
+      },
+      "history": {
+        "success": 1,
+        "error": 0,
+        "message": "Historial guardado correctamente"
       }
     },
-    "cached": false
-  }
+    "totalErrors": 0,
+    "errorsSummary": {
+      "resultSaveErrors": 0,
+      "errorSaveErrors": 0
+    },
+    "isAnonymous": false
+  },
+  "requestId": "1be5cb7c-794c-4be7-9bd6-967350558474"
 }
 ```
+
+**Campos específicos de usuario autenticado:**
+
+- `analysisSaved`: `true` - Indica que se guardó en base de datos
+- `analysisId`: número - ID del análisis guardado
+- `persistence`: objeto completo con estado de persistencia de cada entidad
+- `totalErrors`: número de errores durante la persistencia
+- `errorsSummary`: resumen de errores de guardado
+- `isAnonymous`: `false` - Indica que es un usuario autenticado
 
 #### Response - Cached (200)
 
-Cuando el resultado está en cache (mismo formato, con `cached: true`):
+Cuando el resultado está en cache (mismo formato, con `cached: true` en metadata):
 
 ```json
 {
-  "success": true,
-  "message": "Análisis recuperado de cache",
+  "ok": true,
   "data": {
-    "analysisId": "...",
-    "cached": true,
-    "cacheKey": "sha256:a1b2c3d4...",
-    "cacheAge": 180
-  }
+    "ok": true,
+    "meta": {
+      "axe-core": { ... },
+      "duration": 150
+    },
+    "results": [ ... ],
+    "total": 2,
+    "analysisSaved": true,
+    "message": "Resultado recuperado de caché",
+    "analysisId": 1,
+    "persistence": { ... },
+    "isAnonymous": false
+  },
+  "requestId": "..."
 }
 ```
 
-#### Response - Error (4xx/5xx)
+---
+
+### 2. POST /api/analyze/anonymous
+
+🆕 **Nuevo endpoint**: Realiza análisis de accesibilidad **sin autenticación** y **sin persistencia en base de datos**.
+
+Útil para:
+- Pruebas rápidas sin registro
+- Demos públicas
+- Testing de herramientas
+- Análisis temporales
+
+#### Request
+
+```http
+POST /api/analyze/anonymous
+Content-Type: application/json
+```
+
+> ⚠️ **No requiere autenticación** (sin header `Authorization`)
 
 ```json
 {
-  "success": false,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "URL inválida o inalcanzable",
-    "details": {
-      "field": "url",
-      "value": "invalid-url",
-      "reason": "Must be a valid HTTP/HTTPS URL"
+  "inputType": "url",
+  "value": "https://example.com",
+  "tool": "axe-core",
+  "wcagVersion": "2.2",
+  "wcagLevel": "AA",
+  "cumulativeWcag": false
+}
+```
+
+**Parámetros:**
+
+| Campo | Tipo | Requerido | Default | Descripción |
+|-------|------|-----------|---------|-------------|
+| `inputType` | `"url"` \| `"html"` | ✅ | - | Tipo de entrada a analizar |
+| `value` | string | ✅ | - | URL (http/https) o código HTML |
+| `tool` | `"axe-core"` \| `"equal-access"` \| `"both"` | ❌ | `"axe-core"` | Herramienta(s) de análisis |
+| `wcagVersion` | `"2.0"` \| `"2.1"` \| `"2.2"` | ❌ | `"2.2"` | Versión WCAG |
+| `wcagLevel` | `"A"` \| `"AA"` \| `"AAA"` | ❌ | `"AA"` | Nivel WCAG |
+| `cumulativeWcag` | boolean | ❌ | `false` | Incluir niveles inferiores |
+
+> ⚠️ **userId no se acepta** en este endpoint (se ignora si se envía)
+
+#### Response - Success (200)
+
+```json
+{
+  "ok": true,
+  "data": {
+    "ok": true,
+    "meta": {
+      "axe-core": {
+        "violations": 2,
+        "needsReview": 0,
+        "recommendations": 0,
+        "passes": 13,
+        "incomplete": 0,
+        "inapplicable": 75
+      },
+      "inputType": "url",
+      "value": "https://example.com",
+      "tool": "axe-core",
+      "duration": 3539
     },
-    "timestamp": "2024-10-15T10:30:00.000Z",
-    "requestId": "req-uuid-123"
-  }
+    "results": [
+      {
+        "tool": "axe-core",
+        "stats": { ... },
+        "items": [ ... ]
+      }
+    ],
+    "total": 2,
+    "analysisSaved": false,
+    "message": "Anonymous analysis completed successfully",
+    "analysisId": null,
+    "persistence": null,
+    "isAnonymous": true
+  },
+  "requestId": "94290097-0657-4bf9-bd19-edb24ccf2a71"
+}
+```
+
+**Diferencias con `/api/analyze` (autenticado):**
+
+| Campo | Usuario Autenticado | Usuario Anónimo |
+|-------|---------------------|-----------------|
+| `analysisSaved` | `true` | `false` |
+| `analysisId` | número | `null` |
+| `persistence` | objeto completo | `null` |
+| `totalErrors` | presente | ausente |
+| `errorsSummary` | presente | ausente |
+| `isAnonymous` | `false` | `true` |
+
+#### Comparación de Respuestas
+
+**Usuario Autenticado** (`POST /api/analyze`):
+```json
+{
+  "analysisSaved": true,
+  "analysisId": 1,
+  "persistence": {
+    "analysis": { "success": 1, "error": 0, "message": "..." },
+    "results": { "success": 2, "error": 0, "message": "..." },
+    "errors": { "success": 2, "error": 0, "message": "..." },
+    "history": { "success": 1, "error": 0, "message": "..." }
+  },
+  "totalErrors": 0,
+  "errorsSummary": { "resultSaveErrors": 0, "errorSaveErrors": 0 },
+  "isAnonymous": false
+}
+```
+
+**Usuario Anónimo** (`POST /api/analyze/anonymous`):
+```json
+{
+  "analysisSaved": false,
+  "analysisId": null,
+  "persistence": null,
+  "isAnonymous": true
 }
 ```
 
@@ -258,38 +395,41 @@ Cuando el resultado está en cache (mismo formato, con `cached: true`):
 |--------|-------------|
 | `200` | Análisis exitoso |
 | `400` | Request inválida (validación fallida) |
-| `401` | No autenticado (JWT inválido/expirado) |
-| `403` | No autorizado (sin permisos) |
 | `429` | Rate limit excedido |
 | `500` | Error interno del servidor |
 | `503` | Servicio no disponible (browser pool lleno) |
+| `504` | Timeout en análisis |
 
 #### Ejemplo con cURL
 
 ```bash
-curl -X POST http://localhost:3001/api/analyze \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..." \
+# Análisis anónimo (sin autenticación)
+curl -X POST http://localhost:3001/api/analyze/anonymous \
   -H "Content-Type: application/json" \
   -d '{
-    "url": "https://example.com",
-    "standards": ["wcag2aa"],
-    "userId": 123
+    "inputType": "url",
+    "value": "https://example.com",
+    "tool": "axe-core",
+    "wcagVersion": "2.2",
+    "wcagLevel": "AA"
   }'
 ```
 
 #### Ejemplo con JavaScript (fetch)
 
 ```javascript
-const response = await fetch('http://localhost:3001/api/analyze', {
+// Análisis anónimo
+const response = await fetch('http://localhost:3001/api/analyze/anonymous', {
   method: 'POST',
   headers: {
-    'Authorization': `Bearer ${token}`,
     'Content-Type': 'application/json'
   },
   body: JSON.stringify({
-    url: 'https://example.com',
-    standards: ['wcag2aa'],
-    userId: 123
+    inputType: 'url',
+    value: 'https://example.com',
+    tool: 'axe-core',
+    wcagVersion: '2.2',
+    wcagLevel: 'AA'
   })
 });
 
@@ -298,7 +438,7 @@ const result = await response.json();
 
 ---
 
-### 2. GET /health
+### 3. GET /health
 
 Health check del servicio (no requiere autenticación).
 
