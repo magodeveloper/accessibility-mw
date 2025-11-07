@@ -462,11 +462,19 @@ async function saveAnalysis(
       'X-Gateway-Secret': process.env.GATEWAY_SECRET || '', // Agregar secret del gateway
     };
     
+    // Propagar el token JWT del usuario autenticado
+    console.log('🔍 DEBUG saveAnalysis - req.headers.authorization:', req.headers.authorization ? 'PRESENT' : 'MISSING');
+    if (req.headers.authorization) {
+      authHeaders['Authorization'] = req.headers.authorization;
+    }
+    
     // Incluir headers de usuario si existen (añadidos por el Gateway)
     if (req.headers['x-user-id']) authHeaders['X-User-Id'] = req.headers['x-user-id'] as string;
     if (req.headers['x-user-email']) authHeaders['X-User-Email'] = req.headers['x-user-email'] as string;
     if (req.headers['x-user-role']) authHeaders['X-User-Role'] = req.headers['x-user-role'] as string;
     if (req.headers['x-user-name']) authHeaders['X-User-Name'] = req.headers['x-user-name'] as string;
+    
+    console.log('🔍 DEBUG saveAnalysis - authHeaders keys:', Object.keys(authHeaders));
 
     const saveResp = await httpClient.post(
       `${ANALYSIS_API_URL}/api/Analysis`,
@@ -540,6 +548,11 @@ async function saveHistory(
       'Accept-Language': req.headers['accept-language'] || 'es',
       'X-Gateway-Secret': process.env.GATEWAY_SECRET || '', // Agregar secret del gateway
     };
+    
+    // Propagar el token JWT del usuario autenticado
+    if (req.headers.authorization) {
+      authHeaders['Authorization'] = req.headers.authorization;
+    }
     
     if (req.headers['x-user-id']) authHeaders['X-User-Id'] = req.headers['x-user-id'] as string;
     if (req.headers['x-user-email']) authHeaders['X-User-Email'] = req.headers['x-user-email'] as string;
@@ -615,6 +628,11 @@ async function saveResult(
       'X-Gateway-Secret': process.env.GATEWAY_SECRET || '', // Agregar secret del gateway
     };
     
+    // Propagar el token JWT del usuario autenticado
+    if (req.headers.authorization) {
+      authHeaders['Authorization'] = req.headers.authorization;
+    }
+    
     if (req.headers['x-user-id']) authHeaders['X-User-Id'] = req.headers['x-user-id'] as string;
     if (req.headers['x-user-email']) authHeaders['X-User-Email'] = req.headers['x-user-email'] as string;
     if (req.headers['x-user-role']) authHeaders['X-User-Role'] = req.headers['x-user-role'] as string;
@@ -687,6 +705,11 @@ async function saveError(
       'Accept-Language': req.headers['accept-language'] || 'es',
       'X-Gateway-Secret': process.env.GATEWAY_SECRET || '', // Agregar secret del gateway
     };
+    
+    // Propagar el token JWT del usuario autenticado
+    if (req.headers.authorization) {
+      authHeaders['Authorization'] = req.headers.authorization;
+    }
     
     if (req.headers['x-user-id']) authHeaders['X-User-Id'] = req.headers['x-user-id'] as string;
     if (req.headers['x-user-email']) authHeaders['X-User-Email'] = req.headers['x-user-email'] as string;
@@ -989,8 +1012,22 @@ analyzeRouter.post('/', async (req: express.Request, res: express.Response) => {
     wcagVersion,
     wcagLevel,
     cumulativeWcag,
-    userId,
+    userId: userIdFromBody,
   } = validated;
+
+  // Usar userId del body si está presente, o del contexto del Gateway
+  const userContext = (req as express.Request & { userContext?: { userId?: string } }).userContext;
+  const userIdFromContext = userContext?.userId ? Number.parseInt(userContext.userId, 10) : undefined;
+  const userId = userIdFromBody ?? userIdFromContext;
+
+  let userIdSource: string;
+  if (userIdFromBody) {
+    userIdSource = 'body';
+  } else if (userIdFromContext) {
+    userIdSource = 'context';
+  } else {
+    userIdSource = 'none';
+  }
 
   try {
     logger.info('Starting analysis', {
@@ -999,6 +1036,7 @@ analyzeRouter.post('/', async (req: express.Request, res: express.Response) => {
       wcagVersion,
       wcagLevel,
       isAnonymous: !userId,
+      userIdSource,
     });
 
     const { unified, wcagVersions, wcagLevels } = await runFullAnalysis({
