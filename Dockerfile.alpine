@@ -2,7 +2,7 @@
 # Usa Alpine en lugar de la imagen completa de Playwright
 
 # Etapa 1: Build
-FROM node:20.19.5-alpine3.22 AS builder
+FROM node:25.1.0-alpine3.22 AS builder
 
 WORKDIR /app
 
@@ -23,7 +23,7 @@ COPY src ./src
 RUN npm run build
 
 # Etapa 2: Runtime (Alpine - mucho más ligera)
-FROM node:20.19.5-alpine3.22
+FROM node:25.1.0-alpine3.22
 
 WORKDIR /app
 
