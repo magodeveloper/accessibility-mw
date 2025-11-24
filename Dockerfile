@@ -1,5 +1,5 @@
 # Etapa 1: Compilación completa
-FROM node:20.19.5-alpine3.22 AS builder
+FROM node:25.2.1-alpine3.22 AS builder
 
 # Build arguments para metadata
 ARG NODE_ENV=development
