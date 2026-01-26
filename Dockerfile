@@ -31,7 +31,7 @@ RUN rm -rf node_modules && \
   npm cache clean --force
 
 # Etapa 2: Imagen de producción liviana (SIN reinstalar npm)
-FROM mcr.microsoft.com/playwright:v1.56.1-jammy AS accessibility-mw
+FROM mcr.microsoft.com/playwright:v1.58.0-jammy AS accessibility-mw
 
 # Build arguments para metadata
 ARG BUILD_DATE
